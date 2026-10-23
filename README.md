@@ -1,20 +1,24 @@
 # Media Sorter
 
-A keyboard-driven desktop app for culling photos and videos on an external volume:
-look at each file full screen, rate it 1 to 10, send it to a target folder with one
-key, or drop it in the volume's trash. Then browse what you sorted in a grid, filter by
-folder and rating, and flip through it in order or shuffled.
+A keyboard-driven desktop app for culling photos and videos in any folder, whether that
+is an SD card, an external drive or a directory on your machine: look at each file full
+screen, rate it 1 to 10, send it to a target folder with one key, or drop it in the
+folder's own trash. Browse everything in one grid and filter it down by location, type,
+subfolder, rating or name, flip through it in order or shuffled, and find duplicates,
+including near-identical photos and video clips cut from longer videos.
 
 Built with [Tauri 2](https://tauri.app) (Rust backend, React + TypeScript frontend),
 so the same code builds for macOS, Linux and Windows.
 
 ## How it works
 
-- **Open a folder** (your SD card, external drive, or any directory). The app scans it
+- **Open a folder** (SD card, external drive, or any directory). The app scans it
   recursively.
 - **Nothing is stored inside the app.** Target folders and ratings live in
   `.mediasorter.json` at the root of the folder you opened, so they travel with the
-  volume. The only things kept locally are the theme choice and the recent-folders list.
+  media. Duplicate-scan fingerprints are cached in `.mediasorter.cache.json` next to it
+  (safe to delete). The only things kept locally are the theme choice and the
+  recent-folders list.
 - **Sorting moves files** on disk, immediately. The last actions can be undone with
   `⌘Z`. Target folders can be anywhere; folders inside the opened root are excluded from
   the unsorted queue.
@@ -24,6 +28,21 @@ so the same code builds for macOS, Linux and Windows.
   `.HEIC` + `.MOV`, are treated as one item and moved as a group.
 - **RAW files** are displayed via the JPEG preview embedded in the RAW. HEIC and video
   decoding use the system webview (WebKit on macOS).
+- **Browse** (`B`) shows everything under the opened folder, including target folders
+  and any targets outside it, as one grid. Narrow it down by location (unsorted / a
+  target), type, subfolder, rating, or a name search; order by name, date, size or
+  rating, or shuffle.
+- **Duplicates** (`D`) scans a scope and groups:
+  - *exact copies*: identical content fingerprint (size plus hashed head, middle and
+    tail chunks), works for any file type including large videos;
+  - *similar photos*: perceptual hash (DCT pHash) distance within the chosen
+    sensitivity, so re-encoded, resized or lightly edited copies match. HEIC and other
+    formats the Rust side cannot decode are hashed by the webview instead;
+  - *videos*: one frame hash per second of footage. Two videos with matching frame
+    sequences are the same footage; a shorter clip whose sequence appears inside a
+    longer video is reported as contained in it, with the offset. The first 10 minutes
+    of each video are analysed. Each group offers *Keep this* (trash the rest) and
+    per-file *Trash*; clicking a tile opens the group in the viewer.
 
 ### Formats
 
@@ -46,7 +65,8 @@ so the same code builds for macOS, Linux and Windows.
 | `←` `→` | Previous / next |
 | `Space`, `M`, `,` `.` | Video: play/pause, mute, scrub 5s |
 | `S` | Shuffle the queue |
-| `B` | Browse sorted media (`Esc` back) |
+| `B` | Browse everything (`Esc` back) |
+| `D` | Find duplicates (`Esc` back) |
 | `G` | Settings |
 | `I` | File info |
 | `H` | Hide / show HUD |
@@ -88,14 +108,17 @@ loaded in dev mode with `?mock` and is never bundled.
 
 ```
 src-tauri/src/
-  lib.rs       Tauri commands (scan, move, trash, library, preview)
+  lib.rs       Tauri commands (scan, move, trash, library, preview, hashes, cache)
+  dupes.rs     Content fingerprints and perceptual image hashes (pHash, dHash)
   media.rs     Recursive scan + grouping of RAW/JPEG/sidecar/live-photo pairs
   library.rs   .mediasorter.json on the volume (targets, ratings, trash dir)
   ops.rs       Group moves with collision-safe renaming, trash purge
   preview.rs   Embedded JPEG extraction from RAW files
 src/
-  store.ts     App state (zustand): queue, ratings, moves, undo
-  screens/     Welcome, Viewer (full-screen sorting), Browse (grid), Settings, Trash, Help
+  store.ts     App state (zustand): queue, ratings, moves, undo, full item list
+  dupesStore.ts Duplicate scan: fingerprint/hash passes, cache, grouping
+  lib/dupes.ts Hash helpers, canvas/video hashing, group and subset matching
+  screens/     Welcome, Viewer (full-screen sorting), Browse (grid), Dupes, Settings, Trash, Help
   components/  MediaStage (image/raw/video), RatingBar, TargetBar, Thumb, Modal, Toasts
   themes/      base.css (tokens + components), cp2077.css, ghost.css, index.ts (registry)
   dev/mock.ts  Browser-only Tauri bridge mock
@@ -116,5 +139,6 @@ in `src/main.tsx`, and add an entry to `themes` in `src/themes/index.ts`. Shippe
 - Optional in-memory downscaled thumbnails for very large grids
 - Write ratings into XMP sidecars for Lightroom and friends
 - Side-by-side compare, zoom to 100%
+- Duplicate scan: audio fingerprinting for videos, scenes beyond the first 10 minutes
 - Linux / Windows builds (HEIC and RAW previews there will need a decoder, since those
   webviews do not decode HEIC)

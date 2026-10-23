@@ -90,7 +90,7 @@ export function Settings() {
           </button>
         </div>
         <p className="dim">
-          Deleted items go to <span className="mono">{s.library?.trashDir}</span> on the volume.
+          Deleted items go to <span className="mono">{s.library?.trashDir}</span> inside the opened folder.
           {trash && (
             <>
               {" "}
@@ -103,10 +103,10 @@ export function Settings() {
       <hr className="rule" />
       <section className="row">
         <button className="btn" onClick={() => void s.rescan()}>
-          Rescan volume
+          Rescan folder
         </button>
         <button className="btn ghost" onClick={s.closeRoot}>
-          Close volume
+          Close folder
         </button>
         <span className="faint mono grow">{s.root}</span>
       </section>

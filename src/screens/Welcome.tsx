@@ -7,7 +7,7 @@ export function Welcome() {
   const loading = useStore((s) => s.loading);
 
   const pick = async () => {
-    const dir = await pickFolder("Choose the folder (or volume) with your media", "/Volumes");
+    const dir = await pickFolder("Choose a folder with your media");
     if (dir) void openRoot(dir);
   };
 
@@ -19,8 +19,9 @@ export function Welcome() {
           MEDIA SORTER
         </h1>
         <p className="dim">
-          Point it at a folder on your external volume. Ratings and target folders are stored in a single
-          <span className="mono"> .mediasorter.json</span> next to your files, nothing is kept inside the app.
+          Point it at any folder: an SD card, an external drive or a folder on this machine. Ratings and target
+          folders are stored in a single <span className="mono">.mediasorter.json</span> next to your files;
+          nothing is kept inside the app.
         </p>
         {loading ? (
           <div className="mono accent-text">{loading}</div>

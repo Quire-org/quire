@@ -48,6 +48,9 @@ pub struct MediaItem {
     pub modified: u64,
     pub has_raw: bool,
     pub has_video: bool,
+    /// Id of the target folder containing this item, when known (scan_all).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_id: Option<String>,
 }
 
 fn ext_of(p: &Path) -> Option<String> {
@@ -186,6 +189,7 @@ pub fn scan(root: &Path, dir: &Path, exclude: &[PathBuf]) -> Vec<MediaItem> {
             modified,
             has_raw,
             has_video,
+            target_id: None,
         });
     }
     items

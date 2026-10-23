@@ -36,6 +36,14 @@ export interface MoveResult {
   item: MediaItem;
 }
 
+export interface ImageHashResult {
+  /** 64-bit hashes as 16 hex characters. */
+  phash: string;
+  dhash: string;
+  width: number;
+  height: number;
+}
+
 export interface TrashInfo {
   path: string;
   files: number;

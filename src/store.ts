@@ -5,10 +5,10 @@ import { suggestHotkey } from "./lib/hotkeys";
 import { basename, shuffled, uid } from "./lib/format";
 import type { Library, MediaItem, Target } from "./lib/types";
 
-export type Screen = "welcome" | "viewer" | "browse";
+export type Screen = "welcome" | "viewer" | "browse" | "dupes";
 
 /** Where the viewer's queue came from. */
-export type QueueSource = { kind: "unsorted" } | { kind: "browse" };
+export type QueueSource = { kind: "unsorted" } | { kind: "browse" } | { kind: "dupes" };
 
 export interface Toast {
   id: string;
@@ -38,6 +38,10 @@ interface State {
   shuffle: boolean;
   /** Master list of unsorted items, in scan order. */
   unsorted: MediaItem[];
+  /** Everything under the root plus outside targets; items in a target carry targetId. */
+  allItems: MediaItem[];
+  allLoaded: boolean;
+  allStale: boolean;
   loading: string | null;
   busy: boolean;
   toasts: Toast[];
@@ -65,6 +69,10 @@ interface Actions {
   setRating(item: MediaItem, rating: number | null): void;
   moveCurrent(targetId: string): Promise<void>;
   trashCurrent(): Promise<void>;
+  moveItem(item: MediaItem, targetId: string): Promise<boolean>;
+  trashItem(item: MediaItem): Promise<boolean>;
+  loadAll(force?: boolean): Promise<MediaItem[]>;
+  openDupes(): void;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -117,6 +125,9 @@ export const useStore = create<Store>((set, get) => ({
   source: { kind: "unsorted" },
   shuffle: false,
   unsorted: [],
+  allItems: [],
+  allLoaded: false,
+  allStale: false,
   loading: null,
   busy: false,
   toasts: [],
@@ -145,7 +156,7 @@ export const useStore = create<Store>((set, get) => ({
     set({ loading: "Reading library…" });
     try {
       const library = await api.loadLibrary(root);
-      set({ loading: "Scanning volume…" });
+      set({ loading: "Scanning folder…" });
       const unsorted = sortItems(await api.scanUnsorted(root, library));
       const recent = [root, ...get().recentRoots.filter((r) => r !== root)];
       saveRecent(recent);
@@ -162,6 +173,9 @@ export const useStore = create<Store>((set, get) => ({
         undoStack: [],
         recentRoots: recent,
         settingsOpen: library.targets.length === 0,
+        allItems: [],
+        allLoaded: false,
+        allStale: false,
       });
       get().toast(`${unsorted.length} unsorted items`, "ok");
     } catch (e) {
@@ -175,6 +189,8 @@ export const useStore = create<Store>((set, get) => ({
       root: null,
       library: null,
       unsorted: [],
+      allItems: [],
+      allLoaded: false,
       queue: [],
       index: 0,
       screen: "welcome",
@@ -187,10 +203,10 @@ export const useStore = create<Store>((set, get) => ({
   async rescan(quiet = false) {
     const { root, library, source } = get();
     if (!root || !library) return;
-    set({ loading: "Scanning volume…" });
+    set({ loading: "Scanning folder…" });
     try {
       const unsorted = sortItems(await api.scanUnsorted(root, library));
-      const patch: Partial<State> = { unsorted, loading: null };
+      const patch: Partial<State> = { unsorted, loading: null, allStale: true };
       if (source.kind === "unsorted") {
         const cur = get().queue[get().index];
         const queue = get().shuffle ? shuffled(unsorted) : unsorted;
@@ -260,36 +276,68 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   async moveCurrent(targetId) {
-    const { root, library, queue, index, busy } = get();
-    const item = queue[index];
+    const item = get().queue[get().index];
+    if (item) await get().moveItem(item, targetId);
+  },
+
+  async trashCurrent() {
+    const item = get().queue[get().index];
+    if (item) await get().trashItem(item);
+  },
+
+  async moveItem(item, targetId) {
+    const { root, library, busy } = get();
     const target = library?.targets.find((t) => t.id === targetId);
-    if (!root || !library || !item || !target || busy) return;
+    if (!root || !library || !target || busy) return false;
     set({ busy: true });
     try {
       const res = await api.moveItem(root, item, target.path);
-      applyMove(res.moved, item, res.item, `Moved to ${target.name}`);
+      applyMove(res.moved, item, { ...res.item, targetId }, `Moved to ${target.name}`);
       get().toast(`→ ${target.name}`, "ok");
+      return true;
     } catch (e) {
       get().toast(String(e), "error");
+      return false;
     } finally {
       set({ busy: false });
     }
   },
 
-  async trashCurrent() {
-    const { root, library, queue, index, busy } = get();
-    const item = queue[index];
-    if (!root || !library || !item || busy) return;
+  async trashItem(item) {
+    const { root, library, busy } = get();
+    if (!root || !library || busy) return false;
     set({ busy: true });
     try {
       const res = await api.trashItem(root, library, item);
-      applyMove(res.moved, item, res.item, "Deleted");
+      applyMove(res.moved, item, res.item, "Deleted", true);
       get().toast("Moved to trash", "warn");
+      return true;
     } catch (e) {
       get().toast(String(e), "error");
+      return false;
     } finally {
       set({ busy: false });
     }
+  },
+
+  async loadAll(force = false) {
+    const { root, library, allLoaded, allStale, allItems } = get();
+    if (!root || !library) return [];
+    if (allLoaded && !allStale && !force) return allItems;
+    set({ loading: "Scanning folder…" });
+    try {
+      const items = sortItems(await api.scanAll(root, library));
+      set({ allItems: items, allLoaded: true, allStale: false, loading: null });
+      return items;
+    } catch (e) {
+      set({ loading: null });
+      get().toast(String(e), "error");
+      return allItems;
+    }
+  },
+
+  openDupes() {
+    set({ screen: "dupes", settingsOpen: false, trashOpen: false });
   },
 
   async undo() {
@@ -315,12 +363,14 @@ export const useStore = create<Store>((set, get) => ({
         const queue = get().queue.slice();
         const at = Math.min(entry.index, queue.length);
         queue.splice(at, 0, entry.item);
-        const unsorted = get().source.kind === "unsorted" ? sortItems([...get().unsorted, entry.item]) : get().unsorted;
+        const unsorted = !entry.item.targetId ? sortItems([...get().unsorted, entry.item]) : get().unsorted;
+        const allItems = sortItems([...get().allItems.filter((i) => i.key !== entry.toKey), entry.item]);
         set({
           library: { ...library, ratings },
           queue,
           index: at,
           unsorted,
+          allItems,
           undoStack: undoStack.slice(0, -1),
         });
         get().saveLibrary();
@@ -409,7 +459,7 @@ export const useStore = create<Store>((set, get) => ({
 }));
 
 /** Shared bookkeeping after a move or trash succeeded. */
-function applyMove(moves: [string, string][], from: MediaItem, to: MediaItem, label: string) {
+function applyMove(moves: [string, string][], from: MediaItem, to: MediaItem, label: string, trashed = false) {
   const s = useStore.getState();
   const library = s.library!;
   const ratings = { ...library.ratings };
@@ -417,17 +467,21 @@ function applyMove(moves: [string, string][], from: MediaItem, to: MediaItem, la
     ratings[to.key] = ratings[from.key];
     delete ratings[from.key];
   }
+  const removedAt = s.queue.findIndex((q) => q.key === from.key);
   const queue = s.queue.filter((q) => q.key !== from.key);
   const unsorted = s.unsorted.filter((u) => u.key !== from.key);
+  const allItems = s.allItems.filter((i) => i.key !== from.key);
+  if (!trashed) allItems.push(to);
   const index = queue.length === 0 ? 0 : Math.min(s.index, queue.length - 1);
   useStore.setState({
     library: { ...library, ratings },
     queue,
     unsorted,
+    allItems: sortItems(allItems),
     index,
     undoStack: [
       ...s.undoStack.slice(-49),
-      { type: "move", label, moves, item: from, index: s.index, fromKey: from.key, toKey: to.key },
+      { type: "move", label, moves, item: from, index: removedAt >= 0 ? removedAt : s.index, fromKey: from.key, toKey: to.key },
     ],
   });
   void useStore.getState().saveLibrary();

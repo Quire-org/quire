@@ -6,6 +6,7 @@ let startupHandled = false;
 import { Welcome } from "./screens/Welcome";
 import { Viewer } from "./screens/Viewer";
 import { Browse } from "./screens/Browse";
+import { Dupes } from "./screens/Dupes";
 import { Settings } from "./screens/Settings";
 import { Trash } from "./screens/Trash";
 import { Help } from "./screens/Help";
@@ -31,6 +32,7 @@ export default function App() {
       {screen === "welcome" && <Welcome />}
       {screen === "viewer" && <Viewer />}
       {screen === "browse" && <Browse />}
+      {screen === "dupes" && <Dupes />}
       {settingsOpen && <Settings />}
       {trashOpen && <Trash />}
       {helpOpen && <Help />}

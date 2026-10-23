@@ -1,3 +1,4 @@
+mod dupes;
 mod library;
 mod media;
 mod ops;
@@ -30,6 +31,38 @@ async fn scan_unsorted(root: String, library: Library) -> Result<Vec<MediaItem>,
     let mut exclude: Vec<PathBuf> = library.targets.iter().map(|t| resolve(&root, &t.path)).collect();
     exclude.push(library.trash_path(&root));
     Ok(media::scan(&root, &root, &exclude))
+}
+
+/// Everything under the root (minus the trash folder) plus any target folders
+/// that live outside the root. Items inside a target folder carry its id.
+#[tauri::command]
+async fn scan_all(root: String, library: Library) -> Result<Vec<MediaItem>, String> {
+    let root = PathBuf::from(root);
+    if !root.is_dir() {
+        return Err(format!("{} is not a directory", root.display()));
+    }
+    let trash = library.trash_path(&root);
+    let targets: Vec<(String, PathBuf)> = library
+        .targets
+        .iter()
+        .map(|t| (t.id.clone(), resolve(&root, &t.path)))
+        .collect();
+    let mut items = media::scan(&root, &root, &[trash.clone()]);
+    for (_, dir) in &targets {
+        if !dir.starts_with(&root) && dir.is_dir() {
+            items.extend(media::scan(&root, dir, &[trash.clone()]));
+        }
+    }
+    for item in &mut items {
+        let p = Path::new(&item.primary);
+        // Deepest matching target wins when targets are nested.
+        item.target_id = targets
+            .iter()
+            .filter(|(_, dir)| p.starts_with(dir))
+            .max_by_key(|(_, dir)| dir.components().count())
+            .map(|(id, _)| id.clone());
+    }
+    Ok(items)
 }
 
 /// Scan one target folder (sorted media).
@@ -83,7 +116,7 @@ async fn move_item(root: String, item: MediaItem, dest: String) -> Result<MoveRe
     Ok(MoveResult { moved, item: rebuild_item(&root, &item, &new_files) })
 }
 
-/// Move an item into the trash folder on the volume.
+/// Move an item into the trash folder inside the opened root.
 #[tauri::command]
 async fn trash_item(root: String, library: Library, item: MediaItem) -> Result<MoveResult, String> {
     let root = PathBuf::from(root);
@@ -148,6 +181,43 @@ async fn scan_trash(root: String, library: Library) -> Result<Vec<MediaItem>, St
     Ok(media::scan(&root, &trash, &[]))
 }
 
+/// Perceptual hashes of an image (or a RAW file's embedded preview).
+#[tauri::command]
+async fn image_hash(path: String, is_raw: bool) -> Result<dupes::ImageHash, String> {
+    tauri::async_runtime::spawn_blocking(move || dupes::image_hash(Path::new(&path), is_raw))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Cheap content fingerprint for exact-duplicate detection.
+#[tauri::command]
+async fn file_fingerprint(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || dupes::file_fingerprint(Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+const CACHE_FILE: &str = ".mediasorter.cache.json";
+
+/// Opaque JSON cache (fingerprints, hashes) stored next to the library file.
+#[tauri::command]
+fn load_cache(root: String) -> Result<serde_json::Value, String> {
+    let p = Path::new(&root).join(CACHE_FILE);
+    if !p.exists() {
+        return Ok(serde_json::Value::Null);
+    }
+    let text = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
+    Ok(serde_json::from_str(&text).unwrap_or(serde_json::Value::Null))
+}
+
+#[tauri::command]
+fn save_cache(root: String, cache: serde_json::Value) -> Result<(), String> {
+    let p = Path::new(&root).join(CACHE_FILE);
+    let tmp = Path::new(&root).join(format!("{CACHE_FILE}.tmp"));
+    std::fs::write(&tmp, serde_json::to_vec(&cache).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &p).map_err(|e| e.to_string())
+}
+
 /// Raw bytes of the JPEG embedded in a RAW file, for display.
 #[tauri::command]
 async fn raw_preview(path: String) -> Result<Response, String> {
@@ -188,6 +258,7 @@ pub fn run() {
             load_library,
             save_library,
             scan_unsorted,
+            scan_all,
             scan_dir,
             move_item,
             trash_item,
@@ -196,6 +267,10 @@ pub fn run() {
             empty_trash,
             scan_trash,
             raw_preview,
+            image_hash,
+            file_fingerprint,
+            load_cache,
+            save_cache,
             initial_root,
             path_exists,
             create_dir,

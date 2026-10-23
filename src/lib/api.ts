@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Library, MediaItem, MoveResult, TrashInfo } from "./types";
+import type { ImageHashResult, Library, MediaItem, MoveResult, TrashInfo } from "./types";
 
 export const api = {
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
@@ -10,10 +10,17 @@ export const api = {
     invoke<MediaItem[]>("scan_unsorted", { root, library }),
   scanDir: (root: string, dir: string) =>
     invoke<MediaItem[]>("scan_dir", { root, dir }),
+  scanAll: (root: string, library: Library) =>
+    invoke<MediaItem[]>("scan_all", { root, library }),
+  imageHash: (path: string, isRaw: boolean) =>
+    invoke<ImageHashResult>("image_hash", { path, isRaw }),
+  fileFingerprint: (path: string) => invoke<string>("file_fingerprint", { path }),
+  loadCache: (root: string) => invoke<unknown>("load_cache", { root }),
+  saveCache: (root: string, cache: unknown) => invoke<void>("save_cache", { root, cache }),
   moveItem: (root: string, item: MediaItem, dest: string) =>
-    invoke<MoveResult>("move_item", { root, item: strip(item), dest }),
+    invoke<MoveResult>("move_item", { root, item, dest }),
   trashItem: (root: string, library: Library, item: MediaItem) =>
-    invoke<MoveResult>("trash_item", { root, library, item: strip(item) }),
+    invoke<MoveResult>("trash_item", { root, library, item }),
   restoreFiles: (moves: [string, string][]) =>
     invoke<void>("restore_files", { moves }),
   trashInfo: (root: string, library: Library) =>
@@ -29,12 +36,6 @@ export const api = {
   resolvePath: (root: string, stored: string) =>
     invoke<string>("resolve_path", { root, stored }),
 };
-
-/** Remove client-only fields before sending an item to Rust. */
-function strip(item: MediaItem): MediaItem {
-  const { targetId: _t, ...rest } = item;
-  return rest;
-}
 
 /** URL the webview can load a file from. */
 export const fileSrc = (path: string) => convertFileSrc(path);

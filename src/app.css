@@ -587,3 +587,82 @@ section p {
   z-index: 150;
   font-size: 12px;
 }
+
+/* ---------- Browse filters / Duplicates ---------- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.small {
+  font-size: 13px;
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browse-side p {
+  margin: 0;
+}
+.browse-side select.input {
+  font-size: 13px;
+}
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.progress-bar {
+  height: 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent-2);
+  transition: width 120ms linear;
+}
+.dupe-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dupe-group {
+  padding: 12px 14px 14px;
+}
+.dupe-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.dupe-members {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.dupe-card {
+  width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dupe-meta {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dupe-meta .note {
+  color: var(--accent-2);
+}
+.dupe-actions {
+  display: flex;
+  gap: 6px;
+}

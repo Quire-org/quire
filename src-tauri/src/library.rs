@@ -1,5 +1,6 @@
-//! The library file lives on the volume next to the media
-//! (`<root>/.mediasorter.json`) so nothing accumulates inside the app.
+//! The library file lives next to the media (`<root>/.mediasorter.json`),
+//! whether that is an SD card, an external drive or a local folder, so
+//! nothing accumulates inside the app.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

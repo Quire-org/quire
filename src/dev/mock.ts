@@ -18,6 +18,8 @@ interface Entry {
 // Mirrors the generated test volume.
 const seed: Entry[] = [
   { rel: "DCIM/100CANON/CLIP_0001.mp4", kind: "video", files: ["DCIM/100CANON/CLIP_0001.mp4"] },
+  { rel: "DCIM/101CANON/CLIP_0002.mp4", kind: "video", files: ["DCIM/101CANON/CLIP_0002.mp4"] },
+  { rel: "DCIM/101CANON/CLIP_0003.mp4", kind: "video", files: ["DCIM/101CANON/CLIP_0003.mp4"] },
   { rel: "DCIM/100CANON/IMG_1000.jpg", kind: "image", files: ["DCIM/100CANON/IMG_1000.jpg"] },
   { rel: "DCIM/100CANON/IMG_1001.jpg", kind: "image", files: ["DCIM/100CANON/IMG_1001.CR2", "DCIM/100CANON/IMG_1001.jpg", "DCIM/100CANON/IMG_1001.xmp"] },
   ...[1002, 1003, 1004, 1005, 1006, 1007].map((n) => ({ rel: `DCIM/100CANON/IMG_${n}.png`, kind: "image" as const, files: [`DCIM/100CANON/IMG_${n}.png`] })),
@@ -28,6 +30,16 @@ const seed: Entry[] = [
 let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted" };
 let items: MediaItem[] = seed.map((e) => toItem(e.files.map((f) => `${ROOT}/${f}`), `${ROOT}/${e.rel}`, e.kind));
 let pickCount = 0;
+
+function fakeHash(text: string): bigint {
+  const M = 0xffffffffffffffffn;
+  let h = 0xcbf29ce484222325n;
+  for (const ch of text) h = ((h ^ BigInt(ch.charCodeAt(0))) * 0x100000001b3n) & M;
+  // splitmix64 finaliser so names differing in one character give unrelated bits
+  h = ((h ^ (h >> 30n)) * 0xbf58476d1ce4e5b9n) & M;
+  h = ((h ^ (h >> 27n)) * 0x94d049bb133111ebn) & M;
+  return h ^ (h >> 31n);
+}
 /** current path -> path the static server actually has (files never move in the mock). */
 const origin = new Map<string, string>();
 const served = (p: string) => origin.get(p) ?? p;
@@ -77,6 +89,31 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const ex = [...lib.targets.map((t) => resolve(t.path)), resolve(lib.trashDir)];
       return items.filter((i) => !ex.some((d) => under(i.primary, d)));
     }
+    case "scan_all": {
+      const lib = args.library as Library;
+      const trash = resolve(lib.trashDir);
+      return items
+        .filter((i) => !under(i.primary, trash))
+        .map((i) => {
+          const t = lib.targets.find((t) => under(i.primary, resolve(t.path)));
+          return t ? { ...i, targetId: t.id } : i;
+        });
+    }
+    case "image_hash": {
+      // Deterministic fake hashes: IMG_1004/IMG_1006 near-identical, IMG_1000 pair shares content.
+      const name = (args.path as string).split("/").pop()!.replace(/\.[^.]+$/, "");
+      const base = name === "IMG_1006" ? fakeHash("IMG_1004") ^ 0x3n : fakeHash(name);
+      return { phash: base.toString(16).padStart(16, "0"), dhash: fakeHash(name + "d").toString(16).padStart(16, "0"), width: 320, height: 200 };
+    }
+    case "file_fingerprint": {
+      const name = (args.path as string).split("/").pop()!;
+      const same = name === "IMG_1008.png" ? "IMG_1002.png" : name;
+      return "fp-" + same;
+    }
+    case "load_cache":
+      return null;
+    case "save_cache":
+      return null;
     case "scan_dir": {
       const d = resolve(args.dir as string);
       return items.filter((i) => under(i.primary, d));

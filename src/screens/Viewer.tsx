@@ -34,6 +34,8 @@ export function Viewer() {
           void st.toggleFullscreen();
         } else if (st.source.kind === "browse") {
           st.openBrowse();
+        } else if (st.source.kind === "dupes") {
+          st.openDupes();
         }
         return;
       }
@@ -66,6 +68,9 @@ export function Viewer() {
           return;
         case "b":
           st.openBrowse();
+          return;
+        case "d":
+          st.openDupes();
           return;
         case "g":
           st.set({ settingsOpen: true });
@@ -134,7 +139,7 @@ export function Viewer() {
                 Rescan
               </button>
               <button className="btn accent2" onClick={s.openBrowse}>
-                Browse sorted <kbd className="kbd">B</kbd>
+                Browse <kbd className="kbd">B</kbd>
               </button>
             </div>
           </div>
@@ -185,14 +190,23 @@ export function Viewer() {
           <button className={`btn sm ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
             Shuffle <kbd className="kbd">S</kbd>
           </button>
-          {s.source.kind === "browse" ? (
+          {s.source.kind === "dupes" ? (
+            <button className="btn sm accent2" onClick={s.openDupes} title="Back to duplicates (Esc)">
+              Duplicates <kbd className="kbd">Esc</kbd>
+            </button>
+          ) : s.source.kind === "browse" ? (
             <button className="btn sm accent2" onClick={s.openBrowse} title="Back to browse (Esc)">
               Browse <kbd className="kbd">Esc</kbd>
             </button>
           ) : (
-            <button className="btn sm accent2" onClick={s.openBrowse} title="Browse sorted (B)">
-              Browse <kbd className="kbd">B</kbd>
-            </button>
+            <>
+              <button className="btn sm accent2" onClick={s.openBrowse} title="Browse everything (B)">
+                Browse <kbd className="kbd">B</kbd>
+              </button>
+              <button className="btn sm" onClick={s.openDupes} title="Find duplicates (D)">
+                Dupes <kbd className="kbd">D</kbd>
+              </button>
+            </>
           )}
           <button className="btn sm" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
             Settings <kbd className="kbd">G</kbd>
