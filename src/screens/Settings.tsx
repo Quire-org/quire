@@ -2,15 +2,16 @@ import { useEffect, useState } from "react";
 import { useStore } from "../store";
 import { api, pickFolder } from "../lib/api";
 import { Modal } from "../components/Modal";
-import { themes, applyTheme, loadThemeId } from "../themes";
+import { themes } from "../themes";
 import { RESERVED_KEYS } from "../lib/hotkeys";
 import { formatBytes, tailPath } from "../lib/format";
+import { CloudArrowUp, FolderPlus, HardDrive, Palette } from "@phosphor-icons/react";
 import type { TrashInfo } from "../lib/types";
 
 export function Settings() {
   const s = useStore();
   const targets = s.library?.targets ?? [];
-  const [theme, setTheme] = useState(loadThemeId());
+  const theme = s.theme;
   const [trash, setTrash] = useState<TrashInfo | null>(null);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export function Settings() {
         <div className="sec-head">
           <h3>Target folders</h3>
           <button className="btn primary sm" onClick={() => void add()}>
-            + Add folder
+            <FolderPlus /> Add folder
           </button>
         </div>
         {targets.length === 0 && <p className="dim">Add the folders you want to sort into. Each gets a hotkey.</p>}
@@ -90,16 +91,15 @@ export function Settings() {
 
       <hr className="rule" />
       <section>
-        <h3>Theme & display</h3>
+        <h3>
+          <Palette /> Theme & display
+        </h3>
         <div className="theme-list">
           {themes.map((t) => (
             <button
               key={t.id}
               className={`btn ${theme === t.id ? "active" : ""}`}
-              onClick={() => {
-                applyTheme(t.id);
-                setTheme(t.id);
-              }}
+              onClick={() => s.setTheme(t.id)}
               title={t.description}
             >
               {t.name}
@@ -136,10 +136,10 @@ export function Settings() {
           Rescan folder
         </button>
         <button className="btn accent2" onClick={() => s.set({ driveOpen: true, settingsOpen: false })}>
-          Drive health
+          <HardDrive /> Drive health
         </button>
         <button className="btn accent2" onClick={() => s.set({ backupOpen: true, settingsOpen: false })}>
-          Backup…
+          <CloudArrowUp /> Backup…
         </button>
         <button className="btn ghost" onClick={s.closeRoot}>
           Close folder

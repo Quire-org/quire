@@ -4,10 +4,14 @@
  * decorations (overlays, clip paths). Add a theme by importing its CSS in
  * main.tsx and listing it here.
  */
+export type IconWeight = "thin" | "light" | "regular" | "bold" | "fill" | "duotone";
+
 export interface Theme {
   id: string;
   name: string;
   description: string;
+  /** Phosphor icon weight that matches the theme's character. */
+  iconWeight: IconWeight;
 }
 
 export const themes: Theme[] = [
@@ -15,31 +19,37 @@ export const themes: Theme[] = [
     id: "cp2077",
     name: "Night City",
     description: "Cyberpunk 2077: acid yellow, cyan, red, cut corners, scanlines.",
+    iconWeight: "fill",
   },
   {
     id: "ghost",
     name: "Ghost",
     description: "Minimal monochrome, no decorations. Lets the image speak.",
+    iconWeight: "regular",
   },
   {
     id: "cozy",
     name: "Cozy",
     description: "Warm cream, dusty rose and sage. Soft corners, calm and quiet.",
+    iconWeight: "duotone",
   },
   {
     id: "midnight",
     name: "Midnight",
     description: "Night City's cuts and glow in cool blue and silver.",
+    iconWeight: "bold",
   },
   {
     id: "sunset",
     name: "Sunset",
     description: "Peach, apricot and plum with soft gradients and round corners.",
+    iconWeight: "duotone",
   },
   {
     id: "gallery",
     name: "Gallery",
     description: "White walls, almost no chrome. The images are the only colour.",
+    iconWeight: "thin",
   },
 ];
 

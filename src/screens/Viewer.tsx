@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, selectCurrent, selectRating } from "../store";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
+import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, GearSix, MonitorPlay, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { TargetBar } from "../components/TargetBar";
@@ -269,7 +270,7 @@ export function Viewer() {
               onClick={s.source.kind === "browse" ? s.openBrowse : s.source.kind === "albums" ? s.openAlbums : s.openDupes}
               title={`Back to ${s.source.kind === "browse" ? "Browse" : s.source.kind === "albums" ? "Albums" : "Duplicates"} (Esc)`}
             >
-              ← <kbd className="kbd">Esc</kbd>
+              <ArrowLeft /> <kbd className="kbd">Esc</kbd>
             </button>
           )}
         </div>
@@ -291,34 +292,34 @@ export function Viewer() {
             {s.queue.length ? s.index + 1 : 0} of {s.queue.length}
           </span>
           <button className="btn sm ghost" onClick={() => void s.surprise()} title="Surprise me (R)">
-            ✦ <kbd className="kbd">R</kbd>
+            <Sparkle /> <kbd className="kbd">R</kbd>
           </button>
           <button className={`btn sm ghost ${s.fitMode === "fill" ? "active" : ""}`} onClick={s.toggleFit} title="Fit whole image / fill screen (X)">
-            {s.fitMode === "fit" ? "Fit" : "Fill"} <kbd className="kbd">X</kbd>
+            {s.fitMode === "fit" ? <ArrowsIn /> : <ArrowsOut />} <kbd className="kbd">X</kbd>
           </button>
-          <button className={`btn sm ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
-            Shuffle <kbd className="kbd">S</kbd>
+          <button className={`btn sm ghost ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
+            <Shuffle /> <kbd className="kbd">S</kbd>
           </button>
           <button className="btn sm" onClick={s.openBrowse} title="Browse everything (B)">
-            Browse <kbd className="kbd">B</kbd>
+            <SquaresFour /> <kbd className="kbd">B</kbd>
           </button>
           <button className="btn sm" onClick={s.openAlbums} title="Albums (A)">
-            Albums <kbd className="kbd">A</kbd>
+            <Books /> <kbd className="kbd">A</kbd>
           </button>
           <button className="btn sm" onClick={s.openDupes} title="Find duplicates (D)">
-            Dupes <kbd className="kbd">D</kbd>
+            <Copy /> <kbd className="kbd">D</kbd>
           </button>
-          <button className="btn sm" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
-            Settings <kbd className="kbd">G</kbd>
+          <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
+            <GearSix /> <kbd className="kbd">G</kbd>
           </button>
           <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
-            ?
+            <Question />
           </button>
           <button className={`btn sm ghost ${s.immersive ? "active" : ""}`} onClick={s.toggleImmersive} title="Immersive (C)">
-            ◼ <kbd className="kbd">C</kbd>
+            <MonitorPlay /> <kbd className="kbd">C</kbd>
           </button>
           <button className="btn sm ghost" onClick={() => void s.toggleFullscreen()} title="Fullscreen (F)">
-            ⛶
+            <CornersOut /> <kbd className="kbd">F</kbd>
           </button>
         </div>
       </div>
@@ -328,16 +329,16 @@ export function Viewer() {
           <RatingBar value={albumKey ? albumRating : rating} onChange={rate} label={albumKey ? `Album rating${album ? ` · ${album.name}` : ""}` : "Rating"} />
           <div className="nav">
             <button className="btn" onClick={s.prev} disabled={s.queue.length < 2} title="Previous (←)">
-              <kbd className="kbd">←</kbd> Prev
+              <CaretLeft /> Prev
             </button>
             <button className="btn" onClick={s.next} disabled={s.queue.length < 2} title="Next (→)">
-              Next <kbd className="kbd">→</kbd>
+              Next <CaretRight />
             </button>
             <button className="btn ghost" onClick={() => void s.undo()} disabled={s.undoStack.length === 0 || s.busy} title="Undo (⌘Z)">
-              Undo <kbd className="kbd">⌘Z</kbd>
+              <ArrowCounterClockwise /> Undo <kbd className="kbd">⌘Z</kbd>
             </button>
             <button className="btn danger" onClick={() => void s.trashCurrent()} disabled={!current || s.busy} title="Delete (⌫)">
-              Delete <kbd className="kbd">⌫</kbd>
+              <Trash /> Delete <kbd className="kbd">⌫</kbd>
             </button>
           </div>
         </div>

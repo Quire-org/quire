@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { MediaItem } from "../lib/types";
 import { Modal } from "./Modal";
+import { CaretDown } from "@phosphor-icons/react";
 
 /**
  * Include / exclude folders from a tree. `selected` holds every included
@@ -57,7 +58,7 @@ export function FolderPicker({
   return (
     <div className="fp" ref={ref}>
       <button className={`btn sm fp-btn ${selected !== null ? "active" : ""}`} onClick={() => setOpen(true)}>
-        {label} <span className="faint">▾</span>
+        {label} <CaretDown />
       </button>
       {open && (
         <Modal title="Folders" onClose={() => setOpen(false)} wide>

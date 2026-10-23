@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fileSrc, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
 import type { MediaItem } from "../lib/types";
+import { Check, Play, Star } from "@phosphor-icons/react";
 
 /**
  * Grid tile. Media loads once the tile is near the viewport (or immediately
@@ -71,18 +72,30 @@ export function Thumb({
             }}
           />
         ) : (
-          visible && <div className="thumb-ph mono">{item.kind === "video" ? "▶" : item.kind.toUpperCase()}</div>
+          visible && <div className="thumb-ph mono">{item.kind === "video" ? <Play /> : item.kind.toUpperCase()}</div>
         )}
-        {item.kind === "video" && url && <span className="thumb-play">▶</span>}
-        {rating != null && <span className="badge accent tile-rating">★ {rating}</span>}
-        {selected && <span className="tile-check">✓</span>}
+        {item.kind === "video" && url && (
+          <span className="thumb-play">
+            <Play />
+          </span>
+        )}
+        {rating != null && (
+          <span className="badge accent tile-rating">
+            <Star /> {rating}
+          </span>
+        )}
+        {selected && (
+          <span className="tile-check">
+            <Check />
+          </span>
+        )}
       </div>
       <div className="thumb-meta">
         <span className="thumb-name mono">{item.name}</span>
         <span className="thumb-badges">
           {scanned && (
             <span className="badge ok" title="Fingerprinted by the duplicate scanner">
-              ✓
+              <Check />
             </span>
           )}
           {item.kind === "video" && <span className="badge accent2">VID</span>}

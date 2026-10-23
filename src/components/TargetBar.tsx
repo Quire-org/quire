@@ -1,4 +1,5 @@
 import type { Target } from "../lib/types";
+import { FolderPlus } from "@phosphor-icons/react";
 
 export function TargetBar({
   targets,
@@ -22,7 +23,7 @@ export function TargetBar({
         </button>
       ))}
       <button className="btn sm ghost" onClick={onAdd} title="Add a target folder">
-        + Folder
+        <FolderPlus /> Folder
       </button>
     </div>
   );

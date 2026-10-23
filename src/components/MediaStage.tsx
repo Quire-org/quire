@@ -4,6 +4,7 @@ import { formatTime } from "../lib/format";
 import type { MediaItem } from "../lib/types";
 import { FitImage, useFitSize, type FitMode, type Natural } from "./FitImage";
 import { ScrubPreview } from "./ScrubPreview";
+import { Gauge, Pause, Play, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 
 export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -149,7 +150,7 @@ function VideoStage({ item, videoRef, fit }: { item: MediaItem; videoRef: RefObj
             if (v) v.paused ? v.play() : v.pause();
           }}
         >
-          {playing ? "❚❚" : "▶"}
+          {playing ? <Pause /> : <Play />}
         </button>
         <span className="mono vtime">{formatTime(time)}</span>
         <div
@@ -189,7 +190,7 @@ function VideoStage({ item, videoRef, fit }: { item: MediaItem; videoRef: RefObj
             setSpeed(next);
           }}
         >
-          {speed}×
+          <Gauge /> {speed}×
         </button>
         <button
           className="btn sm icon"
@@ -199,7 +200,7 @@ function VideoStage({ item, videoRef, fit }: { item: MediaItem; videoRef: RefObj
             if (v) v.muted = !v.muted;
           }}
         >
-          {muted ? "MUTED" : "SOUND"}
+          {muted ? <SpeakerSlash /> : <SpeakerHigh />}
         </button>
       </div>
     </div>

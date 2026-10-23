@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from "react";
+import { X } from "@phosphor-icons/react";
 
 export function Modal({
   title,
@@ -30,7 +31,7 @@ export function Modal({
         <div className="modal-head">
           <h2>{title}</h2>
           <button className="btn ghost sm" onClick={onClose}>
-            Close <kbd className="kbd">Esc</kbd>
+            <X /> <kbd className="kbd">Esc</kbd>
           </button>
         </div>
         <div className="modal-body">{children}</div>

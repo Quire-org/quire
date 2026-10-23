@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, storedPath } from "./lib/api";
 import { suggestHotkey } from "./lib/hotkeys";
 import { identityOf, reconcile } from "./lib/reconcile";
+import { applyTheme, loadThemeId } from "./themes";
 import { basename, shuffled, uid } from "./lib/format";
 import type { Album, AlbumRename, History, Library, MediaItem, Target } from "./lib/types";
 
@@ -154,6 +155,8 @@ interface Actions {
   reconcileKeys(items: MediaItem[]): Promise<void>;
   navCollapsed: boolean;
   toggleNav(): void;
+  theme: string;
+  setTheme(id: string): void;
   setLibraryField(patch: Partial<Library>): void;
   setAlbumFilters(patch: Partial<AlbumFilters>): void;
   undo(): Promise<void>;
@@ -238,6 +241,7 @@ export const useStore = create<Store>((set, get) => ({
   backupOpen: false,
   viewed: {},
   navCollapsed: loadPref<{ v: boolean }>("mediasorter.navCollapsed", { v: false }).v,
+  theme: loadThemeId(),
   browseFilters: loadPref("mediasorter.browseFilters", DEFAULT_BROWSE),
   albumFilters: loadPref("mediasorter.albumFilters", DEFAULT_ALBUMS),
   loading: null,
@@ -677,6 +681,11 @@ export const useStore = create<Store>((set, get) => ({
     if (!library) return;
     set({ library: { ...library, ...patch } });
     get().saveLibrary();
+  },
+
+  setTheme(id) {
+    applyTheme(id);
+    set({ theme: id });
   },
 
   toggleNav() {

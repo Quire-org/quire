@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { TopNav } from "../components/TopNav";
+import { FolderPlus, Play, Star, X } from "@phosphor-icons/react";
 import { useStore } from "../store";
 import { fileSrc, pickFolder, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
@@ -110,12 +111,12 @@ export function Albums() {
                 <span className="faint mono">{s.albums.filter((a) => a.albumRoot === r).length}</span>
               </button>
               <button className="btn sm ghost" onClick={() => s.removeAlbumRoot(r)} title="Stop treating this folder's subfolders as albums">
-                ×
+                <X />
               </button>
             </div>
           ))}
           <button className="btn sm primary" onClick={() => void addRoot()}>
-            + Add album folder
+            <FolderPlus /> Add album folder
           </button>
         </div>
 
@@ -166,7 +167,7 @@ export function Albums() {
 
         <hr className="rule" />
         <button className="btn primary" disabled={!albums.length || s.busy} onClick={() => void s.openAlbums_Slideshow(albums)} title="Flip through everything in the visible albums">
-          Slideshow <kbd className="kbd">⏎</kbd>
+          <Play /> Slideshow <kbd className="kbd">⏎</kbd>
         </button>
         <p className="dim small">Open an album to rate it: the rating keys in the viewer rate the whole album.</p>
 
@@ -274,7 +275,11 @@ function AlbumCard({ album }: { album: Album }) {
         <span className="badge accent2 album-count" title={`${album.images} photos, ${album.videos} videos, ${formatBytes(album.bytes)}`}>
           {album.count}
         </span>
-        {rating != null && <span className="badge accent tile-rating">★ {rating}</span>}
+        {rating != null && (
+          <span className="badge accent tile-rating">
+            <Star /> {rating}
+          </span>
+        )}
         <div className="album-actions" onClick={(e) => e.stopPropagation()}>
           {targets.map((t) => (
             <button key={t.id} className="btn sm primary" disabled={s.busy} onClick={() => void s.moveAlbum(album, t.id)} title={`Move the whole folder to ${t.path}`}>

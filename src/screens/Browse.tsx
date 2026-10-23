@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from "react";
 import { TopNav } from "../components/TopNav";
+import { ArrowsClockwise, Play, Selection, Sparkle, Trash } from "@phosphor-icons/react";
 import { useStore } from "../store";
 import { useDupes } from "../dupesStore";
 import { Thumb } from "../components/Thumb";
@@ -345,13 +346,13 @@ export function Browse() {
 
         <hr className="rule" />
         <button className="btn primary" disabled={!items.length} onClick={() => open(0)}>
-          Slideshow <kbd className="kbd">⏎</kbd>
+          <Play /> Slideshow <kbd className="kbd">⏎</kbd>
         </button>
         <button className="btn sm" onClick={() => void s.surprise()} title="A random item you haven't seen lately">
-          ✦ Surprise me <kbd className="kbd">R</kbd>
+          <Sparkle /> Surprise me <kbd className="kbd">R</kbd>
         </button>
         <button className="btn sm ghost" onClick={() => setF({ ...DEFAULTS_RESET })} title="Reset all filters">
-          Reset filters
+          <ArrowsClockwise /> Reset filters
         </button>
         <Deco kind="mug" className="deco-side" />
       </aside>
@@ -381,7 +382,7 @@ export function Browse() {
               ))}
             </span>
             <button className="btn sm danger" disabled={s.busy} onClick={() => void trashSelected()}>
-              Trash <kbd className="kbd">⌫</kbd>
+              <Trash /> Trash <kbd className="kbd">⌫</kbd>
             </button>
             <button className="btn sm ghost" onClick={() => setSelected(new Set(items.map((i) => i.key)))}>
               All <kbd className="kbd">⌘A</kbd>
@@ -397,7 +398,7 @@ export function Browse() {
               {scannedCount > 0 && <span className="faint"> · {scannedCount} fingerprinted ✓</span>}
             </span>
             <button className={chip(selectMode)} onClick={() => setSelectMode((m) => !m)} title="Click selects tiles instead of opening them (⌘-click and ⇧-click always select)">
-              {selectMode ? "Selecting" : "Select"}
+              <Selection /> {selectMode ? "Selecting" : "Select"}
             </button>
           </div>
         )}

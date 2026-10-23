@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { IconContext } from "@phosphor-icons/react";
+import { themes } from "./themes";
 import { useStore } from "./store";
 import { api } from "./lib/api";
 
@@ -24,6 +26,8 @@ export default function App() {
   const helpOpen = useStore((s) => s.helpOpen);
   const driveOpen = useStore((s) => s.driveOpen);
   const backupOpen = useStore((s) => s.backupOpen);
+  const theme = useStore((s) => s.theme);
+  const iconWeight = themes.find((t) => t.id === theme)?.iconWeight ?? "regular";
   const openRoot = useStore((s) => s.openRoot);
 
   // Open a folder passed on the command line / MEDIA_SORTER_ROOT, if any.
@@ -34,7 +38,7 @@ export default function App() {
   }, [openRoot]);
 
   return (
-    <>
+    <IconContext.Provider value={{ weight: iconWeight, size: 16, className: "ico" }}>
       {screen === "welcome" && <Welcome />}
       {screen === "viewer" && <Viewer />}
       {screen === "browse" && <Browse />}
@@ -48,6 +52,6 @@ export default function App() {
       {helpOpen && <Help />}
       {loading && screen !== "welcome" && <div className="loading-bar mono">{loading}</div>}
       <Toasts />
-    </>
+    </IconContext.Provider>
   );
 }

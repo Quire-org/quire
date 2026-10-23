@@ -183,7 +183,9 @@ in `src/main.tsx`, and add an entry to `themes` in `src/themes/index.ts`. Shippe
 **Ghost** (quiet monochrome), **Cozy** (light, warm cream with dusty rose and sage,
 rounded corners, Nunito), **Midnight** (Night City's cuts in cool blue and silver,
 Orbitron), **Sunset** (peach, apricot and plum, gradients, Quicksand) and **Gallery**
-(white, nearly chromeless, Manrope).
+(white, nearly chromeless, Manrope). Icons are Phosphor, with the weight chosen per theme
+(fill for Night City, bold for Midnight, duotone for Cozy and Sunset, thin for Gallery), and
+the two dark themes add a subtle film-grain overlay.
 
 ## Roadmap ideas
 

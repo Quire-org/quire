@@ -1,3 +1,4 @@
+import { Books, CaretUp, Copy, GearSix, List, Question, SquaresFour, SlidersHorizontal } from "@phosphor-icons/react";
 import { useStore, type Screen } from "../store";
 
 const LABEL: Record<string, string> = { viewer: "Sort", browse: "Browse", albums: "Albums", dupes: "Duplicates" };
@@ -9,14 +10,14 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
     return (
       <div className="topnav collapsed">
         <button className="btn sm ghost" onClick={s.toggleNav} title="Show the top bar and sidebar (H)">
-          ☰ <span className="label">{LABEL[current]}</span> <kbd className="kbd">H</kbd>
+          <List /> <span className="label">{LABEL[current]}</span> <kbd className="kbd">H</kbd>
         </button>
       </div>
     );
   }
-  const tab = (id: Screen, label: string, key: string, go: () => void) => (
+  const tab = (id: Screen, label: string, key: string, icon: React.ReactNode, go: () => void) => (
     <button className={`btn sm ${current === id ? "active" : ""}`} onClick={go} title={`${label} (${key})`}>
-      {label} <kbd className="kbd">{key}</kbd>
+      {icon} {label} <kbd className="kbd">{key}</kbd>
     </button>
   );
   return (
@@ -28,24 +29,21 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
         </span>
       </div>
       <div className="topnav-tabs">
-        {tab("viewer", "Sort", "Esc", s.openSortQueue)}
-        {tab("browse", "Browse", "B", s.openBrowse)}
-        {tab("albums", "Albums", "A", s.openAlbums)}
-        {tab("dupes", "Duplicates", "D", s.openDupes)}
+        {tab("viewer", "Sort", "Esc", <SlidersHorizontal />, s.openSortQueue)}
+        {tab("browse", "Browse", "B", <SquaresFour />, s.openBrowse)}
+        {tab("albums", "Albums", "A", <Books />, s.openAlbums)}
+        {tab("dupes", "Duplicates", "D", <Copy />, s.openDupes)}
       </div>
       <div className="hud-right">
         {children}
-        <button className="btn sm ghost" onClick={() => s.set({ backupOpen: true })} title="Back this folder up">
-          Backup
-        </button>
-        <button className="btn sm" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
-          Settings <kbd className="kbd">G</kbd>
+        <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
+          <GearSix /> <kbd className="kbd">G</kbd>
         </button>
         <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
-          ?
+          <Question />
         </button>
         <button className="btn sm ghost" onClick={s.toggleNav} title="Hide the top bar and sidebar (H)">
-          ▴ <kbd className="kbd">H</kbd>
+          <CaretUp /> <kbd className="kbd">H</kbd>
         </button>
       </div>
     </div>
