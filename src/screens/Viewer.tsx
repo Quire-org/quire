@@ -155,6 +155,7 @@ export function Viewer() {
         {current ? (
           <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} />
         ) : (
+          <div className="fitbox">
           <div className="stage-empty panel">
             <div className="label">Queue empty</div>
             <h2>{s.source.kind === "unsorted" ? "Everything is sorted" : "Nothing here"}</h2>
@@ -169,6 +170,7 @@ export function Viewer() {
                 Browse <kbd className="kbd">B</kbd>
               </button>
             </div>
+          </div>
           </div>
         )}
         {upcoming.map((i) => (

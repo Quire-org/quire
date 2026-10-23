@@ -5,6 +5,7 @@ import { videoPoster } from "../lib/poster";
 import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate } from "../lib/format";
 import type { Album } from "../lib/types";
+import { FitImage } from "../components/FitImage";
 
 /** Album folders: rated, categorised and opened as a whole. */
 export function Albums() {
@@ -114,7 +115,7 @@ function AlbumCard({ album }: { album: Album }) {
   return (
     <div className="album-card panel">
       <div className="album-cover" onClick={() => void s.openAlbum(album)} title="Open album">
-        {cover ? <img src={cover} alt="" draggable={false} /> : <div className="thumb-ph mono">{album.count ? "…" : "EMPTY"}</div>}
+        {cover ? <FitImage src={cover} mode="fit" blurBackdrop /> : <div className="thumb-ph mono">{album.count ? "…" : "EMPTY"}</div>}
         <span className="badge accent2 album-count">{album.count}</span>
       </div>
       <div className="album-name ellipsis" title={album.path}>

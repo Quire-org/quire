@@ -24,13 +24,12 @@ const seed: Entry[] = [
   { rel: "DCIM/100CANON/IMG_1001.jpg", kind: "image", files: ["DCIM/100CANON/IMG_1001.CR2", "DCIM/100CANON/IMG_1001.jpg", "DCIM/100CANON/IMG_1001.xmp"] },
   ...[1002, 1003, 1004, 1005, 1006, 1007].map((n) => ({ rel: `DCIM/100CANON/IMG_${n}.png`, kind: "image" as const, files: [`DCIM/100CANON/IMG_${n}.png`] })),
   { rel: "DCIM/100CANON/IMG_2000.CR2", kind: "raw", files: ["DCIM/100CANON/IMG_2000.CR2"] },
-  ...[1008, 1009, 1010, 1011].map((n) => ({ rel: `DCIM/101CANON/IMG_${n}.png`, kind: "image" as const, files: [`DCIM/101CANON/IMG_${n}.png`] })),
+  ...[1008, 1009, 1010, 1011, 1012].map((n) => ({ rel: `DCIM/101CANON/IMG_${n}.png`, kind: "image" as const, files: [`DCIM/101CANON/IMG_${n}.png`] })),
   // Album folders: served from the same files as the DCIM originals (see `origin`).
   { rel: "Albums/Iceland 2025/IMG_1003.png", kind: "image", files: ["Albums/Iceland 2025/IMG_1003.png"] },
   { rel: "Albums/Iceland 2025/IMG_1005.png", kind: "image", files: ["Albums/Iceland 2025/IMG_1005.png"] },
   { rel: "Albums/Iceland 2025/CLIP_0003.mp4", kind: "video", files: ["Albums/Iceland 2025/CLIP_0003.mp4"] },
-  { rel: "Albums/Birthday/IMG_1007.png", kind: "image", files: ["Albums/Birthday/IMG_1007.png"] },
-  { rel: "Albums/Birthday/IMG_1009.png", kind: "image", files: ["Albums/Birthday/IMG_1009.png"] },
+  { rel: "Albums/Birthday/IMG_1012.png", kind: "image", files: ["Albums/Birthday/IMG_1012.png"] },
 ];
 
 let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {} };
