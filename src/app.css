@@ -554,6 +554,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-height: 0;
+}
+.modal:has(.fp-list) {
+  height: calc(100% - 48px);
 }
 .sec-head {
   display: flex;
@@ -746,17 +750,29 @@ section p {
   width: 100%;
   justify-content: space-between;
 }
+.fp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
 .fp-list {
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   padding: 6px 0;
 }
 .fp-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
+  gap: 8px;
+  padding: 4px 10px 4px 6px;
   font-size: 14px;
-  cursor: pointer;
+  min-height: 32px;
 }
 .fp-row:hover {
   background: var(--bg-3);
@@ -766,6 +782,32 @@ section p {
 }
 .fp-name {
   flex: 1;
+  cursor: pointer;
+}
+.fp-twisty {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.fp-only {
+  opacity: 0;
+  min-height: 24px;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+.fp-row:hover .fp-only {
+  opacity: 1;
+}
+.fp-count {
+  min-width: 36px;
+  text-align: right;
 }
 
 /* ---------- Scan pill ---------- */
