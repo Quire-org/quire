@@ -158,8 +158,9 @@ interface Actions {
   theme: string;
   setTheme(id: string): void;
   /** Auto-advance in the viewer: seconds per image; videos play to the end. */
-  slideshow: { playing: boolean; interval: number };
+  slideshow: { playing: boolean; interval: number; hideUi: boolean; hidByShow: boolean };
   toggleSlideshow(): void;
+  setSlideshowHideUi(on: boolean): void;
   setSlideshowInterval(seconds: number): void;
   setLibraryField(patch: Partial<Library>): void;
   setAlbumFilters(patch: Partial<AlbumFilters>): void;
@@ -246,7 +247,7 @@ export const useStore = create<Store>((set, get) => ({
   viewed: {},
   navCollapsed: loadPref<{ v: boolean }>("mediasorter.navCollapsed", { v: false }).v,
   theme: loadThemeId(),
-  slideshow: { playing: false, interval: loadPref<{ v: number }>("mediasorter.slideshow", { v: 5 }).v },
+  slideshow: { playing: false, hidByShow: false, ...loadPref<{ interval: number; hideUi: boolean }>("mediasorter.slideshow", { interval: 5, hideUi: true }) },
   browseFilters: loadPref("mediasorter.browseFilters", DEFAULT_BROWSE),
   albumFilters: loadPref("mediasorter.albumFilters", DEFAULT_ALBUMS),
   loading: null,
@@ -485,11 +486,11 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openDupes() {
-    set({ screen: "dupes", settingsOpen: false, trashOpen: false, slideshow: { ...get().slideshow, playing: false } });
+    set({ screen: "dupes", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
   openAlbums() {
-    set({ screen: "albums", settingsOpen: false, trashOpen: false, slideshow: { ...get().slideshow, playing: false } });
+    set({ screen: "albums", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
   async loadAlbums(force = false) {
@@ -689,14 +690,31 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   toggleSlideshow() {
-    const playing = !get().slideshow.playing;
-    set({ slideshow: { ...get().slideshow, playing } });
-    get().toast(playing ? `Slideshow: ${get().slideshow.interval}s per image, Enter to pause` : "Slideshow paused");
+    const cur = get().slideshow;
+    const playing = !cur.playing;
+    if (playing) {
+      // Hide the UI for the show, and remember whether we were the ones who hid it.
+      const hidByShow = cur.hideUi && !get().immersive;
+      if (hidByShow) set({ immersive: true, hudHidden: true, infoOpen: false });
+      set({ slideshow: { ...cur, playing, hidByShow } });
+      get().toast(`Slideshow: ${cur.interval}s per image. Enter pauses, C shows the controls`);
+    } else {
+      if (cur.hidByShow && get().immersive) set({ immersive: false, hudHidden: false });
+      set({ slideshow: { ...cur, playing, hidByShow: false } });
+      get().toast("Slideshow paused");
+    }
   },
 
   setSlideshowInterval(seconds) {
-    set({ slideshow: { ...get().slideshow, interval: seconds } });
-    savePref("mediasorter.slideshow", { v: seconds });
+    const slideshow = { ...get().slideshow, interval: seconds };
+    set({ slideshow });
+    savePref("mediasorter.slideshow", { interval: seconds, hideUi: slideshow.hideUi });
+  },
+
+  setSlideshowHideUi(on) {
+    const slideshow = { ...get().slideshow, hideUi: on };
+    set({ slideshow });
+    savePref("mediasorter.slideshow", { interval: slideshow.interval, hideUi: on });
   },
 
   setTheme(id) {
@@ -850,7 +868,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openBrowse() {
-    set({ screen: "browse", settingsOpen: false, trashOpen: false, slideshow: { ...get().slideshow, playing: false } });
+    set({ screen: "browse", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
   openViewer(items, index, source) {

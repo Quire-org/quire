@@ -107,7 +107,7 @@ so the same code builds for macOS, Linux and Windows.
 | `D` | Find duplicates (`Esc` back) |
 | `A` | Albums (`Esc` back) |
 | `X` | Fit the whole image, or fill the screen (may crop) |
-| `⏎` | Slideshow: auto-advance on a timer (2 to 60 s, picked next to the button); videos play to the end |
+| `⏎` | Slideshow: auto-advance on a timer (2 to 60 s, picked next to the button); videos play to the end. Hides the UI by default (toggle next to the interval); Esc pauses |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
 | `H` | Hide / show the top bar and sidebar on Browse, Albums and Duplicates |
 | `R` | Surprise me |

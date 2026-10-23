@@ -102,6 +102,8 @@ export function Viewer() {
       if (key === "escape") {
         if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen) {
           st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false });
+        } else if (st.slideshow.playing) {
+          st.toggleSlideshow();
         } else if (st.immersive) {
           st.toggleImmersive();
         } else if (st.fullscreen) {
@@ -318,6 +320,9 @@ export function Viewer() {
                 </option>
               ))}
             </select>
+            <button className={`btn sm ghost ${show.hideUi ? "active" : ""}`} onClick={() => s.setSlideshowHideUi(!show.hideUi)} title={show.hideUi ? "Slideshow hides the UI (click to keep it)" : "Slideshow keeps the UI (click to hide it)"}>
+              <MonitorPlay />
+            </button>
           </span>
           <button className="btn sm ghost" onClick={() => void s.surprise()} title="Surprise me (R)">
             <Sparkle /> <kbd className="kbd">R</kbd>
