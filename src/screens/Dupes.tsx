@@ -32,6 +32,7 @@ export function Dupes() {
       if (key === "b") s.openBrowse();
       if (key === "a") s.openAlbums();
       if (key === "g") s.set({ settingsOpen: true });
+      if (key === "h") s.toggleNav();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

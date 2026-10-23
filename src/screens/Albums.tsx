@@ -74,6 +74,7 @@ export function Albums() {
       if (key === "b") s.openBrowse();
       if (key === "d") s.openDupes();
       if (key === "g") s.set({ settingsOpen: true });
+      if (key === "h") s.toggleNav();
       if (key === "s") toggleRandom();
       if (key === "enter" && albums.length) void s.openAlbums_Slideshow(albums);
     };

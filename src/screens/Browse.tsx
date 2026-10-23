@@ -244,6 +244,7 @@ export function Browse() {
       if (key === "r") void s.surprise();
       if (key === "s") toggleRandom();
       if (key === "g") s.set({ settingsOpen: true });
+      if (key === "h") s.toggleNav();
       if (key === "enter" && items.length) open(0);
     };
     window.addEventListener("keydown", onKey);

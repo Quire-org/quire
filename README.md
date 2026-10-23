@@ -108,6 +108,7 @@ so the same code builds for macOS, Linux and Windows.
 | `A` | Albums (`Esc` back) |
 | `X` | Fit the whole image, or fill the screen (may crop) |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
+| `H` | Hide / show the top bar on Browse, Albums and Duplicates |
 | `R` | Surprise me |
 | `[` `]` `\` | Playback speed down / up / reset |
 | `G` | Settings |

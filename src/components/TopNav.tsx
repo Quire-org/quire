@@ -8,8 +8,8 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
   if (s.navCollapsed) {
     return (
       <div className="topnav collapsed">
-        <button className="btn sm ghost" onClick={s.toggleNav} title="Show navigation">
-          ☰ <span className="label">{LABEL[current]}</span>
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Show navigation (H)">
+          ☰ <span className="label">{LABEL[current]}</span> <kbd className="kbd">H</kbd>
         </button>
       </div>
     );
@@ -35,9 +35,6 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
       </div>
       <div className="hud-right">
         {children}
-        <button className="btn sm ghost" onClick={() => void s.surprise()} title="Surprise me (R)">
-          ✦ <kbd className="kbd">R</kbd>
-        </button>
         <button className="btn sm ghost" onClick={() => s.set({ backupOpen: true })} title="Back this folder up">
           Backup
         </button>
@@ -47,8 +44,8 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
         <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
           ?
         </button>
-        <button className="btn sm ghost" onClick={s.toggleNav} title="Hide navigation">
-          ▴
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Hide navigation (H)">
+          ▴ <kbd className="kbd">H</kbd>
         </button>
       </div>
     </div>
