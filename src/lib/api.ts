@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc, Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Album, AlbumRename, Benchmark, DriveInfo, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
+import type { Album, AlbumRename, Benchmark, DriveInfo, History, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
 
 export const api = {
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
@@ -28,6 +28,8 @@ export const api = {
     invoke<ImageHashResult>("image_hash", { path, isRaw }),
   fileFingerprint: (path: string) => invoke<string>("file_fingerprint", { path }),
   loadCache: (root: string) => invoke<unknown>("load_cache", { root }),
+  loadHistory: (root: string) => invoke<History | null>("load_history", { root }),
+  saveHistory: (root: string, history: History) => invoke<void>("save_history", { root, history }),
   saveCache: (root: string, cache: unknown) => invoke<void>("save_cache", { root, cache }),
   moveItem: (root: string, item: MediaItem, dest: string) =>
     invoke<MoveResult>("move_item", { root, item, dest }),

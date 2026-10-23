@@ -3,7 +3,7 @@ export const RESERVED_KEYS = new Set([
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
   " ", "arrowleft", "arrowright", "arrowup", "arrowdown",
   "backspace", "delete", "escape", "enter", "tab",
-  "z", "s", "f", "b", "u", "h", "g", "i", "?", "m", ",", ".", "d", "a", "x",
+  "z", "s", "f", "b", "u", "h", "g", "i", "?", "m", ",", ".", "d", "a", "x", "c", "r", "[", "]", "\\",
 ]);
 
 export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
@@ -14,7 +14,10 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["⌘Z"], label: "Undo" },
   { keys: ["Space"], label: "Play / pause video" },
   { keys: ["M"], label: "Mute video" },
-  { keys: [",", "."], label: "Scrub video 5s" },
+  { keys: [",", "."], label: "Scrub 5s, or step frames when paused" },
+  { keys: ["[", "]", "\\"], label: "Playback speed down / up / reset" },
+  { keys: ["C"], label: "Immersive mode (black, no HUD, hidden cursor)" },
+  { keys: ["R"], label: "Surprise me: a random item you haven't seen lately" },
   { keys: ["S"], label: "Shuffle queue" },
   { keys: ["B"], label: "Browse everything" },
   { keys: ["D"], label: "Find duplicates" },

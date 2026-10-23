@@ -6,6 +6,7 @@ import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate, shuffled } from "../lib/format";
 import type { Album, AlbumRename } from "../lib/types";
 import { FitImage } from "../components/FitImage";
+import { Deco } from "../components/Deco";
 
 type KindSel = "all" | "photos" | "videos" | "mixed";
 type SortSel = "name" | "date" | "size" | "count" | "rating";
@@ -187,6 +188,7 @@ export function Albums() {
           Settings <kbd className="kbd">G</kbd>
         </button>
 
+        <Deco kind="sprout" className="deco-side" />
         <details className="advanced">
           <summary className="label">Advanced</summary>
           <p className="dim small">Folder names like <span className="mono">My%20Trip</span> can be decoded to their real names.</p>

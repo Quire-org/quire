@@ -1,11 +1,11 @@
 import { useState } from "react";
 
-export function RatingBar({ value, onChange }: { value: number | undefined; onChange: (r: number | null) => void }) {
+export function RatingBar({ value, onChange, label = "Rating" }: { value: number | undefined; onChange: (r: number | null) => void; label?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const shown = hover ?? value ?? 0;
   return (
     <div className="rating" onMouseLeave={() => setHover(null)}>
-      <span className="label">Rating</span>
+      <span className="label">{label}</span>
       <div className="rating-segs">
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
           <button

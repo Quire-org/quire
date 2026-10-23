@@ -51,6 +51,9 @@ pub struct MediaItem {
     /// Id of the target folder containing this item, when known (scan_all).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_id: Option<String>,
+    /// Key of the album (album-root subfolder) containing this item, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub album_key: Option<String>,
 }
 
 fn ext_of(p: &Path) -> Option<String> {
@@ -190,6 +193,7 @@ pub fn scan(root: &Path, dir: &Path, exclude: &[PathBuf]) -> Vec<MediaItem> {
             has_raw,
             has_video,
             target_id: None,
+            album_key: None,
         });
     }
     items

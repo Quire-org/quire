@@ -14,6 +14,14 @@ export interface MediaItem {
   hasVideo: boolean;
   /** Set client-side when the item came from a target folder scan. */
   targetId?: string;
+  /** Key of the album this item belongs to, when inside an album folder. */
+  albumKey?: string;
+}
+
+export interface History {
+  version: number;
+  /** item key -> last viewed, ms since epoch */
+  viewed: Record<string, number>;
 }
 
 export interface Target {

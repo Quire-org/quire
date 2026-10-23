@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, storedPath } from "./lib/api";
 import { suggestHotkey } from "./lib/hotkeys";
 import { basename, shuffled, uid } from "./lib/format";
-import type { Album, AlbumRename, Library, MediaItem, Target } from "./lib/types";
+import type { Album, AlbumRename, History, Library, MediaItem, Target } from "./lib/types";
 
 export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums";
 
@@ -47,6 +47,9 @@ interface State {
   albumsLoaded: boolean;
   fitMode: FitMode;
   driveOpen: boolean;
+  immersive: boolean;
+  /** item key -> last viewed (ms); lives in .mediasorter.history.json next to the media. */
+  viewed: Record<string, number>;
   loading: string | null;
   busy: boolean;
   toasts: Toast[];
@@ -93,6 +96,11 @@ interface Actions {
   /** Rename those folders (all of the plan, or a chosen subset) and re-key their ratings. */
   applyAlbumRenames(plan: AlbumRename[]): Promise<number>;
   setAutoDecodeAlbumNames(on: boolean): void;
+  setAlbumRatingByKey(key: string, rating: number | null): void;
+  recordView(item: MediaItem): void;
+  /** Jump to a random item, favouring ones not seen lately. */
+  surprise(): Promise<void>;
+  toggleImmersive(): void;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -136,6 +144,17 @@ function sortItems(items: MediaItem[]): MediaItem[] {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+let historyTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleHistorySave() {
+  if (historyTimer) clearTimeout(historyTimer);
+  historyTimer = setTimeout(() => {
+    const { root, viewed } = useStore.getState();
+    if (!root) return;
+    const history: History = { version: 1, viewed };
+    api.saveHistory(root, history).catch(() => {});
+  }, 2000);
+}
+
 function loadFit(): FitMode {
   try {
     return localStorage.getItem("mediasorter.fit") === "fill" ? "fill" : "fit";
@@ -160,6 +179,8 @@ export const useStore = create<Store>((set, get) => ({
   albumsLoaded: false,
   fitMode: loadFit(),
   driveOpen: false,
+  immersive: false,
+  viewed: {},
   loading: null,
   busy: false,
   toasts: [],
@@ -188,7 +209,8 @@ export const useStore = create<Store>((set, get) => ({
     set({ loading: "Reading library…" });
     try {
       const library = await api.loadLibrary(root);
-      set({ loading: "Scanning folder…" });
+      const history = await api.loadHistory(root).catch(() => null);
+      set({ loading: "Scanning folder…", viewed: history?.viewed ?? {} });
       const unsorted = sortItems(await api.scanUnsorted(root, library));
       const recent = [root, ...get().recentRoots.filter((r) => r !== root)];
       saveRecent(recent);
@@ -227,6 +249,8 @@ export const useStore = create<Store>((set, get) => ({
       allLoaded: false,
       albums: [],
       albumsLoaded: false,
+      viewed: {},
+      immersive: false,
       queue: [],
       index: 0,
       screen: "welcome",
@@ -459,7 +483,7 @@ export const useStore = create<Store>((set, get) => ({
     const { root } = get();
     if (!root) return;
     try {
-      const items = sortItems(await api.scanDir(root, album.path));
+      const items = sortItems(await api.scanDir(root, album.path)).map((i) => ({ ...i, albumKey: album.key }));
       set({ screen: "viewer", queue: items, index: 0, source: { kind: "albums" }, shuffle: false });
     } catch (e) {
       get().toast(String(e), "error");
@@ -516,12 +540,63 @@ export const useStore = create<Store>((set, get) => ({
     set({ loading: "Reading albums…" });
     try {
       const lists = await Promise.all(albums.map((a) => api.scanDir(root, a.path)));
-      const items = lists.flatMap((l) => sortItems(l));
+      const items = lists.flatMap((l, k) => sortItems(l).map((i) => ({ ...i, albumKey: albums[k].key })));
       set({ screen: "viewer", queue: items, index: 0, source: { kind: "albums" }, shuffle: false, loading: null });
     } catch (e) {
       set({ loading: null });
       get().toast(String(e), "error");
     }
+  },
+
+  setAlbumRatingByKey(key, rating) {
+    const { library } = get();
+    if (!library) return;
+    const albumRatings = { ...library.albumRatings };
+    if (rating == null) delete albumRatings[key];
+    else albumRatings[key] = rating;
+    set({ library: { ...library, albumRatings } });
+    get().saveLibrary();
+  },
+
+  recordView(item) {
+    const { root } = get();
+    if (!root) return;
+    const viewed = { ...get().viewed, [item.key]: Date.now() };
+    set({ viewed });
+    scheduleHistorySave();
+  },
+
+  async surprise() {
+    const all = await get().loadAll();
+    if (all.length === 0) {
+      get().toast("Nothing to show yet", "warn");
+      return;
+    }
+    const { viewed } = get();
+    const now = Date.now();
+    // Never viewed counts like a month untouched; recently viewed is unlikely but possible.
+    const weights = all.map((i) => {
+      const t = viewed[i.key];
+      return t ? Math.min(30, Math.max(1, (now - t) / 86_400_000)) : 30;
+    });
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    let pick = all.length - 1;
+    for (let k = 0; k < weights.length; k++) {
+      r -= weights[k];
+      if (r <= 0) {
+        pick = k;
+        break;
+      }
+    }
+    const rest = shuffled(all.filter((_, k) => k !== pick));
+    set({ screen: "viewer", queue: [all[pick], ...rest], index: 0, source: { kind: "browse" }, shuffle: true, settingsOpen: false, trashOpen: false });
+    get().toast("Surprise!", "ok");
+  },
+
+  toggleImmersive() {
+    const immersive = !get().immersive;
+    set({ immersive, hudHidden: immersive, infoOpen: false });
+    if (immersive) get().toast("Immersive mode. Press C to leave");
   },
 
   toggleFit() {
@@ -555,6 +630,12 @@ export const useStore = create<Store>((set, get) => ({
           ratings[entry.fromKey] = ratings[entry.toKey];
           delete ratings[entry.toKey];
         }
+        const viewed = { ...get().viewed };
+        if (entry.toKey in viewed) {
+          viewed[entry.fromKey] = viewed[entry.toKey];
+          delete viewed[entry.toKey];
+          scheduleHistorySave();
+        }
         const queue = get().queue.slice();
         const at = Math.min(entry.index, queue.length);
         queue.splice(at, 0, entry.item);
@@ -562,6 +643,7 @@ export const useStore = create<Store>((set, get) => ({
         const allItems = sortItems([...get().allItems.filter((i) => i.key !== entry.toKey), entry.item]);
         set({
           library: { ...library, ratings },
+          viewed,
           queue,
           index: at,
           unsorted,
@@ -662,6 +744,12 @@ function applyMove(moves: [string, string][], from: MediaItem, to: MediaItem, la
     ratings[to.key] = ratings[from.key];
     delete ratings[from.key];
   }
+  const viewed = { ...s.viewed };
+  if (from.key in viewed) {
+    viewed[to.key] = viewed[from.key];
+    delete viewed[from.key];
+    scheduleHistorySave();
+  }
   const removedAt = s.queue.findIndex((q) => q.key === from.key);
   const queue = s.queue.filter((q) => q.key !== from.key);
   const unsorted = s.unsorted.filter((u) => u.key !== from.key);
@@ -670,6 +758,7 @@ function applyMove(moves: [string, string][], from: MediaItem, to: MediaItem, la
   const index = queue.length === 0 ? 0 : Math.min(s.index, queue.length - 1);
   useStore.setState({
     library: { ...library, ratings },
+    viewed,
     queue,
     unsorted,
     allItems: sortItems(allItems),

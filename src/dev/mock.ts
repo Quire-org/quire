@@ -37,6 +37,7 @@ const seed: Entry[] = [
 let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false };
 let items: MediaItem[] = seed.map((e) => toItem(e.files.map((f) => `${ROOT}/${f}`), `${ROOT}/${e.rel}`, e.kind));
 let pickCount = 0;
+let history: { version: number; viewed: Record<string, number> } | null = null;
 
 function fakeHash(text: string): bigint {
   const M = 0xffffffffffffffffn;
@@ -202,8 +203,16 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const lib = args.library as Library;
       const trash = resolve(lib.trashDir);
       const albumRoots = (args.includeAlbums as boolean) ? [] : lib.albumRoots.map(resolve);
+      const albumKeyOf = (p: string) => {
+        for (const r of lib.albumRoots) {
+          const dir = resolve(r);
+          if (under(p, dir)) return `${r}/${p.slice(dir.length + 1).split("/")[0]}`;
+        }
+        return undefined;
+      };
       return items
         .filter((i) => !under(i.primary, trash) && !albumRoots.some((a) => under(i.primary, a)))
+        .map((i) => (args.includeAlbums && albumKeyOf(i.primary) ? { ...i, albumKey: albumKeyOf(i.primary) } : i))
         .map((i) => {
           const t = lib.targets.find((t) => under(i.primary, resolve(t.path)));
           return t ? { ...i, targetId: t.id } : i;
@@ -222,6 +231,11 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return "fp-" + same;
     }
     case "load_cache":
+      return null;
+    case "load_history":
+      return history;
+    case "save_history":
+      history = args.history as typeof history;
       return null;
     case "save_cache":
       return null;

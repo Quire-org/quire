@@ -1,5 +1,6 @@
 import { useStore } from "../store";
 import { pickFolder } from "../lib/api";
+import { Deco } from "../components/Deco";
 
 export function Welcome() {
   const openRoot = useStore((s) => s.openRoot);
@@ -14,6 +15,7 @@ export function Welcome() {
   return (
     <div className="welcome">
       <div className="welcome-card panel">
+        <Deco kind="plant" className="deco-corner" />
         <div className="label">Media Sorter // v0.1</div>
         <h1 className="brand glitch" data-text="MEDIA SORTER">
           MEDIA SORTER

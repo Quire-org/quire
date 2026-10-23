@@ -29,9 +29,17 @@ so the same code builds for macOS, Linux and Windows.
 - **RAW files** are displayed via the JPEG preview embedded in the RAW. HEIC and video
   decoding use the system webview (WebKit on macOS).
 - **Browse** (`B`) shows everything under the opened folder, including target folders
-  and any targets outside it, as one grid. Narrow it down by location (unsorted / a
-  target), type, subfolder, rating, or a name search; order by name, date, size or
-  rating, or shuffle.
+  and any targets outside it, as one virtualised masonry grid (tiles keep their shape;
+  only the visible part is rendered, so thousands of items scroll smoothly). Narrow it
+  down by location (unsorted, a target, recently viewed, never viewed), type, folders,
+  rating, or a name search; order by name, date, size or rating, or shuffle. ⌘-click,
+  ⇧-click or *Select mode* select several tiles; the bar at the top then rates, moves or
+  trashes them all, and the usual keys act on the selection. View history is kept in
+  `.mediasorter.history.json` next to the media. *Surprise me* (`R`) jumps to a random
+  item, favouring ones you have not looked at lately.
+- **Viewer extras**: playback speed (`[`, `]`, `\`, or the speed button), frame stepping
+  with `,` and `.` while paused, a thumbnail of the frame under the cursor when hovering
+  the progress bar, and immersive mode (`C`): black background, no HUD, cursor hidden.
 - **Albums** (`A`): pick one or more *album folders* in Settings. Every subfolder of an album
   folder is an album: it never appears in the main grid or the sorting queue, and the Albums
   screen shows it as one card with the first image as cover. Albums get their own 1 to 10
@@ -90,6 +98,9 @@ so the same code builds for macOS, Linux and Windows.
 | `D` | Find duplicates (`Esc` back) |
 | `A` | Albums (`Esc` back) |
 | `X` | Fit the whole image, or fill the screen (may crop) |
+| `C` | Immersive mode |
+| `R` | Surprise me |
+| `[` `]` `\` | Playback speed down / up / reset |
 | `G` | Settings |
 | `I` | File info |
 | `H` | Hide / show HUD |

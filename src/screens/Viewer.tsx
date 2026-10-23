@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, selectCurrent, selectRating } from "../store";
-import { MediaStage } from "../components/MediaStage";
+import { MediaStage, SPEEDS } from "../components/MediaStage";
+import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { TargetBar } from "../components/TargetBar";
 import { fileSrc, pickFolder } from "../lib/api";
@@ -13,7 +14,48 @@ export function Viewer() {
   const rating = useStore(selectRating);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [cursorHidden, setCursorHidden] = useState(false);
   const targets = s.library?.targets ?? [];
+  const album = current?.albumKey ? s.albums.find((a) => a.key === current.albumKey) : undefined;
+  const albumKey = current?.albumKey;
+  const albumRating = albumKey ? s.library?.albumRatings[albumKey] : undefined;
+
+  useEffect(() => {
+    if (albumKey && !s.albumsLoaded) void s.loadAlbums();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [albumKey]);
+
+  // Remember what was looked at (after a moment, so flicking past does not count).
+  useEffect(() => {
+    if (!current) return;
+    const t = setTimeout(() => useStore.getState().recordView(current), 700);
+    return () => clearTimeout(t);
+  }, [current?.key]);
+
+  // Immersive mode hides the cursor after a second of stillness.
+  useEffect(() => {
+    if (!s.immersive) {
+      setCursorHidden(false);
+      return;
+    }
+    let timer = setTimeout(() => setCursorHidden(true), 1000);
+    const onMove = () => {
+      setCursorHidden(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => setCursorHidden(true), 1000);
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("mousemove", onMove);
+    };
+  }, [s.immersive]);
+
+  const rate = (r: number | null) => {
+    if (!current) return;
+    if (albumKey) s.setAlbumRatingByKey(albumKey, r);
+    else s.setRating(current, r);
+  };
   const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen;
 
   // Keep the stage clear of the HUD bars whatever their height (target buttons may wrap).
@@ -49,6 +91,8 @@ export function Viewer() {
       if (key === "escape") {
         if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen) {
           st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false });
+        } else if (st.immersive) {
+          st.toggleImmersive();
         } else if (st.fullscreen) {
           void st.toggleFullscreen();
         } else if (st.source.kind === "browse") {
@@ -82,8 +126,23 @@ export function Viewer() {
           void st.trashCurrent();
           return;
         case "u":
-          if (cur) st.setRating(cur, null);
+          if (cur) (cur.albumKey ? st.setAlbumRatingByKey(cur.albumKey, null) : st.setRating(cur, null));
           return;
+        case "c":
+          st.toggleImmersive();
+          return;
+        case "r":
+          void st.surprise();
+          return;
+        case "[":
+        case "]":
+        case "\\": {
+          const v = videoRef.current;
+          if (!v) return;
+          const i = Math.max(0, SPEEDS.indexOf(v.playbackRate));
+          v.playbackRate = key === "\\" ? 1 : SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, i + (key === "]" ? 1 : -1)))];
+          return;
+        }
         case "s":
           st.toggleShuffle();
           return;
@@ -128,12 +187,16 @@ export function Viewer() {
         case ",":
         case ".": {
           const v = videoRef.current;
-          if (v) v.currentTime = Math.max(0, v.currentTime + (key === "," ? -5 : 5));
+          if (!v) return;
+          // Paused: step a frame; playing: skip 5 seconds.
+          const step = v.paused ? 1 / 30 : 5;
+          v.currentTime = Math.max(0, v.currentTime + (key === "," ? -step : step));
           return;
         }
       }
       if (/^[0-9]$/.test(key)) {
-        if (cur) st.setRating(cur, key === "0" ? 10 : Number(key));
+        const r = key === "0" ? 10 : Number(key);
+        if (cur) (cur.albumKey ? st.setAlbumRatingByKey(cur.albumKey, r) : st.setRating(cur, r));
         return;
       }
       const target = st.library?.targets.find((t) => t.hotkey.toLowerCase() === key);
@@ -150,7 +213,7 @@ export function Viewer() {
   const upcoming = s.queue.slice(s.index + 1, s.index + 3).filter((i) => i.kind === "image");
 
   return (
-    <div ref={rootRef} className={`viewer ${s.hudHidden ? "hud-hidden" : ""}`}>
+    <div ref={rootRef} className={`viewer ${s.hudHidden ? "hud-hidden" : ""} ${s.immersive ? "immersive" : ""} ${cursorHidden ? "cursor-hidden" : ""}`}>
       <div className="stage">
         {current ? (
           <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} />
@@ -162,6 +225,7 @@ export function Viewer() {
             <p className="dim">
               {s.source.kind === "unsorted" ? "No unsorted media left in this folder." : "This selection has no items."}
             </p>
+            <Deco kind="cat" />
             <div className="row">
               <button className="btn" onClick={() => void s.rescan()}>
                 Rescan
@@ -206,6 +270,8 @@ export function Viewer() {
             <>
               <span className="mono item-name">{basename(current.primary)}</span>
               <span className="badge accent2">{ext(current.primary)}</span>
+              {album && <span className="badge accent">ALBUM · {album.name}</span>}
+              {!album && current.albumKey && <span className="badge accent">ALBUM</span>}
               {current.hasRaw && current.kind !== "raw" && <span className="badge">+RAW</span>}
               {current.hasVideo && current.kind !== "video" && <span className="badge">+VID</span>}
               <span className="dim mono">{current.dir || "/"}</span>
@@ -216,6 +282,9 @@ export function Viewer() {
           <span className="mono counter" title="Position in the current queue">
             {s.queue.length ? s.index + 1 : 0} of {s.queue.length}
           </span>
+          <button className="btn sm ghost" onClick={() => void s.surprise()} title="Surprise me (R)">
+            ✦ <kbd className="kbd">R</kbd>
+          </button>
           <button className={`btn sm ghost ${s.fitMode === "fill" ? "active" : ""}`} onClick={s.toggleFit} title="Fit whole image / fill screen (X)">
             {s.fitMode === "fit" ? "Fit" : "Fill"} <kbd className="kbd">X</kbd>
           </button>
@@ -253,6 +322,9 @@ export function Viewer() {
           <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
             ?
           </button>
+          <button className={`btn sm ghost ${s.immersive ? "active" : ""}`} onClick={s.toggleImmersive} title="Immersive (C)">
+            ◼ <kbd className="kbd">C</kbd>
+          </button>
           <button className="btn sm ghost" onClick={() => void s.toggleFullscreen()} title="Fullscreen (F)">
             ⛶
           </button>
@@ -261,7 +333,7 @@ export function Viewer() {
 
       <div className="hud hud-bottom">
         <div className="hud-row">
-          <RatingBar value={rating} onChange={(r) => current && s.setRating(current, r)} />
+          <RatingBar value={albumKey ? albumRating : rating} onChange={rate} label={albumKey ? `Album${album ? ` · ${album.name}` : ""}` : "Rating"} />
           <div className="nav">
             <button className="btn" onClick={s.prev} disabled={s.queue.length < 2} title="Previous (←)">
               <kbd className="kbd">←</kbd> Prev

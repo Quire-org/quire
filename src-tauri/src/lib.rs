@@ -60,8 +60,16 @@ async fn scan_all(root: String, library: Library, include_albums: bool) -> Resul
             items.extend(media::scan(&root, dir, &exclude));
         }
     }
+    let album_roots = library.album_root_paths(&root);
     for item in &mut items {
         let p = Path::new(&item.primary);
+        if include_albums {
+            item.album_key = album_roots.iter().find_map(|ar| {
+                let rel = p.strip_prefix(ar).ok()?;
+                let first = rel.components().next()?;
+                Some(media::rel_key(&root, &ar.join(first.as_os_str())))
+            });
+        }
         // Deepest matching target wins when targets are nested.
         item.target_id = targets
             .iter()
@@ -263,6 +271,26 @@ async fn file_fingerprint(path: String) -> Result<String, String> {
 }
 
 const CACHE_FILE: &str = ".mediasorter.cache.json";
+const HISTORY_FILE: &str = ".mediasorter.history.json";
+
+/// View history (item key -> last viewed, ms) kept next to the media.
+#[tauri::command]
+fn load_history(root: String) -> Result<serde_json::Value, String> {
+    let p = Path::new(&root).join(HISTORY_FILE);
+    if !p.exists() {
+        return Ok(serde_json::Value::Null);
+    }
+    let text = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
+    Ok(serde_json::from_str(&text).unwrap_or(serde_json::Value::Null))
+}
+
+#[tauri::command]
+fn save_history(root: String, history: serde_json::Value) -> Result<(), String> {
+    let p = Path::new(&root).join(HISTORY_FILE);
+    let tmp = Path::new(&root).join(format!("{HISTORY_FILE}.tmp"));
+    std::fs::write(&tmp, serde_json::to_vec(&history).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, &p).map_err(|e| e.to_string())
+}
 
 /// Opaque JSON cache (fingerprints, hashes) stored next to the library file.
 #[tauri::command]
@@ -344,6 +372,8 @@ pub fn run() {
             file_fingerprint,
             load_cache,
             save_cache,
+            load_history,
+            save_history,
             initial_root,
             path_exists,
             create_dir,

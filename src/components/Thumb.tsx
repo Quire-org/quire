@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fileSrc, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
 import type { MediaItem } from "../lib/types";
 
-/** Grid tile. RAW previews and video posters are fetched once the tile scrolls into view. */
+/**
+ * Grid tile. Media loads once the tile is near the viewport (or immediately
+ * when `eager`, for virtualised grids that only mount what is visible).
+ */
 export function Thumb({
   item,
   rating,
@@ -11,26 +14,35 @@ export function Thumb({
   selected,
   label,
   scanned,
+  eager,
+  onAspect,
+  aspect,
 }: {
   item: MediaItem;
   rating?: number;
-  onClick: () => void;
+  onClick: (e: MouseEvent) => void;
   selected?: boolean;
   label?: string;
   /** Known to the duplicate scanner (fingerprinted and not a duplicate so far). */
   scanned?: boolean;
+  eager?: boolean;
+  /** Reports width / height of the loaded media, for masonry layouts. */
+  onAspect?: (key: string, ratio: number) => void;
+  /** Aspect ratio to size the media box with (width / height). Default 4:3. */
+  aspect?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(!!eager);
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (eager) return;
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver((entries) => entries.forEach((e) => e.isIntersecting && setVisible(true)), { rootMargin: "400px" });
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [eager]);
 
   useEffect(() => {
     if (!visible) return;
@@ -43,16 +55,27 @@ export function Thumb({
     };
   }, [visible, item.kind, item.primary]);
 
+  const ratio = aspect && aspect > 0 ? aspect : 4 / 3;
   return (
     <div ref={ref} className={`thumb ${selected ? "selected" : ""}`} onClick={onClick} title={item.primary}>
-      <div className="thumb-media">
+      <div className="thumb-media" style={{ paddingTop: `${100 / ratio}%` }}>
         {url ? (
-          <img src={url} alt="" loading="lazy" decoding="async" draggable={false} />
+          <img
+            src={url}
+            alt=""
+            decoding="async"
+            draggable={false}
+            onLoad={(e) => {
+              const im = e.currentTarget;
+              if (onAspect && im.naturalWidth && im.naturalHeight) onAspect(item.key, im.naturalWidth / im.naturalHeight);
+            }}
+          />
         ) : (
           visible && <div className="thumb-ph mono">{item.kind === "video" ? "▶" : item.kind.toUpperCase()}</div>
         )}
         {item.kind === "video" && url && <span className="thumb-play">▶</span>}
         {rating != null && <span className="badge accent tile-rating">★ {rating}</span>}
+        {selected && <span className="tile-check">✓</span>}
       </div>
       <div className="thumb-meta">
         <span className="thumb-name mono">{item.name}</span>
