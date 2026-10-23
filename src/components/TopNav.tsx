@@ -2,13 +2,13 @@ import { useStore, type Screen } from "../store";
 
 const LABEL: Record<string, string> = { viewer: "Sort", browse: "Browse", albums: "Albums", dupes: "Duplicates" };
 
-/** The same navigation bar on every list screen. Collapses to a thin strip. */
+/** The same navigation bar on every list screen. H collapses it and the sidebar to a thin strip. */
 export function TopNav({ current, children }: { current: Screen; children?: React.ReactNode }) {
   const s = useStore();
   if (s.navCollapsed) {
     return (
       <div className="topnav collapsed">
-        <button className="btn sm ghost" onClick={s.toggleNav} title="Show navigation (H)">
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Show the top bar and sidebar (H)">
           ☰ <span className="label">{LABEL[current]}</span> <kbd className="kbd">H</kbd>
         </button>
       </div>
@@ -44,7 +44,7 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
         <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
           ?
         </button>
-        <button className="btn sm ghost" onClick={s.toggleNav} title="Hide navigation (H)">
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Hide the top bar and sidebar (H)">
           ▴ <kbd className="kbd">H</kbd>
         </button>
       </div>

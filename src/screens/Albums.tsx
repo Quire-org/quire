@@ -90,7 +90,7 @@ export function Albums() {
   const totalBytes = albums.reduce((a, b) => a + b.bytes, 0);
 
   return (
-    <div className="screen">
+    <div className={`screen ${s.navCollapsed ? "chrome-hidden" : ""}`}>
       <TopNav current="albums" />
     <div className="browse albums">
       <aside className="browse-side panel">

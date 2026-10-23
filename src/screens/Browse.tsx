@@ -258,7 +258,7 @@ export function Browse() {
   const maxY = viewport.top + viewport.h + OVERSCAN;
 
   return (
-    <div className="screen">
+    <div className={`screen ${s.navCollapsed ? "chrome-hidden" : ""}`}>
       <TopNav current="browse" />
     <div className="browse">
       <aside className="browse-side panel">

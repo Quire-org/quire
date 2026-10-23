@@ -57,7 +57,7 @@ export function Dupes() {
   const est = d.estimate;
 
   return (
-    <div className="screen">
+    <div className={`screen ${s.navCollapsed ? "chrome-hidden" : ""}`}>
       <TopNav current="dupes" />
     <div className="browse dupes">
       <aside className="browse-side panel">

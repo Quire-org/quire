@@ -17,7 +17,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: [",", "."], label: "Scrub 5s, or step frames when paused" },
   { keys: ["[", "]", "\\"], label: "Playback speed down / up / reset" },
   { keys: ["C"], label: "Immersive: hide the HUD, black background, hidden cursor" },
-  { keys: ["H"], label: "Browse / Albums / Duplicates: hide or show the top bar" },
+  { keys: ["H"], label: "Browse / Albums / Duplicates: hide or show the top bar and sidebar" },
   { keys: ["R"], label: "Surprise me: a random item you haven't seen lately" },
   { keys: ["S"], label: "Shuffle queue" },
   { keys: ["B"], label: "Browse everything" },

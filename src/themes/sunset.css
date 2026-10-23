@@ -1,0 +1,91 @@
+/* Sunset: Cozy's warmer sibling. Peach, apricot and plum, soft gradients. */
+[data-theme="sunset"] {
+  --bg: #fbeee4;
+  --bg-2: #fff7f1;
+  --bg-3: #f6dfd0;
+  --fg: #4b2e3a;
+  --fg-dim: #8c6a74;
+  --fg-faint: #c3a6ad;
+  --accent: #f0996b;
+  --accent-fg: #3a1f16;
+  --accent-2: #a9607e;
+  --danger: #d9534f;
+  --ok: #7fae7a;
+  --warn: #e3a94f;
+  --border: rgba(75, 46, 58, 0.12);
+  --border-strong: rgba(75, 46, 58, 0.28);
+  --hud-bg: rgba(255, 247, 241, 0.9);
+  --font-display: "Quicksand", "Nunito", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 14px;
+  --clip-btn: none;
+  --clip-panel: none;
+  --glow: 0 4px 14px rgba(240, 153, 107, 0.35);
+  --glow-strong: 0 6px 22px rgba(240, 153, 107, 0.5);
+  --scanlines: none;
+  --letter: 0.01em;
+}
+[data-theme="sunset"] body {
+  font-weight: 600;
+  background: linear-gradient(180deg, #fbeee4 0%, #f9e2d8 100%);
+}
+[data-theme="sunset"] h1,
+[data-theme="sunset"] h2,
+[data-theme="sunset"] h3 {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 700;
+}
+[data-theme="sunset"] .btn,
+[data-theme="sunset"] .label {
+  text-transform: none;
+  letter-spacing: 0.01em;
+}
+[data-theme="sunset"] .btn {
+  font-weight: 700;
+  border-radius: 999px;
+}
+[data-theme="sunset"] .btn.primary {
+  background: linear-gradient(135deg, #f7b27f, #ec8a6a);
+  border-color: transparent;
+}
+[data-theme="sunset"] .panel,
+[data-theme="sunset"] .modal {
+  background: linear-gradient(180deg, #fff9f4, #fff2ea);
+  box-shadow: 0 8px 28px rgba(75, 46, 58, 0.12);
+}
+[data-theme="sunset"] .brand {
+  color: var(--accent-2);
+  letter-spacing: 0.06em;
+}
+[data-theme="sunset"] .thumb {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+[data-theme="sunset"] .thumb:hover {
+  outline-color: var(--accent);
+  box-shadow: var(--glow);
+}
+[data-theme="sunset"] .rating-seg {
+  border-radius: 8px;
+}
+[data-theme="sunset"] .rating-seg.on {
+  background: var(--accent);
+}
+[data-theme="sunset"] .rating-seg.on.hot {
+  background: var(--accent-2);
+  color: #fff;
+}
+[data-theme="sunset"] .stage,
+[data-theme="sunset"] .viewer {
+  background: #f1dccf;
+}
+[data-theme="sunset"] .modal-backdrop {
+  background: rgba(75, 46, 58, 0.35);
+}
+[data-theme="sunset"] .kbd {
+  border-radius: 6px;
+}
+[data-theme="sunset"] .deco {
+  display: block;
+}

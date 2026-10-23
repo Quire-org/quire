@@ -26,6 +26,21 @@ export const themes: Theme[] = [
     name: "Cozy",
     description: "Warm cream, dusty rose and sage. Soft corners, calm and quiet.",
   },
+  {
+    id: "midnight",
+    name: "Midnight",
+    description: "Night City's cuts and glow in cool blue and silver.",
+  },
+  {
+    id: "sunset",
+    name: "Sunset",
+    description: "Peach, apricot and plum with soft gradients and round corners.",
+  },
+  {
+    id: "gallery",
+    name: "Gallery",
+    description: "White walls, almost no chrome. The images are the only colour.",
+  },
 ];
 
 const KEY = "mediasorter.theme";

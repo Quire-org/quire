@@ -1,0 +1,74 @@
+/* Midnight: Night City's structure in cool blue and silver. */
+[data-theme="midnight"] {
+  --bg: #070b14;
+  --bg-2: #0c1322;
+  --bg-3: #141d31;
+  --fg: #e6ecf7;
+  --fg-dim: #94a3bd;
+  --fg-faint: #4e5c75;
+  --accent: #7cc4ff;
+  --accent-fg: #06101c;
+  --accent-2: #c9d4e6;
+  --danger: #ff6b8a;
+  --ok: #7ee2b8;
+  --warn: #ffc46b;
+  --border: rgba(124, 196, 255, 0.16);
+  --border-strong: rgba(124, 196, 255, 0.5);
+  --hud-bg: rgba(7, 11, 20, 0.84);
+  --font-display: "Orbitron", "Rajdhani", system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, Menlo, monospace;
+  --radius: 0px;
+  --clip-btn: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  --clip-panel: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  --glow: 0 0 10px rgba(124, 196, 255, 0.35);
+  --glow-strong: 0 0 18px rgba(124, 196, 255, 0.6);
+  --scanlines: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.5) 100%);
+  --letter: 0.06em;
+}
+[data-theme="midnight"] body {
+  font-size: 14px;
+}
+[data-theme="midnight"] h1,
+[data-theme="midnight"] h2,
+[data-theme="midnight"] h3 {
+  font-family: "Orbitron", "Rajdhani", sans-serif;
+  letter-spacing: 0.12em;
+}
+[data-theme="midnight"] .brand {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(124, 196, 255, 0.5);
+}
+[data-theme="midnight"] .hud-top::before,
+[data-theme="midnight"] .hud-bottom::before,
+[data-theme="midnight"] .topnav::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent) 0 40%, transparent 40% 60%, var(--accent-2) 60%);
+  opacity: 0.7;
+}
+[data-theme="midnight"] .hud-top::before {
+  bottom: -1px;
+}
+[data-theme="midnight"] .hud-bottom::before {
+  top: -1px;
+}
+[data-theme="midnight"] .topnav {
+  position: relative;
+}
+[data-theme="midnight"] .topnav::after {
+  bottom: -1px;
+}
+[data-theme="midnight"] .rating-seg.on {
+  background: var(--accent);
+  box-shadow: var(--glow);
+}
+[data-theme="midnight"] .rating-seg.on.hot {
+  background: #ffffff;
+}
+[data-theme="midnight"] input[type="checkbox"],
+[data-theme="midnight"] input[type="range"]::-webkit-slider-thumb {
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+}

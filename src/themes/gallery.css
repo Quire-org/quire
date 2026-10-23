@@ -1,0 +1,107 @@
+/* Gallery: white walls, almost no chrome. The images are the only colour. */
+[data-theme="gallery"] {
+  --bg: #ffffff;
+  --bg-2: #fafafa;
+  --bg-3: #efefef;
+  --fg: #1a1a1a;
+  --fg-dim: #6b6b6b;
+  --fg-faint: #b5b5b5;
+  --accent: #1a1a1a;
+  --accent-fg: #ffffff;
+  --accent-2: #6b6b6b;
+  --danger: #c0392b;
+  --ok: #3f8f5f;
+  --warn: #b7791f;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.22);
+  --hud-bg: rgba(255, 255, 255, 0.92);
+  --font-display: "Manrope", "Nunito", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 2px;
+  --clip-btn: none;
+  --clip-panel: none;
+  --glow: none;
+  --glow-strong: none;
+  --scanlines: none;
+  --letter: 0.02em;
+}
+[data-theme="gallery"] body {
+  font-weight: 500;
+  font-size: 14px;
+}
+[data-theme="gallery"] h1,
+[data-theme="gallery"] h2,
+[data-theme="gallery"] h3 {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+[data-theme="gallery"] .btn {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  background: transparent;
+  border-color: transparent;
+}
+[data-theme="gallery"] .btn:hover {
+  background: var(--bg-3);
+}
+[data-theme="gallery"] .btn.active {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+[data-theme="gallery"] .btn.primary {
+  background: var(--fg);
+  color: #fff;
+}
+[data-theme="gallery"] .btn.danger {
+  color: var(--danger);
+}
+[data-theme="gallery"] .label {
+  text-transform: none;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+}
+[data-theme="gallery"] .brand {
+  color: var(--fg);
+  letter-spacing: 0.3em;
+  font-weight: 500;
+}
+[data-theme="gallery"] .panel,
+[data-theme="gallery"] .browse-side,
+[data-theme="gallery"] .topnav,
+[data-theme="gallery"] .hud {
+  border-color: var(--border);
+}
+[data-theme="gallery"] .thumb {
+  border: 0;
+  background: transparent;
+}
+[data-theme="gallery"] .thumb-meta {
+  padding: 6px 2px;
+}
+[data-theme="gallery"] .thumb:hover {
+  outline-color: var(--fg);
+}
+[data-theme="gallery"] .rating-seg {
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+}
+[data-theme="gallery"] .rating-seg.on {
+  background: var(--fg);
+  color: #fff;
+}
+[data-theme="gallery"] .stage,
+[data-theme="gallery"] .viewer {
+  background: #ffffff;
+}
+[data-theme="gallery"] .modal-backdrop {
+  background: rgba(255, 255, 255, 0.6);
+}
+[data-theme="gallery"] .modal {
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+}
+[data-theme="gallery"] .toast {
+  border-left-width: 2px;
+}

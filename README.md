@@ -108,7 +108,7 @@ so the same code builds for macOS, Linux and Windows.
 | `A` | Albums (`Esc` back) |
 | `X` | Fit the whole image, or fill the screen (may crop) |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
-| `H` | Hide / show the top bar on Browse, Albums and Duplicates |
+| `H` | Hide / show the top bar and sidebar on Browse, Albums and Duplicates |
 | `R` | Surprise me |
 | `[` `]` `\` | Playback speed down / up / reset |
 | `G` | Settings |
@@ -180,8 +180,10 @@ CSS file that overrides those properties under `[data-theme="<id>"]` and may add
 decorations (overlays, clip paths). To add one: create `src/themes/<id>.css`, import it
 in `src/main.tsx`, and add an entry to `themes` in `src/themes/index.ts`. Shipped themes:
 **Night City** (Cyberpunk 2077: acid yellow, cyan, red, cut corners, scanlines),
-**Ghost** (quiet monochrome) and **Cozy** (light, warm cream with dusty rose and sage,
-rounded corners, Nunito).
+**Ghost** (quiet monochrome), **Cozy** (light, warm cream with dusty rose and sage,
+rounded corners, Nunito), **Midnight** (Night City's cuts in cool blue and silver,
+Orbitron), **Sunset** (peach, apricot and plum, gradients, Quicksand) and **Gallery**
+(white, nearly chromeless, Manrope).
 
 ## Roadmap ideas
 

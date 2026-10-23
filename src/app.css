@@ -384,6 +384,12 @@
   min-height: 0;
   padding: 2px 10px;
 }
+.screen.chrome-hidden .browse-side {
+  display: none;
+}
+.screen.chrome-hidden .browse {
+  grid-template-columns: 1fr;
+}
 
 /* ---------- Browse ---------- */
 .browse {
