@@ -116,7 +116,8 @@ so the same code builds for macOS, Linux and Windows.
 | `F` | Fullscreen |
 | `?` | Key reference |
 
-Target hotkeys are auto-assigned from the folder name and editable in Settings.
+Target hotkeys are auto-assigned from the folder name and editable in Settings. Buttons
+hide their key hints; hold ⌘ to reveal them, or press `?` for the full list.
 
 ## Development
 

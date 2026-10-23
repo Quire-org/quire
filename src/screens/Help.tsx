@@ -7,6 +7,7 @@ export function Help() {
   const targets = s.library?.targets ?? [];
   return (
     <Modal title="Keyboard" onClose={() => s.set({ helpOpen: false })}>
+      <p className="dim small">Hold ⌘ to reveal the key on every button.</p>
       <div className="keys">
         {targets.map((t) => (
           <div key={t.id} className="key-row">

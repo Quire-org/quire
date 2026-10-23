@@ -30,6 +30,26 @@ export default function App() {
   const iconWeight = themes.find((t) => t.id === theme)?.iconWeight ?? "regular";
   const openRoot = useStore((s) => s.openRoot);
 
+  // Key hints on buttons are hidden; holding ⌘ (or Ctrl) reveals them.
+  useEffect(() => {
+    const root = document.documentElement;
+    const on = (e: KeyboardEvent) => {
+      if (e.key === "Meta" || e.key === "Control") root.classList.add("show-keys");
+    };
+    const off = (e: KeyboardEvent) => {
+      if (e.key === "Meta" || e.key === "Control") root.classList.remove("show-keys");
+    };
+    const clear = () => root.classList.remove("show-keys");
+    window.addEventListener("keydown", on);
+    window.addEventListener("keyup", off);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("keydown", on);
+      window.removeEventListener("keyup", off);
+      window.removeEventListener("blur", clear);
+    };
+  }, []);
+
   // Open a folder passed on the command line / MEDIA_SORTER_ROOT, if any.
   useEffect(() => {
     if (startupHandled) return;

@@ -193,6 +193,16 @@ h3 {
   box-shadow: var(--glow);
 }
 
+/* Key hints on buttons stay hidden until ⌘ is held; target folders always show theirs. */
+.btn .kbd {
+  display: none;
+}
+html.show-keys .btn .kbd,
+.btn.target-btn .kbd,
+.keys .kbd {
+  display: inline-flex;
+}
+
 /* Keycap */
 .kbd {
   display: inline-flex;
