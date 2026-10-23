@@ -31,6 +31,13 @@ const seed: Entry[] = [
   { rel: "Albums/Iceland 2025/CLIP_0003.mp4", kind: "video", files: ["Albums/Iceland 2025/CLIP_0003.mp4"] },
   { rel: "Albums/Birthday/IMG_1012.png", kind: "image", files: ["Albums/Birthday/IMG_1012.png"] },
   { rel: "Albums/Z%C3%BCrich%20Trip/IMG_1004.png", kind: "image", files: ["Albums/Z%C3%BCrich%20Trip/IMG_1004.png"] },
+  // A deep archive tree (4 years x 12 months) to exercise the folder picker and virtualised grid.
+  ...[2021, 2022, 2023, 2024].flatMap((y) =>
+    Array.from({ length: 12 }, (_, m) => {
+      const mm = String(m + 1).padStart(2, "0");
+      return { rel: `Archive/${y}/${mm}/IMG_${y}${mm}.png`, kind: "image" as const, files: [`Archive/${y}/${mm}/IMG_${y}${mm}.png`] };
+    }),
+  ),
   { rel: "Albums/Caf%C3%A9%20Night/IMG_1006.png", kind: "image", files: ["Albums/Caf%C3%A9%20Night/IMG_1006.png"] },
 ];
 
@@ -52,6 +59,10 @@ function fakeHash(text: string): bigint {
 const origin = new Map<string, string>();
 const served = (p: string) => origin.get(p) ?? p;
 for (const e of seed) {
+  if (e.rel.startsWith("Archive/")) {
+    origin.set(`${ROOT}/${e.rel}`, `${ROOT}/DCIM/100CANON/IMG_100${(e.rel.length % 6) + 2}.png`);
+    continue;
+  }
   if (!e.rel.startsWith("Albums/")) continue;
   const base = e.rel.split("/").pop()!;
   const src = seed.find((o) => !o.rel.startsWith("Albums/") && o.rel.endsWith("/" + base));

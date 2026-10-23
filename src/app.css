@@ -526,14 +526,16 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 100;
   padding: 24px;
 }
 .modal {
   width: min(560px, 100%);
-  max-height: calc(100% - 48px);
+  /* viewport units: a percentage would resolve against the centred cell, i.e. nothing */
+  max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
   background: var(--bg-2);
@@ -561,7 +563,7 @@
   overflow: hidden; /* the folder list scrolls itself */
 }
 .modal:has(.fp-list) {
-  height: calc(100% - 48px);
+  height: calc(100vh - 48px);
 }
 .sec-head {
   display: flex;
