@@ -110,3 +110,8 @@
   96% { clip-path: inset(60% 0 10% 0); transform: translateX(-3px); }
   98% { clip-path: inset(40% 0 30% 0); transform: translateX(2px); }
 }
+
+[data-theme="cp2077"] input[type="checkbox"],
+[data-theme="cp2077"] input[type="range"]::-webkit-slider-thumb {
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+}

@@ -15,7 +15,8 @@ export function Modal({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        e.stopPropagation();
+        // Only the modal reacts; screen-level Escape handlers on window must not fire too.
+        e.stopImmediatePropagation();
         onClose();
       }
     };

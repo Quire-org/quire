@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { MediaItem } from "../lib/types";
+import { Modal } from "./Modal";
 
 /**
  * Include / exclude folders from a tree. `selected` holds every included
@@ -16,6 +17,7 @@ export function FolderPicker({
   onChange: (sel: Set<string> | null) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   const nodes = useMemo(() => {
@@ -31,20 +33,6 @@ export function FolderPicker({
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([path, count]) => ({ path, count, depth: path ? path.split("/").length : 0 }));
   }, [items]);
   const all = useMemo(() => new Set(nodes.map((n) => n.path)), [nodes]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (e.stopPropagation(), setOpen(false));
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open]);
 
   const isOn = (p: string) => selected === null || selected.has(p);
   const descendants = (p: string) => nodes.filter((n) => n.path === p || (p === "" ? true : n.path.startsWith(p + "/"))).map((n) => n.path);
@@ -63,29 +51,36 @@ export function FolderPicker({
   const onCount = selected === null ? all.size : [...selected].filter((p) => all.has(p)).length;
   const label = selected === null ? "All folders" : onCount === 0 ? "No folders" : `${onCount} of ${all.size} folders`;
 
+  const q = filter.trim().toLowerCase();
+  const shown = q ? nodes.filter((n) => n.path.toLowerCase().includes(q)) : nodes;
+
   return (
     <div className="fp" ref={ref}>
-      <button className={`btn sm fp-btn ${selected !== null ? "active" : ""}`} onClick={() => setOpen((o) => !o)}>
+      <button className={`btn sm fp-btn ${selected !== null ? "active" : ""}`} onClick={() => setOpen(true)}>
         {label} <span className="faint">▾</span>
       </button>
       {open && (
-        <div className="fp-pop panel">
+        <Modal title="Folders" onClose={() => setOpen(false)} wide>
           <div className="fp-head">
-            <span className="label">Include folders</span>
+            <input className="input grow" placeholder="Filter folders…" value={filter} onChange={(e) => setFilter(e.target.value)} autoFocus />
             <span className="row">
+              <span className="mono dim small">{label}</span>
               <button className="btn sm ghost" onClick={() => onChange(null)}>
                 All
               </button>
               <button className="btn sm ghost" onClick={() => onChange(new Set())}>
                 None
               </button>
+              <button className="btn sm primary" onClick={() => setOpen(false)}>
+                Done
+              </button>
             </span>
           </div>
           <div className="fp-list">
-            {nodes.map((n) => {
+            {shown.map((n) => {
               const st = state(n.path);
               return (
-                <label key={n.path || "/"} className={`fp-row ${st}`} style={{ paddingLeft: 8 + n.depth * 16 }}>
+                <label key={n.path || "/"} className={`fp-row ${st}`} style={{ paddingLeft: 8 + (q ? 0 : n.depth) * 18 }}>
                   <input
                     type="checkbox"
                     checked={st === "on"}
@@ -94,13 +89,16 @@ export function FolderPicker({
                     }}
                     onChange={() => toggle(n.path)}
                   />
-                  <span className="fp-name mono ellipsis">{n.path ? n.path.split("/").pop() : "(root)"}</span>
+                  <span className="fp-name mono ellipsis" title={n.path || "(root)"}>
+                    {q ? n.path || "(root)" : n.path ? n.path.split("/").pop() : "(root)"}
+                  </span>
                   <span className="faint mono">{n.count}</span>
                 </label>
               );
             })}
+            {shown.length === 0 && <div className="dim small">No folders match.</div>}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

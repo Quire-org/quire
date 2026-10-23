@@ -268,3 +268,102 @@ hr.rule {
 input[type="range"] {
   accent-color: var(--accent);
 }
+
+/* ---------- Checkboxes ---------- */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  clip-path: var(--clip-btn);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
+  vertical-align: middle;
+}
+input[type="checkbox"]::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: var(--accent-fg);
+  clip-path: polygon(14% 44%, 0 65%, 40% 100%, 100% 20%, 82% 4%, 40% 66%);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity var(--transition),
+    transform var(--transition);
+}
+input[type="checkbox"]:hover {
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+input[type="checkbox"]:checked::after {
+  opacity: 1;
+  transform: scale(1);
+}
+input[type="checkbox"]:indeterminate {
+  background: var(--bg-3);
+  border-color: var(--accent);
+}
+input[type="checkbox"]:indeterminate::after {
+  opacity: 1;
+  transform: scale(1);
+  width: 10px;
+  height: 3px;
+  background: var(--accent);
+  clip-path: none;
+}
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+input[type="checkbox"]:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- Range sliders ---------- */
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 18px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  background: var(--accent);
+  border: 1px solid var(--accent-fg);
+  border-radius: var(--radius);
+  clip-path: var(--clip-btn);
+  box-shadow: var(--glow);
+}
+input[type="range"]:disabled {
+  opacity: 0.4;
+}
