@@ -52,6 +52,7 @@ export function Thumb({
           visible && <div className="thumb-ph mono">{item.kind === "video" ? "▶" : item.kind.toUpperCase()}</div>
         )}
         {item.kind === "video" && url && <span className="thumb-play">▶</span>}
+        {rating != null && <span className="badge accent tile-rating">★ {rating}</span>}
       </div>
       <div className="thumb-meta">
         <span className="thumb-name mono">{item.name}</span>
@@ -64,7 +65,6 @@ export function Thumb({
           {item.kind === "video" && <span className="badge accent2">VID</span>}
           {item.hasRaw && <span className="badge">RAW</span>}
           {label && <span className="badge accent">{label}</span>}
-          {rating != null && <span className="badge accent">★ {rating}</span>}
         </span>
       </div>
     </div>

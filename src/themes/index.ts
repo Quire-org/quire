@@ -21,6 +21,11 @@ export const themes: Theme[] = [
     name: "Ghost",
     description: "Minimal monochrome, no decorations. Lets the image speak.",
   },
+  {
+    id: "cozy",
+    name: "Cozy",
+    description: "Warm cream, dusty rose and sage. Soft corners, calm and quiet.",
+  },
 ];
 
 const KEY = "mediasorter.theme";

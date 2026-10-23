@@ -285,16 +285,26 @@ function AlbumCard({ album }: { album: Album }) {
     <div className="album-card panel">
       <div className="album-cover" onClick={() => void s.openAlbum(album)} title="Open album">
         {cover ? <FitImage src={cover} mode="fit" blurBackdrop /> : <div className="thumb-ph mono">{album.count ? "…" : "EMPTY"}</div>}
-        <span className="badge accent2 album-count">{album.count}</span>
+        <span className="badge accent2 album-count" title={`${album.images} photos, ${album.videos} videos, ${formatBytes(album.bytes)}`}>
+          {album.count}
+        </span>
+        {rating != null && <span className="badge accent tile-rating">★ {rating}</span>}
+        <div className="album-actions" onClick={(e) => e.stopPropagation()}>
+          {targets.map((t) => (
+            <button key={t.id} className="btn sm primary" disabled={s.busy} onClick={() => void s.moveAlbum(album, t.id)} title={`Move the whole folder to ${t.path}`}>
+              {t.name}
+            </button>
+          ))}
+          <button className="btn sm" onClick={() => void s.openAlbum(album)}>
+            Open
+          </button>
+        </div>
       </div>
-      <div className="album-name ellipsis" title={album.path}>
-        {album.name}
-      </div>
-      <div className="mono faint small">
-        {album.images} photos · {album.videos} videos · {formatBytes(album.bytes)} · {formatDate(album.modified)}
-      </div>
-      <div className="side-row">
-        <div className="album-rating" onMouseLeave={() => setHover(null)}>
+      <div className="album-foot">
+        <div className="album-name ellipsis" title={`${album.path}\n${formatDate(album.modified)}`}>
+          {album.name}
+        </div>
+        <div className="album-rating" onMouseLeave={() => setHover(null)} title="Rate this album">
           {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
@@ -305,17 +315,6 @@ function AlbumCard({ album }: { album: Album }) {
             />
           ))}
         </div>
-        <span className="mono accent-text small">{rating != null ? `${rating}/10` : "—"}</span>
-      </div>
-      <div className="album-targets">
-        {targets.map((t) => (
-          <button key={t.id} className="btn sm primary" disabled={s.busy} onClick={() => void s.moveAlbum(album, t.id)} title={`Move the whole folder to ${t.path}`}>
-            {t.name}
-          </button>
-        ))}
-        <button className="btn sm ghost" onClick={() => void s.openAlbum(album)}>
-          Open
-        </button>
       </div>
     </div>
   );

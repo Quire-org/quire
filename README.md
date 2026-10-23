@@ -158,8 +158,9 @@ All styling reads CSS custom properties defined in `src/themes/base.css`. A them
 CSS file that overrides those properties under `[data-theme="<id>"]` and may add
 decorations (overlays, clip paths). To add one: create `src/themes/<id>.css`, import it
 in `src/main.tsx`, and add an entry to `themes` in `src/themes/index.ts`. Shipped themes:
-**Night City** (Cyberpunk 2077: acid yellow, cyan, red, cut corners, scanlines) and
-**Ghost** (quiet monochrome).
+**Night City** (Cyberpunk 2077: acid yellow, cyan, red, cut corners, scanlines),
+**Ghost** (quiet monochrome) and **Cozy** (light, warm cream with dusty rose and sage,
+rounded corners, Nunito).
 
 ## Roadmap ideas
 
