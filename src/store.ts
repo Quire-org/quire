@@ -150,6 +150,7 @@ interface Actions {
   /** Jump to a random item, favouring ones not seen lately. */
   surprise(): Promise<void>;
   toggleImmersive(): void;
+  toggleHud(): void;
   setBrowseFilters(patch: Partial<BrowseFilters>): void;
   /** Re-attach ratings and history to files that were moved or renamed outside the app. */
   reconcileKeys(items: MediaItem[]): Promise<void>;
@@ -693,13 +694,13 @@ export const useStore = create<Store>((set, get) => ({
     const cur = get().slideshow;
     const playing = !cur.playing;
     if (playing) {
-      // Hide the UI for the show, and remember whether we were the ones who hid it.
-      const hidByShow = cur.hideUi && !get().immersive;
-      if (hidByShow) set({ immersive: true, hudHidden: true, infoOpen: false });
+      // Hide the HUD for the show (like H), and remember whether we were the ones who hid it.
+      const hidByShow = cur.hideUi && !get().hudHidden;
+      if (hidByShow) set({ hudHidden: true, infoOpen: false });
       set({ slideshow: { ...cur, playing, hidByShow } });
-      get().toast(`Slideshow: ${cur.interval}s per image. Enter pauses, C shows the controls`);
+      get().toast(`Slideshow: ${cur.interval}s per image. Enter pauses, H shows the controls`);
     } else {
-      if (cur.hidByShow && get().immersive) set({ immersive: false, hudHidden: false });
+      if (cur.hidByShow && get().hudHidden && !get().immersive) set({ hudHidden: false });
       set({ slideshow: { ...cur, playing, hidByShow: false } });
       get().toast("Slideshow paused");
     }
@@ -758,6 +759,12 @@ export const useStore = create<Store>((set, get) => ({
     const immersive = !get().immersive;
     set({ immersive, hudHidden: immersive, infoOpen: false });
     if (immersive) get().toast("Immersive mode. Press C to leave");
+  },
+
+  toggleHud() {
+    const hudHidden = !get().hudHidden;
+    // Showing the HUD also leaves immersive mode; hiding it alone keeps the theme background.
+    set({ hudHidden, immersive: hudHidden ? get().immersive : false, infoOpen: false });
   },
 
   toggleFit() {

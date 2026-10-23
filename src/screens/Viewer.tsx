@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, selectCurrent, selectRating } from "../store";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
-import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, GearSix, MonitorPlay, Pause, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, EyeSlash, GearSix, MonitorPlay, Pause, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { TargetBar } from "../components/TargetBar";
@@ -143,6 +143,9 @@ export function Viewer() {
           return;
         case "c":
           st.toggleImmersive();
+          return;
+        case "h":
+          st.toggleHud();
           return;
         case "enter":
           st.toggleSlideshow();
@@ -320,8 +323,8 @@ export function Viewer() {
                 </option>
               ))}
             </select>
-            <button className={`btn sm ghost ${show.hideUi ? "active" : ""}`} onClick={() => s.setSlideshowHideUi(!show.hideUi)} title={show.hideUi ? "Slideshow hides the UI (click to keep it)" : "Slideshow keeps the UI (click to hide it)"}>
-              <MonitorPlay />
+            <button className={`btn sm ghost ${show.hideUi ? "active" : ""}`} onClick={() => s.setSlideshowHideUi(!show.hideUi)} title={show.hideUi ? "Slideshow hides the HUD, like H (click to keep it)" : "Slideshow keeps the HUD (click to hide it)"}>
+              <EyeSlash />
             </button>
           </span>
           <button className="btn sm ghost" onClick={() => void s.surprise()} title="Surprise me (R)">
@@ -347,6 +350,9 @@ export function Viewer() {
           </button>
           <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
             <Question />
+          </button>
+          <button className={`btn sm ghost ${s.hudHidden && !s.immersive ? "active" : ""}`} onClick={s.toggleHud} title="Hide the HUD (H)">
+            <EyeSlash /> <kbd className="kbd">H</kbd>
           </button>
           <button className={`btn sm ghost ${s.immersive ? "active" : ""}`} onClick={s.toggleImmersive} title="Immersive (C)">
             <MonitorPlay /> <kbd className="kbd">C</kbd>
