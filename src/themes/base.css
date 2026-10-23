@@ -1,0 +1,270 @@
+/*
+ * Base stylesheet. Everything here reads custom properties; themes set them
+ * under [data-theme="<id>"]. The defaults below are a neutral dark fallback
+ * so an unknown theme id still renders.
+ */
+:root {
+  --bg: #0b0c10;
+  --bg-2: #14161c;
+  --bg-3: #1e2129;
+  --fg: #e8eaf0;
+  --fg-dim: #9aa0ad;
+  --fg-faint: #5c6270;
+  --accent: #8ab4ff;
+  --accent-fg: #0b0c10;
+  --accent-2: #7ee8fa;
+  --danger: #ff5c7a;
+  --ok: #7cf59b;
+  --warn: #ffc857;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.3);
+  --hud-bg: rgba(11, 12, 16, 0.78);
+  --font-display: "Rajdhani", system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, Menlo, monospace;
+  --radius: 4px;
+  --clip-btn: none;
+  --clip-panel: none;
+  --glow: none;
+  --glow-strong: none;
+  --scanlines: none;
+  --letter: 0.04em;
+  --transition: 120ms ease-out;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: var(--letter);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+/* Theme-controlled full-screen overlay (scanlines, vignette...). */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  background: var(--scanlines);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+.dim {
+  color: var(--fg-dim);
+}
+.faint {
+  color: var(--fg-faint);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  min-height: 34px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  clip-path: var(--clip-btn);
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.btn.primary:hover {
+  box-shadow: var(--glow-strong);
+  filter: brightness(1.08);
+}
+.btn.accent2 {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.btn.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.btn.danger:hover {
+  background: var(--danger);
+  color: var(--accent-fg);
+  border-color: var(--danger);
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn.ghost:hover {
+  border-color: var(--border-strong);
+}
+.btn.sm {
+  padding: 4px 10px;
+  min-height: 28px;
+  font-size: 13px;
+}
+.btn.icon {
+  padding: 6px 8px;
+}
+.btn.active {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  box-shadow: var(--glow);
+}
+
+/* Keycap */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.btn.primary .kbd {
+  border-color: var(--accent-fg);
+}
+
+/* ---------- Panels / inputs ---------- */
+.panel {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  clip-path: var(--clip-panel);
+}
+
+.input {
+  appearance: none;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.badge.accent {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.badge.accent2 {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+
+hr.rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-3);
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}

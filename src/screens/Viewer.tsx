@@ -1,0 +1,233 @@
+import { useCallback, useEffect, useRef } from "react";
+import { useStore, selectCurrent, selectRating } from "../store";
+import { MediaStage } from "../components/MediaStage";
+import { RatingBar } from "../components/RatingBar";
+import { TargetBar } from "../components/TargetBar";
+import { fileSrc, pickFolder } from "../lib/api";
+import { isTypingTarget } from "../lib/hotkeys";
+import { basename, ext, formatBytes, formatDate, tailPath } from "../lib/format";
+
+export function Viewer() {
+  const s = useStore();
+  const current = useStore(selectCurrent);
+  const rating = useStore(selectRating);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const targets = s.library?.targets ?? [];
+  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen;
+
+  const addTarget = useCallback(async () => {
+    const dir = await pickFolder("Choose a target folder", s.lastTargetParent ?? s.root ?? undefined);
+    if (dir) s.addTarget(dir);
+  }, [s]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      const st = useStore.getState();
+      const cur = st.queue[st.index];
+
+      if (key === "escape") {
+        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen) {
+          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false });
+        } else if (st.fullscreen) {
+          void st.toggleFullscreen();
+        } else if (st.source.kind === "browse") {
+          st.openBrowse();
+        }
+        return;
+      }
+      if (anyModal) return;
+
+      if ((e.metaKey || e.ctrlKey) && key === "z") {
+        e.preventDefault();
+        void st.undo();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      switch (key) {
+        case "arrowright":
+          st.next();
+          return;
+        case "arrowleft":
+          st.prev();
+          return;
+        case "backspace":
+        case "delete":
+          e.preventDefault();
+          void st.trashCurrent();
+          return;
+        case "u":
+          if (cur) st.setRating(cur, null);
+          return;
+        case "s":
+          st.toggleShuffle();
+          return;
+        case "b":
+          st.openBrowse();
+          return;
+        case "g":
+          st.set({ settingsOpen: true });
+          return;
+        case "h":
+          st.set({ hudHidden: !st.hudHidden });
+          return;
+        case "i":
+          st.set({ infoOpen: !st.infoOpen });
+          return;
+        case "?":
+          st.set({ helpOpen: true });
+          return;
+        case "f":
+          void st.toggleFullscreen();
+          return;
+        case " ": {
+          e.preventDefault();
+          const v = videoRef.current;
+          if (v) v.paused ? void v.play() : v.pause();
+          return;
+        }
+        case "m": {
+          const v = videoRef.current;
+          if (v) v.muted = !v.muted;
+          return;
+        }
+        case ",":
+        case ".": {
+          const v = videoRef.current;
+          if (v) v.currentTime = Math.max(0, v.currentTime + (key === "," ? -5 : 5));
+          return;
+        }
+      }
+      if (/^[0-9]$/.test(key)) {
+        if (cur) st.setRating(cur, key === "0" ? 10 : Number(key));
+        return;
+      }
+      const target = st.library?.targets.find((t) => t.hotkey.toLowerCase() === key);
+      if (target) {
+        e.preventDefault();
+        void st.moveCurrent(target.id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [anyModal]);
+
+  // Warm the cache for the next couple of images.
+  const upcoming = s.queue.slice(s.index + 1, s.index + 3).filter((i) => i.kind === "image");
+
+  return (
+    <div className={`viewer ${s.hudHidden ? "hud-hidden" : ""}`}>
+      <div className="stage">
+        {current ? (
+          <MediaStage item={current} videoRef={videoRef} />
+        ) : (
+          <div className="stage-empty panel">
+            <div className="label">Queue empty</div>
+            <h2>{s.source.kind === "unsorted" ? "Everything is sorted" : "Nothing here"}</h2>
+            <p className="dim">
+              {s.source.kind === "unsorted" ? "No unsorted media left in this folder." : "This selection has no items."}
+            </p>
+            <div className="row">
+              <button className="btn" onClick={() => void s.rescan()}>
+                Rescan
+              </button>
+              <button className="btn accent2" onClick={s.openBrowse}>
+                Browse sorted <kbd className="kbd">B</kbd>
+              </button>
+            </div>
+          </div>
+        )}
+        {upcoming.map((i) => (
+          <img key={i.primary} src={fileSrc(i.primary)} alt="" className="preload" />
+        ))}
+        {s.infoOpen && current && (
+          <div className="info panel mono">
+            <div className="label">File</div>
+            {current.files.map((f) => (
+              <div key={f}>{basename(f)}</div>
+            ))}
+            <div className="label">Folder</div>
+            <div>{current.dir || "/"}</div>
+            <div className="label">Size</div>
+            <div>{formatBytes(current.size)}</div>
+            <div className="label">Modified</div>
+            <div>{formatDate(current.modified)}</div>
+            <div className="label">Key</div>
+            <div className="faint">{current.key}</div>
+          </div>
+        )}
+      </div>
+
+      <div className="hud hud-top">
+        <div className="hud-left">
+          <span className="brand">MEDIA SORTER</span>
+          <span className="faint mono hud-root" title={s.root ?? ""}>
+            {s.root ? tailPath(s.root, 2) : ""}
+          </span>
+        </div>
+        <div className="hud-center">
+          {current && (
+            <>
+              <span className="mono item-name">{basename(current.primary)}</span>
+              <span className="badge accent2">{ext(current.primary)}</span>
+              {current.hasRaw && current.kind !== "raw" && <span className="badge">+RAW</span>}
+              {current.hasVideo && current.kind !== "video" && <span className="badge">+VID</span>}
+              <span className="dim mono">{current.dir || "/"}</span>
+            </>
+          )}
+        </div>
+        <div className="hud-right">
+          <span className="mono counter">
+            {s.queue.length ? s.index + 1 : 0} / {s.queue.length}
+          </span>
+          <button className={`btn sm ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
+            Shuffle <kbd className="kbd">S</kbd>
+          </button>
+          {s.source.kind === "browse" ? (
+            <button className="btn sm accent2" onClick={s.openBrowse} title="Back to browse (Esc)">
+              Browse <kbd className="kbd">Esc</kbd>
+            </button>
+          ) : (
+            <button className="btn sm accent2" onClick={s.openBrowse} title="Browse sorted (B)">
+              Browse <kbd className="kbd">B</kbd>
+            </button>
+          )}
+          <button className="btn sm" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
+            Settings <kbd className="kbd">G</kbd>
+          </button>
+          <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
+            ?
+          </button>
+          <button className="btn sm ghost" onClick={() => void s.toggleFullscreen()} title="Fullscreen (F)">
+            ⛶
+          </button>
+        </div>
+      </div>
+
+      <div className="hud hud-bottom">
+        <div className="hud-row">
+          <RatingBar value={rating} onChange={(r) => current && s.setRating(current, r)} />
+          <div className="nav">
+            <button className="btn" onClick={s.prev} disabled={s.queue.length < 2} title="Previous (←)">
+              <kbd className="kbd">←</kbd> Prev
+            </button>
+            <button className="btn" onClick={s.next} disabled={s.queue.length < 2} title="Next (→)">
+              Next <kbd className="kbd">→</kbd>
+            </button>
+            <button className="btn ghost" onClick={() => void s.undo()} disabled={s.undoStack.length === 0 || s.busy} title="Undo (⌘Z)">
+              Undo <kbd className="kbd">⌘Z</kbd>
+            </button>
+            <button className="btn danger" onClick={() => void s.trashCurrent()} disabled={!current || s.busy} title="Delete (⌫)">
+              Delete <kbd className="kbd">⌫</kbd>
+            </button>
+          </div>
+        </div>
+        <div className="hud-row">
+          <TargetBar targets={targets} onMove={(id) => void s.moveCurrent(id)} onAdd={() => void addTarget()} disabled={!current || s.busy} />
+        </div>
+      </div>
+    </div>
+  );
+}

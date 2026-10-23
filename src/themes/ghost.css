@@ -1,0 +1,28 @@
+/* Ghost: quiet monochrome, no decorations. */
+[data-theme="ghost"] {
+  --bg: #0e0e0e;
+  --bg-2: #171717;
+  --bg-3: #222;
+  --fg: #f0f0f0;
+  --fg-dim: #9a9a9a;
+  --fg-faint: #555;
+  --accent: #ffffff;
+  --accent-fg: #0e0e0e;
+  --accent-2: #bdbdbd;
+  --danger: #ff6b6b;
+  --ok: #9be39b;
+  --warn: #ffd27a;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.35);
+  --hud-bg: rgba(14, 14, 14, 0.85);
+  --radius: 6px;
+  --clip-btn: none;
+  --clip-panel: none;
+  --glow: none;
+  --glow-strong: none;
+  --scanlines: none;
+  --letter: 0.02em;
+}
+[data-theme="ghost"] .rating-seg.on {
+  background: var(--accent);
+}

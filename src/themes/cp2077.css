@@ -1,0 +1,112 @@
+/* Night City: Cyberpunk 2077 inspired. */
+[data-theme="cp2077"] {
+  --bg: #07080c;
+  --bg-2: #0f1117;
+  --bg-3: #181b24;
+  --fg: #f2f0e6;
+  --fg-dim: #a6a69a;
+  --fg-faint: #5b5b56;
+  --accent: #fcee0a;
+  --accent-fg: #0a0a06;
+  --accent-2: #37ebf3;
+  --danger: #ff003c;
+  --ok: #7cf59b;
+  --warn: #ff9f1c;
+  --border: rgba(252, 238, 10, 0.16);
+  --border-strong: rgba(252, 238, 10, 0.55);
+  --hud-bg: rgba(7, 8, 12, 0.82);
+  --radius: 0px;
+  --clip-btn: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  --clip-panel: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  --glow: 0 0 10px rgba(252, 238, 10, 0.35);
+  --glow-strong: 0 0 18px rgba(252, 238, 10, 0.6), 0 0 2px rgba(252, 238, 10, 0.9);
+  --scanlines:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0px, rgba(0, 0, 0, 0.18) 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%);
+  --letter: 0.05em;
+}
+
+[data-theme="cp2077"] .btn.primary {
+  background: var(--accent);
+  background-image: repeating-linear-gradient(135deg, transparent 0 8px, rgba(0, 0, 0, 0.06) 8px 9px);
+}
+
+[data-theme="cp2077"] .btn.danger:hover {
+  box-shadow: 0 0 14px rgba(255, 0, 60, 0.6);
+}
+
+[data-theme="cp2077"] .hud-top,
+[data-theme="cp2077"] .hud-bottom {
+  border-color: rgba(252, 238, 10, 0.35);
+}
+
+/* Yellow / cyan hairline accents on the HUD bars. */
+[data-theme="cp2077"] .hud-top::before,
+[data-theme="cp2077"] .hud-bottom::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent) 0 30%, var(--accent-2) 30% 32%, transparent 32% 68%, var(--danger) 68% 70%, var(--accent) 70%);
+  opacity: 0.8;
+}
+[data-theme="cp2077"] .hud-top::before {
+  bottom: -2px;
+}
+[data-theme="cp2077"] .hud-bottom::before {
+  top: -2px;
+}
+
+[data-theme="cp2077"] .rating-seg.on {
+  background: var(--accent);
+  box-shadow: var(--glow);
+}
+[data-theme="cp2077"] .rating-seg.on.hot {
+  background: var(--danger);
+  box-shadow: 0 0 10px rgba(255, 0, 60, 0.6);
+}
+
+[data-theme="cp2077"] .brand {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(252, 238, 10, 0.5);
+}
+[data-theme="cp2077"] .brand::after {
+  content: "_";
+  animation: cp-blink 1s steps(2) infinite;
+}
+@keyframes cp-blink {
+  to {
+    opacity: 0;
+  }
+}
+
+[data-theme="cp2077"] .thumb.selected,
+[data-theme="cp2077"] .thumb:hover {
+  outline-color: var(--accent);
+  box-shadow: var(--glow);
+}
+
+[data-theme="cp2077"] .modal {
+  box-shadow: 0 0 0 1px rgba(252, 238, 10, 0.25), 0 30px 80px rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="cp2077"] .glitch {
+  position: relative;
+}
+[data-theme="cp2077"] .glitch::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: var(--accent-2);
+  clip-path: inset(30% 0 40% 0);
+  transform: translateX(-2px);
+  opacity: 0.7;
+  animation: cp-glitch 3s infinite;
+}
+@keyframes cp-glitch {
+  0%, 92%, 100% { clip-path: inset(30% 0 40% 0); transform: translateX(-2px); }
+  94% { clip-path: inset(10% 0 70% 0); transform: translateX(3px); }
+  96% { clip-path: inset(60% 0 10% 0); transform: translateX(-3px); }
+  98% { clip-path: inset(40% 0 30% 0); transform: translateX(2px); }
+}
