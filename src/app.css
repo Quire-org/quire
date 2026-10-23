@@ -1140,3 +1140,37 @@ section p {
 .stage-empty .deco {
   align-self: center;
 }
+
+/* ---------- Slideshow ---------- */
+.slideshow-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.slide-interval {
+  padding: 3px 4px;
+  min-height: 28px;
+  font-size: 12px;
+  width: 58px;
+}
+.slide-progress {
+  position: absolute;
+  left: 0;
+  top: var(--hud-top-h, 54px);
+  height: 2px;
+  width: 0;
+  background: var(--accent-2);
+  z-index: 11;
+  animation: slide-progress linear forwards;
+}
+.viewer.hud-hidden .slide-progress {
+  top: 0;
+}
+@keyframes slide-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}

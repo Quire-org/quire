@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, selectCurrent, selectRating } from "../store";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
-import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, GearSix, MonitorPlay, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, GearSix, MonitorPlay, Pause, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { TargetBar } from "../components/TargetBar";
@@ -51,6 +51,16 @@ export function Viewer() {
       window.removeEventListener("mousemove", onMove);
     };
   }, [s.immersive]);
+
+  // Slideshow: images advance after the interval, videos when they end.
+  const show = s.slideshow;
+  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen;
+  useEffect(() => {
+    if (!show.playing || !current || modalOpen) return;
+    if (current.kind === "video") return; // handled by onEnded
+    const t = setTimeout(() => useStore.getState().next(), show.interval * 1000);
+    return () => clearTimeout(t);
+  }, [show.playing, show.interval, current?.key, modalOpen, s.index]);
 
   const rate = (r: number | null) => {
     if (!current) return;
@@ -131,6 +141,9 @@ export function Viewer() {
           return;
         case "c":
           st.toggleImmersive();
+          return;
+        case "enter":
+          st.toggleSlideshow();
           return;
         case "r":
           void st.surprise();
@@ -214,7 +227,7 @@ export function Viewer() {
     <div ref={rootRef} className={`viewer ${s.hudHidden ? "hud-hidden" : ""} ${s.immersive ? "immersive" : ""} ${cursorHidden ? "cursor-hidden" : ""}`}>
       <div className="stage">
         {current ? (
-          <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} />
+          <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} loop={!show.playing} onEnded={() => show.playing && s.next()} />
         ) : (
           <div className="fitbox">
           <div className="stage-empty panel">
@@ -234,6 +247,9 @@ export function Viewer() {
             </div>
           </div>
           </div>
+        )}
+        {show.playing && current && current.kind !== "video" && (
+          <div key={`${current.key}-${show.interval}`} className="slide-progress" style={{ animationDuration: `${show.interval}s` }} />
         )}
         {upcoming.map((i) => (
           <img key={i.primary} src={fileSrc(i.primary)} alt="" className="preload" />
@@ -290,6 +306,18 @@ export function Viewer() {
         <div className="hud-right">
           <span className="mono counter" title="Position in the current queue">
             {s.queue.length ? s.index + 1 : 0} of {s.queue.length}
+          </span>
+          <span className="slideshow-ctl">
+            <button className={`btn sm ghost ${show.playing ? "active" : ""}`} onClick={s.toggleSlideshow} title={show.playing ? "Pause slideshow (⏎)" : "Start slideshow (⏎)"}>
+              {show.playing ? <Pause /> : <Play />} <kbd className="kbd">⏎</kbd>
+            </button>
+            <select className="input slide-interval" value={show.interval} onChange={(e) => s.setSlideshowInterval(Number(e.target.value))} title="Seconds per image">
+              {[2, 3, 5, 8, 10, 15, 20, 30, 60].map((n) => (
+                <option key={n} value={n}>
+                  {n}s
+                </option>
+              ))}
+            </select>
           </span>
           <button className="btn sm ghost" onClick={() => void s.surprise()} title="Surprise me (R)">
             <Sparkle /> <kbd className="kbd">R</kbd>

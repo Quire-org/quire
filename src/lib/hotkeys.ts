@@ -19,6 +19,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["C"], label: "Immersive: hide the HUD, black background, hidden cursor" },
   { keys: ["H"], label: "Browse / Albums / Duplicates: hide or show the top bar and sidebar" },
   { keys: ["R"], label: "Surprise me: a random item you haven't seen lately" },
+  { keys: ["⏎"], label: "Slideshow: auto-advance on a timer (videos play to the end)" },
   { keys: ["S"], label: "Shuffle queue" },
   { keys: ["B"], label: "Browse everything" },
   { keys: ["D"], label: "Find duplicates" },

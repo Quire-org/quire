@@ -13,8 +13,8 @@ export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
  * with a small custom control bar. Media gets explicit pixel sizes from its
  * aspect ratio (see FitImage) so portrait files render where they should.
  */
-export function MediaStage({ item, videoRef, fit = "fit" }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; fit?: FitMode }) {
-  if (item.kind === "video") return <VideoStage item={item} videoRef={videoRef} fit={fit} />;
+export function MediaStage({ item, videoRef, fit = "fit", loop = true, onEnded }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; fit?: FitMode; loop?: boolean; onEnded?: () => void }) {
+  if (item.kind === "video") return <VideoStage item={item} videoRef={videoRef} fit={fit} loop={loop} onEnded={onEnded} />;
   if (item.kind === "raw") return <RawStage item={item} fit={fit} />;
   return <ImageStage item={item} fit={fit} />;
 }
@@ -50,7 +50,7 @@ function RawStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
   return <FitImage src={url} mode={fit} alt={item.name} />;
 }
 
-function VideoStage({ item, videoRef, fit }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; fit: FitMode }) {
+function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; fit: FitMode; loop: boolean; onEnded?: () => void }) {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -112,7 +112,8 @@ function VideoStage({ item, videoRef, fit }: { item: MediaItem; videoRef: RefObj
         style={size ?? undefined}
         src={fileSrc(item.primary)}
         autoPlay
-        loop
+        loop={loop}
+        onEnded={onEnded}
         muted={muted}
         playsInline
         onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}

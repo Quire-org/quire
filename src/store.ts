@@ -157,6 +157,10 @@ interface Actions {
   toggleNav(): void;
   theme: string;
   setTheme(id: string): void;
+  /** Auto-advance in the viewer: seconds per image; videos play to the end. */
+  slideshow: { playing: boolean; interval: number };
+  toggleSlideshow(): void;
+  setSlideshowInterval(seconds: number): void;
   setLibraryField(patch: Partial<Library>): void;
   setAlbumFilters(patch: Partial<AlbumFilters>): void;
   undo(): Promise<void>;
@@ -242,6 +246,7 @@ export const useStore = create<Store>((set, get) => ({
   viewed: {},
   navCollapsed: loadPref<{ v: boolean }>("mediasorter.navCollapsed", { v: false }).v,
   theme: loadThemeId(),
+  slideshow: { playing: false, interval: loadPref<{ v: number }>("mediasorter.slideshow", { v: 5 }).v },
   browseFilters: loadPref("mediasorter.browseFilters", DEFAULT_BROWSE),
   albumFilters: loadPref("mediasorter.albumFilters", DEFAULT_ALBUMS),
   loading: null,
@@ -480,11 +485,11 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openDupes() {
-    set({ screen: "dupes", settingsOpen: false, trashOpen: false });
+    set({ screen: "dupes", settingsOpen: false, trashOpen: false, slideshow: { ...get().slideshow, playing: false } });
   },
 
   openAlbums() {
-    set({ screen: "albums", settingsOpen: false, trashOpen: false });
+    set({ screen: "albums", settingsOpen: false, trashOpen: false, slideshow: { ...get().slideshow, playing: false } });
   },
 
   async loadAlbums(force = false) {
@@ -683,6 +688,17 @@ export const useStore = create<Store>((set, get) => ({
     get().saveLibrary();
   },
 
+  toggleSlideshow() {
+    const playing = !get().slideshow.playing;
+    set({ slideshow: { ...get().slideshow, playing } });
+    get().toast(playing ? `Slideshow: ${get().slideshow.interval}s per image, Enter to pause` : "Slideshow paused");
+  },
+
+  setSlideshowInterval(seconds) {
+    set({ slideshow: { ...get().slideshow, interval: seconds } });
+    savePref("mediasorter.slideshow", { v: seconds });
+  },
+
   setTheme(id) {
     applyTheme(id);
     set({ theme: id });
@@ -834,7 +850,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openBrowse() {
-    set({ screen: "browse", settingsOpen: false, trashOpen: false });
+    set({ screen: "browse", settingsOpen: false, trashOpen: false, slideshow: { ...get().slideshow, playing: false } });
   },
 
   openViewer(items, index, source) {
