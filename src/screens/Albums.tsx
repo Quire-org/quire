@@ -1,18 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
 import { fileSrc, pickFolder, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
 import { isTypingTarget } from "../lib/hotkeys";
-import { formatBytes, formatDate } from "../lib/format";
+import { formatBytes, formatDate, shuffled } from "../lib/format";
 import type { Album, AlbumRename } from "../lib/types";
 import { FitImage } from "../components/FitImage";
+
+type KindSel = "all" | "photos" | "videos" | "mixed";
+type SortSel = "name" | "date" | "size" | "count" | "rating";
 
 /** Album folders: rated, categorised and opened as a whole. */
 export function Albums() {
   const s = useStore();
   const roots = s.library?.albumRoots ?? [];
+  const albumRatings = s.library?.albumRatings ?? {};
   const [plan, setPlan] = useState<AlbumRename[] | null>(null);
   const [checking, setChecking] = useState(false);
+  const [query, setQuery] = useState("");
+  const [rootSel, setRootSel] = useState<string>("all");
+  const [kind, setKind] = useState<KindSel>("all");
+  const [minRating, setMinRating] = useState(0);
+  const [unratedOnly, setUnratedOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortSel>("name");
+  const [desc, setDesc] = useState(false);
+  const [random, setRandom] = useState(false);
+  const [seed, setSeed] = useState(0);
+  const [zoom, setZoom] = useState(260);
 
   const checkNames = async () => {
     setChecking(true);
@@ -27,6 +41,31 @@ export function Albums() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.root, s.albumsLoaded]);
 
+  const albums = useMemo(() => {
+    let list = s.albums;
+    if (rootSel !== "all") list = list.filter((a) => a.albumRoot === rootSel);
+    if (kind === "photos") list = list.filter((a) => a.videos === 0 && a.images > 0);
+    else if (kind === "videos") list = list.filter((a) => a.videos > 0);
+    else if (kind === "mixed") list = list.filter((a) => a.videos > 0 && a.images > 0);
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter((a) => a.name.toLowerCase().includes(q) || a.key.toLowerCase().includes(q));
+    }
+    if (unratedOnly) list = list.filter((a) => albumRatings[a.key] == null);
+    else if (minRating > 0) list = list.filter((a) => (albumRatings[a.key] ?? 0) >= minRating);
+    if (random) return shuffled(list);
+    const cmp: Record<SortSel, (a: Album, b: Album) => number> = {
+      name: (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }),
+      date: (a, b) => a.modified - b.modified,
+      size: (a, b) => a.bytes - b.bytes,
+      count: (a, b) => a.count - b.count,
+      rating: (a, b) => (albumRatings[a.key] ?? 0) - (albumRatings[b.key] ?? 0) || a.name.localeCompare(b.name),
+    };
+    const out = list.slice().sort(cmp[sortBy]);
+    return desc ? out.reverse() : out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.albums, rootSel, kind, query, albumRatings, minRating, unratedOnly, random, seed, sortBy, desc]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen) return;
@@ -35,15 +74,22 @@ export function Albums() {
       if (key === "b") s.openBrowse();
       if (key === "d") s.openDupes();
       if (key === "g") s.set({ settingsOpen: true });
+      if (key === "s") {
+        setRandom((r) => !r);
+        setSeed((x) => x + 1);
+      }
+      if (key === "enter" && albums.length) void s.openAlbums_Slideshow(albums);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [s]);
+  }, [s, albums]);
 
   const addRoot = async () => {
     const dir = await pickFolder("Choose a folder whose subfolders are albums", s.root ?? undefined);
     if (dir) s.addAlbumRoot(dir);
   };
+  const chip = (active: boolean) => `btn sm ${active ? "active" : ""}`;
+  const totalBytes = albums.reduce((a, b) => a + b.bytes, 0);
 
   return (
     <div className="browse albums">
@@ -55,18 +101,22 @@ export function Albums() {
           </button>
         </div>
         <h3>Albums</h3>
-        <p className="dim small">
-          Every subfolder of an album folder is one album. Albums stay out of the main grid and the sorting queue; rate
-          and move them as a whole.
-        </p>
+
+        <input className="input" placeholder="Search albums…" value={query} onChange={(e) => setQuery(e.target.value)} />
+
         <div className="label">Album folders</div>
         <div className="side-list">
-          {roots.length === 0 && <span className="dim small">None yet.</span>}
+          {roots.length > 1 && (
+            <button className={chip(rootSel === "all")} onClick={() => setRootSel("all")}>
+              All <span className="faint mono">{s.albums.length}</span>
+            </button>
+          )}
           {roots.map((r) => (
             <div key={r} className="side-row">
-              <span className="mono small ellipsis grow" title={r}>
-                {r}
-              </span>
+              <button className={`${chip(rootSel === r)} grow`} onClick={() => setRootSel(roots.length > 1 && rootSel !== r ? r : "all")} title={r}>
+                <span className="ellipsis">{r.split("/").pop() || r}</span>
+                <span className="faint mono">{s.albums.filter((a) => a.albumRoot === r).length}</span>
+              </button>
               <button className="btn sm ghost" onClick={() => s.removeAlbumRoot(r)} title="Stop treating this folder's subfolders as albums">
                 ×
               </button>
@@ -76,6 +126,56 @@ export function Albums() {
             + Add album folder
           </button>
         </div>
+
+        <div className="label">Contains</div>
+        <div className="chips">
+          {(["all", "photos", "videos", "mixed"] as KindSel[]).map((k) => (
+            <button key={k} className={chip(kind === k)} onClick={() => setKind(k)}>
+              {k === "all" ? "Any" : k === "photos" ? "Photos only" : k === "videos" ? "Videos" : "Both"}
+            </button>
+          ))}
+        </div>
+
+        <div className="label">Rating</div>
+        <div className="side-row">
+          <input type="range" min={0} max={10} value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} disabled={unratedOnly} />
+          <span className="mono">{unratedOnly ? "—" : minRating === 0 ? "any" : `≥ ${minRating}`}</span>
+        </div>
+        <label className="side-row check">
+          <input type="checkbox" checked={unratedOnly} onChange={(e) => setUnratedOnly(e.target.checked)} /> Unrated only
+        </label>
+
+        <div className="label">Order</div>
+        <div className="chips">
+          {(["name", "date", "size", "count", "rating"] as SortSel[]).map((k) => (
+            <button
+              key={k}
+              className={chip(!random && sortBy === k)}
+              onClick={() => {
+                if (sortBy === k && !random) setDesc((d) => !d);
+                setSortBy(k);
+                setRandom(false);
+              }}
+            >
+              {k} {!random && sortBy === k ? (desc ? "↓" : "↑") : ""}
+            </button>
+          ))}
+          <button
+            className={chip(random)}
+            onClick={() => {
+              setRandom(true);
+              setSeed((x) => x + 1);
+            }}
+          >
+            Random <kbd className="kbd">S</kbd>
+          </button>
+        </div>
+
+        <div className="label">Tile size</div>
+        <div className="side-row">
+          <input type="range" min={180} max={520} step={20} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
+        </div>
+
         <div className="label">Folder names</div>
         <label className="side-row check" title="Folders like My%20Trip become My Trip whenever albums are scanned">
           <input type="checkbox" checked={!!s.library?.autoDecodeAlbumNames} onChange={(e) => s.setAutoDecodeAlbumNames(e.target.checked)} />
@@ -84,7 +184,11 @@ export function Albums() {
         <button className="btn sm" onClick={() => void checkNames()} disabled={checking || roots.length === 0}>
           {checking ? "Checking…" : "Check names now"}
         </button>
+
         <hr className="rule" />
+        <button className="btn primary" disabled={!albums.length || s.busy} onClick={() => void s.openAlbums_Slideshow(albums)} title="Flip through everything in the visible albums">
+          Slideshow <kbd className="kbd">⏎</kbd>
+        </button>
         <button className="btn sm" onClick={s.openBrowse}>
           Browse <kbd className="kbd">B</kbd>
         </button>
@@ -95,7 +199,7 @@ export function Albums() {
       <main className="browse-main">
         <div className="browse-head">
           <span className="mono dim">
-            {s.albums.length} albums · {formatBytes(s.albums.reduce((a, b) => a + b.bytes, 0))}
+            {albums.length} of {s.albums.length} albums · {formatBytes(totalBytes)}
           </span>
         </div>
         {plan && plan.length > 0 && (
@@ -143,12 +247,14 @@ export function Albums() {
             </div>
           </section>
         )}
-        <div className="album-grid">
-          {s.albums.map((a) => (
+        <div className="album-grid" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${zoom}px, 1fr))` }}>
+          {albums.map((a) => (
             <AlbumCard key={a.key} album={a} />
           ))}
-          {s.albumsLoaded && s.albums.length === 0 && (
-            <div className="dim">{roots.length ? "No subfolders with media in the album folders." : "Add an album folder to get started."}</div>
+          {s.albumsLoaded && albums.length === 0 && (
+            <div className="dim">
+              {s.albums.length ? "No albums match these filters." : roots.length ? "No subfolders with media in the album folders." : "Add an album folder to get started."}
+            </div>
           )}
         </div>
       </main>

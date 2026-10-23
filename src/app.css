@@ -380,6 +380,9 @@
 .side-list .btn {
   justify-content: space-between;
 }
+.side-list .btn.grow {
+  min-width: 0;
+}
 .side-row {
   display: flex;
   align-items: center;
@@ -797,7 +800,6 @@ section p {
   flex: 1;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 14px;
   padding: 16px;
   align-content: start;

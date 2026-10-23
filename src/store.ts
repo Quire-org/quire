@@ -85,6 +85,8 @@ interface Actions {
   setAlbumRating(album: Album, rating: number | null): void;
   moveAlbum(album: Album, targetId: string): Promise<boolean>;
   openAlbum(album: Album): Promise<void>;
+  /** Viewer over the contents of several albums, in the given order. */
+  openAlbums_Slideshow(albums: Album[]): Promise<void>;
   toggleFit(): void;
   /** Album folders with URL-escaped names and their decoded names. */
   albumRenamePlan(): Promise<AlbumRename[]>;
@@ -506,6 +508,20 @@ export const useStore = create<Store>((set, get) => ({
     if (!library) return;
     set({ library: { ...library, autoDecodeAlbumNames: on }, albumsLoaded: false });
     get().saveLibrary();
+  },
+
+  async openAlbums_Slideshow(albums) {
+    const { root } = get();
+    if (!root || albums.length === 0) return;
+    set({ loading: "Reading albums…" });
+    try {
+      const lists = await Promise.all(albums.map((a) => api.scanDir(root, a.path)));
+      const items = lists.flatMap((l) => sortItems(l));
+      set({ screen: "viewer", queue: items, index: 0, source: { kind: "albums" }, shuffle: false, loading: null });
+    } catch (e) {
+      set({ loading: null });
+      get().toast(String(e), "error");
+    }
   },
 
   toggleFit() {

@@ -35,7 +35,10 @@ so the same code builds for macOS, Linux and Windows.
 - **Albums** (`A`): pick one or more *album folders* in Settings. Every subfolder of an album
   folder is an album: it never appears in the main grid or the sorting queue, and the Albums
   screen shows it as one card with the first image as cover. Albums get their own 1 to 10
-  rating and can be moved to a target folder as a whole. Folders with URL-escaped names
+  rating and can be moved to a target folder as a whole. The sidebar filters albums by
+  album folder, content (photos only, videos, both), rating and name, orders by name, date,
+  size, count or rating, shuffles, and *Slideshow* flips through everything in the visible
+  albums. Folders with URL-escaped names
   (`My%20Trip`, `Z%C3%BCrich`) can be decoded to their real names, either on demand with a
   preview of every rename, or automatically on each album scan (option on the Albums screen).
 - **Drive health** (Settings → Drive health) shows the volume's bus (SD, USB, NVMe...),
