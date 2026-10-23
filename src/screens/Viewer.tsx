@@ -161,9 +161,6 @@ export function Viewer() {
         case "g":
           st.set({ settingsOpen: true });
           return;
-        case "h":
-          st.set({ hudHidden: !st.hudHidden });
-          return;
         case "i":
           st.set({ infoOpen: !st.infoOpen });
           return;
@@ -270,9 +267,9 @@ export function Viewer() {
             <button
               className="btn sm accent2"
               onClick={s.source.kind === "browse" ? s.openBrowse : s.source.kind === "albums" ? s.openAlbums : s.openDupes}
-              title="Back (Esc)"
+              title={`Back to ${s.source.kind === "browse" ? "Browse" : s.source.kind === "albums" ? "Albums" : "Duplicates"} (Esc)`}
             >
-              ← Back to {s.source.kind === "browse" ? "Browse" : s.source.kind === "albums" ? "Albums" : "Duplicates"} <kbd className="kbd">Esc</kbd>
+              ← <kbd className="kbd">Esc</kbd>
             </button>
           )}
         </div>

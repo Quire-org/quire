@@ -173,7 +173,7 @@ export const useDupes = create<DupesState>((set, get) => ({
     const main = useStore.getState();
     if (!main.root || !main.library) return;
     const { scope, folders, includeAlbums, includeVideos, cache, readMBps } = get();
-    const all = includeAlbums ? await api.scanAll(main.root, main.library, true).catch(() => main.allItems) : await main.loadAll();
+    const all = (await main.loadAll()).filter((i) => includeAlbums || !i.albumKey);
     const candidates = all.filter((i) => inScope(i, scope, folders));
     set({ candidates, estimate: estimateFor(candidates, cache, includeVideos, readMBps) });
   },

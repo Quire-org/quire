@@ -3,7 +3,7 @@ export const RESERVED_KEYS = new Set([
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
   " ", "arrowleft", "arrowright", "arrowup", "arrowdown",
   "backspace", "delete", "escape", "enter", "tab",
-  "z", "s", "f", "b", "u", "h", "g", "i", "?", "m", ",", ".", "d", "a", "x", "c", "r", "[", "]", "\\",
+  "z", "s", "f", "b", "u", "g", "i", "?", "m", ",", ".", "d", "a", "x", "c", "r", "[", "]", "\\",
 ]);
 
 export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
@@ -16,7 +16,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["M"], label: "Mute video" },
   { keys: [",", "."], label: "Scrub 5s, or step frames when paused" },
   { keys: ["[", "]", "\\"], label: "Playback speed down / up / reset" },
-  { keys: ["C"], label: "Immersive mode (black, no HUD, hidden cursor)" },
+  { keys: ["C"], label: "Immersive: hide the HUD, black background, hidden cursor" },
   { keys: ["R"], label: "Surprise me: a random item you haven't seen lately" },
   { keys: ["S"], label: "Shuffle queue" },
   { keys: ["B"], label: "Browse everything" },
@@ -24,7 +24,6 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["A"], label: "Albums" },
   { keys: ["X"], label: "Fit / fill the screen" },
   { keys: ["G"], label: "Open settings" },
-  { keys: ["H"], label: "Hide / show HUD" },
   { keys: ["I"], label: "Show file info" },
   { keys: ["F"], label: "Toggle fullscreen" },
   { keys: ["Esc"], label: "Back / leave fullscreen" },

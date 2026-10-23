@@ -380,6 +380,10 @@
   flex: 1;
   gap: 6px;
 }
+.topnav.collapsed {
+  min-height: 0;
+  padding: 2px 10px;
+}
 
 /* ---------- Browse ---------- */
 .browse {
@@ -434,8 +438,12 @@
   min-height: 0;
 }
 .browse-head {
-  padding: 10px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
 }
 .grid {
   flex: 1;

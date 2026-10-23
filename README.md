@@ -16,7 +16,9 @@ so the same code builds for macOS, Linux and Windows.
   recursively.
 - **Nothing is stored inside the app.** Target folders and ratings live in
   `.mediasorter.json` at the root of the folder you opened, so they travel with the
-  media. Duplicate-scan fingerprints are cached in `.mediasorter.cache.json` next to it
+  media. Every rated file also gets an identity (size, modification time, name and a
+  content fingerprint), so if you move or rename it outside the app, its rating and
+  history are re-attached on the next scan. Duplicate-scan fingerprints are cached in `.mediasorter.cache.json` next to it
   (safe to delete). The only things kept locally are the theme choice and the
   recent-folders list.
 - **Sorting moves files** on disk, immediately. The last actions can be undone with
@@ -105,12 +107,11 @@ so the same code builds for macOS, Linux and Windows.
 | `D` | Find duplicates (`Esc` back) |
 | `A` | Albums (`Esc` back) |
 | `X` | Fit the whole image, or fill the screen (may crop) |
-| `C` | Immersive mode |
+| `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
 | `R` | Surprise me |
 | `[` `]` `\` | Playback speed down / up / reset |
 | `G` | Settings |
 | `I` | File info |
-| `H` | Hide / show HUD |
 | `F` | Fullscreen |
 | `?` | Key reference |
 

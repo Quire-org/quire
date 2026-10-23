@@ -44,6 +44,8 @@ export interface Library {
   autoDecodeAlbumNames: boolean;
   backupDest?: string | null;
   lastBackup?: number | null;
+  /** item key -> identity, so ratings follow files moved outside the app. */
+  ids: Record<string, { s: number; m: number; n: string; f?: string }>;
 }
 
 export interface BackupEntry {

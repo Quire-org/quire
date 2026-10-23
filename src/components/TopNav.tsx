@@ -1,8 +1,19 @@
 import { useStore, type Screen } from "../store";
 
-/** The same navigation bar on every list screen (Browse, Albums, Duplicates). */
+const LABEL: Record<string, string> = { viewer: "Sort", browse: "Browse", albums: "Albums", dupes: "Duplicates" };
+
+/** The same navigation bar on every list screen. Collapses to a thin strip. */
 export function TopNav({ current, children }: { current: Screen; children?: React.ReactNode }) {
   const s = useStore();
+  if (s.navCollapsed) {
+    return (
+      <div className="topnav collapsed">
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Show navigation">
+          ☰ <span className="label">{LABEL[current]}</span>
+        </button>
+      </div>
+    );
+  }
   const tab = (id: Screen, label: string, key: string, go: () => void) => (
     <button className={`btn sm ${current === id ? "active" : ""}`} onClick={go} title={`${label} (${key})`}>
       {label} <kbd className="kbd">{key}</kbd>
@@ -35,6 +46,9 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
         </button>
         <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
           ?
+        </button>
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Hide navigation">
+          ▴
         </button>
       </div>
     </div>

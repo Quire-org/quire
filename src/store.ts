@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, storedPath } from "./lib/api";
 import { suggestHotkey } from "./lib/hotkeys";
+import { identityOf, reconcile } from "./lib/reconcile";
 import { basename, shuffled, uid } from "./lib/format";
 import type { Album, AlbumRename, History, Library, MediaItem, Target } from "./lib/types";
 
@@ -149,6 +150,10 @@ interface Actions {
   surprise(): Promise<void>;
   toggleImmersive(): void;
   setBrowseFilters(patch: Partial<BrowseFilters>): void;
+  /** Re-attach ratings and history to files that were moved or renamed outside the app. */
+  reconcileKeys(items: MediaItem[]): Promise<void>;
+  navCollapsed: boolean;
+  toggleNav(): void;
   setLibraryField(patch: Partial<Library>): void;
   setAlbumFilters(patch: Partial<AlbumFilters>): void;
   undo(): Promise<void>;
@@ -232,6 +237,7 @@ export const useStore = create<Store>((set, get) => ({
   immersive: false,
   backupOpen: false,
   viewed: {},
+  navCollapsed: loadPref<{ v: boolean }>("mediasorter.navCollapsed", { v: false }).v,
   browseFilters: loadPref("mediasorter.browseFilters", DEFAULT_BROWSE),
   albumFilters: loadPref("mediasorter.albumFilters", DEFAULT_ALBUMS),
   loading: null,
@@ -287,6 +293,8 @@ export const useStore = create<Store>((set, get) => ({
         albumsLoaded: false,
       });
       get().toast(`${unsorted.length} unsorted items`, "ok");
+      // Full scan in the background: feeds Browse and re-attaches ratings to moved files.
+      void get().loadAll(true);
     } catch (e) {
       set({ loading: null });
       get().toast(String(e), "error");
@@ -379,13 +387,30 @@ export const useStore = create<Store>((set, get) => ({
     if (!library) return;
     const prev = library.ratings[item.key];
     const ratings = { ...library.ratings };
-    if (rating == null) delete ratings[item.key];
-    else ratings[item.key] = rating;
+    const ids = { ...(library.ids ?? {}) };
+    if (rating == null) {
+      delete ratings[item.key];
+      delete ids[item.key];
+    } else {
+      ratings[item.key] = rating;
+      ids[item.key] = { ...identityOf(item), f: ids[item.key]?.f };
+    }
     set((s) => ({
-      library: { ...library, ratings },
+      library: { ...library, ratings, ids },
       undoStack: [...s.undoStack.slice(-49), { type: "rating", key: item.key, prev, item }],
     }));
     get().saveLibrary();
+    // Content fingerprint in the background, so the rating can follow a renamed copy too.
+    if (rating != null && !ids[item.key].f) {
+      api.fileFingerprint(item.primary)
+        .then((f) => {
+          const lib = get().library;
+          if (!lib || !lib.ids?.[item.key]) return;
+          set({ library: { ...lib, ids: { ...lib.ids, [item.key]: { ...lib.ids[item.key], f } } } });
+          get().saveLibrary();
+        })
+        .catch(() => {});
+    }
   },
 
   async moveCurrent(targetId) {
@@ -439,8 +464,9 @@ export const useStore = create<Store>((set, get) => ({
     if (allLoaded && !allStale && !force) return allItems;
     set({ loading: "Scanning folder…" });
     try {
-      const items = sortItems(await api.scanAll(root, library, false));
+      const items = sortItems(await api.scanAll(root, library, true));
       set({ allItems: items, allLoaded: true, allStale: false, loading: null });
+      void get().reconcileKeys(items);
       return items;
     } catch (e) {
       set({ loading: null });
@@ -653,6 +679,26 @@ export const useStore = create<Store>((set, get) => ({
     get().saveLibrary();
   },
 
+  toggleNav() {
+    const navCollapsed = !get().navCollapsed;
+    set({ navCollapsed });
+    savePref("mediasorter.navCollapsed", { v: navCollapsed });
+  },
+
+  async reconcileKeys(items) {
+    const { library, viewed } = get();
+    if (!library) return;
+    const missing = Object.keys(library.ratings).some((k) => !items.some((i) => i.key === k));
+    if (!missing) return;
+    const r = await reconcile({ ratings: library.ratings, ids: library.ids ?? {}, viewed, items, fingerprint: (p) => api.fileFingerprint(p) });
+    if (r.moves.length === 0) return;
+    const lib = get().library!;
+    set({ library: { ...lib, ratings: r.ratings, ids: r.ids }, viewed: r.viewed });
+    get().saveLibrary();
+    scheduleHistorySave();
+    get().toast(`${r.moves.length} rating${r.moves.length === 1 ? "" : "s"} followed moved files`, "ok");
+  },
+
   setBrowseFilters(patch) {
     const browseFilters = { ...get().browseFilters, ...patch };
     set({ browseFilters });
@@ -702,6 +748,11 @@ export const useStore = create<Store>((set, get) => ({
           ratings[entry.fromKey] = ratings[entry.toKey];
           delete ratings[entry.toKey];
         }
+        const ids = { ...(library.ids ?? {}) };
+        if (entry.toKey in ids) {
+          ids[entry.fromKey] = ids[entry.toKey];
+          delete ids[entry.toKey];
+        }
         const viewed = { ...get().viewed };
         if (entry.toKey in viewed) {
           viewed[entry.fromKey] = viewed[entry.toKey];
@@ -714,7 +765,7 @@ export const useStore = create<Store>((set, get) => ({
         const unsorted = !entry.item.targetId ? sortItems([...get().unsorted, entry.item]) : get().unsorted;
         const allItems = sortItems([...get().allItems.filter((i) => i.key !== entry.toKey), entry.item]);
         set({
-          library: { ...library, ratings },
+          library: { ...library, ratings, ids },
           viewed,
           queue,
           index: at,
@@ -816,6 +867,11 @@ function applyMove(moves: [string, string][], from: MediaItem, to: MediaItem, la
     ratings[to.key] = ratings[from.key];
     delete ratings[from.key];
   }
+  const ids = { ...(library.ids ?? {}) };
+  if (from.key in ids) {
+    ids[to.key] = ids[from.key];
+    delete ids[from.key];
+  }
   const viewed = { ...s.viewed };
   if (from.key in viewed) {
     viewed[to.key] = viewed[from.key];
@@ -829,7 +885,7 @@ function applyMove(moves: [string, string][], from: MediaItem, to: MediaItem, la
   if (!trashed) allItems.push(to);
   const index = queue.length === 0 ? 0 : Math.min(s.index, queue.length - 1);
   useStore.setState({
-    library: { ...library, ratings },
+    library: { ...library, ratings, ids },
     viewed,
     queue,
     unsorted,

@@ -57,7 +57,7 @@ export function Browse() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.root, s.allStale]);
 
-  const all = s.allItems;
+  const all = useMemo(() => s.allItems.filter((i) => !i.albumKey), [s.allItems]);
   const ratings = s.library?.ratings ?? {};
   const viewed = s.viewed;
   const targetName = useMemo(() => Object.fromEntries(targets.map((t) => [t.id, t.name])), [targets]);
@@ -349,9 +349,6 @@ export function Browse() {
         <button className="btn sm" onClick={() => void s.surprise()} title="A random item you haven't seen lately">
           ✦ Surprise me <kbd className="kbd">R</kbd>
         </button>
-        <button className={chip(selectMode)} onClick={() => setSelectMode((m) => !m)} title="Click selects instead of opening (⌘-click and ⇧-click always select)">
-          Select mode
-        </button>
         <button className="btn sm ghost" onClick={() => setF({ ...DEFAULTS_RESET })} title="Reset all filters">
           Reset filters
         </button>
@@ -394,10 +391,13 @@ export function Browse() {
           </div>
         ) : (
           <div className="browse-head">
-            <span className="mono dim">
+            <span className="mono dim grow">
               {s.loading ? s.loading : `${items.length} of ${all.length} items · ${formatBytes(totalBytes)}`}
               {scannedCount > 0 && <span className="faint"> · {scannedCount} fingerprinted ✓</span>}
             </span>
+            <button className={chip(selectMode)} onClick={() => setSelectMode((m) => !m)} title="Click selects tiles instead of opening them (⌘-click and ⇧-click always select)">
+              {selectMode ? "Selecting" : "Select"}
+            </button>
           </div>
         )}
         <div className="scroller" ref={scrollerRef} onScroll={onScroll}>

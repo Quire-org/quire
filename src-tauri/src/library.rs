@@ -40,6 +40,9 @@ pub struct Library {
     #[serde(default)]
     pub auto_decode_album_names: bool,
     /// Where this folder is backed up to, and when that last finished (ms).
+    /// item key -> identity (size, mtime, name, fingerprint) so ratings follow moved files
+    #[serde(default)]
+    pub ids: BTreeMap<String, serde_json::Value>,
     #[serde(default)]
     pub backup_dest: Option<String>,
     #[serde(default)]
@@ -60,6 +63,7 @@ impl Default for Library {
             album_roots: vec![],
             album_ratings: BTreeMap::new(),
             auto_decode_album_names: false,
+            ids: BTreeMap::new(),
             backup_dest: None,
             last_backup: None,
         }
