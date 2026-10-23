@@ -1,3 +1,5 @@
+mod albums;
+mod drive;
 mod dupes;
 mod library;
 mod media;
@@ -30,27 +32,32 @@ async fn scan_unsorted(root: String, library: Library) -> Result<Vec<MediaItem>,
     }
     let mut exclude: Vec<PathBuf> = library.targets.iter().map(|t| resolve(&root, &t.path)).collect();
     exclude.push(library.trash_path(&root));
+    exclude.extend(library.album_root_paths(&root));
     Ok(media::scan(&root, &root, &exclude))
 }
 
 /// Everything under the root (minus the trash folder) plus any target folders
 /// that live outside the root. Items inside a target folder carry its id.
 #[tauri::command]
-async fn scan_all(root: String, library: Library) -> Result<Vec<MediaItem>, String> {
+async fn scan_all(root: String, library: Library, include_albums: bool) -> Result<Vec<MediaItem>, String> {
     let root = PathBuf::from(root);
     if !root.is_dir() {
         return Err(format!("{} is not a directory", root.display()));
     }
     let trash = library.trash_path(&root);
+    let mut exclude = vec![trash.clone()];
+    if !include_albums {
+        exclude.extend(library.album_root_paths(&root));
+    }
     let targets: Vec<(String, PathBuf)> = library
         .targets
         .iter()
         .map(|t| (t.id.clone(), resolve(&root, &t.path)))
         .collect();
-    let mut items = media::scan(&root, &root, &[trash.clone()]);
+    let mut items = media::scan(&root, &root, &exclude);
     for (_, dir) in &targets {
         if !dir.starts_with(&root) && dir.is_dir() {
-            items.extend(media::scan(&root, dir, &[trash.clone()]));
+            items.extend(media::scan(&root, dir, &exclude));
         }
     }
     for item in &mut items {
@@ -181,6 +188,51 @@ async fn scan_trash(root: String, library: Library) -> Result<Vec<MediaItem>, St
     Ok(media::scan(&root, &trash, &[]))
 }
 
+#[tauri::command]
+async fn scan_albums(root: String, library: Library) -> Result<Vec<albums::Album>, String> {
+    let root = PathBuf::from(root);
+    let roots: Vec<(String, PathBuf)> = library.album_roots.iter().map(|a| (a.clone(), resolve(&root, a))).collect();
+    Ok(albums::scan_albums(&root, &roots))
+}
+
+/// Move a whole album folder into a target folder. Returns the new absolute path.
+#[tauri::command]
+async fn move_dir(root: String, dir: String, dest: String) -> Result<String, String> {
+    let root = PathBuf::from(root);
+    let dest_dir = resolve(&root, &dest);
+    albums::move_dir(Path::new(&dir), &dest_dir).map(|p| p.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+async fn drive_info(root: String) -> drive::DriveInfo {
+    tauri::async_runtime::spawn_blocking(move || drive::drive_info(Path::new(&root)))
+        .await
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn read_benchmark(root: String, max_bytes: u64) -> Result<drive::Benchmark, String> {
+    tauri::async_runtime::spawn_blocking(move || drive::read_benchmark(Path::new(&root), max_bytes))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn verify_readability(root: String, on_progress: tauri::ipc::Channel<drive::VerifyProgress>) -> Result<drive::VerifyResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        drive::verify_readability(Path::new(&root), |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cancel_verify() {
+    drive::VERIFY_CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
 /// Perceptual hashes of an image (or a RAW file's embedded preview).
 #[tauri::command]
 async fn image_hash(path: String, is_raw: bool) -> Result<dupes::ImageHash, String> {
@@ -260,6 +312,12 @@ pub fn run() {
             scan_unsorted,
             scan_all,
             scan_dir,
+            scan_albums,
+            move_dir,
+            drive_info,
+            read_benchmark,
+            verify_readability,
+            cancel_verify,
             move_item,
             trash_item,
             restore_files,

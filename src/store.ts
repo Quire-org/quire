@@ -3,12 +3,13 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, storedPath } from "./lib/api";
 import { suggestHotkey } from "./lib/hotkeys";
 import { basename, shuffled, uid } from "./lib/format";
-import type { Library, MediaItem, Target } from "./lib/types";
+import type { Album, Library, MediaItem, Target } from "./lib/types";
 
-export type Screen = "welcome" | "viewer" | "browse" | "dupes";
+export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums";
 
 /** Where the viewer's queue came from. */
-export type QueueSource = { kind: "unsorted" } | { kind: "browse" } | { kind: "dupes" };
+export type QueueSource = { kind: "unsorted" } | { kind: "browse" } | { kind: "dupes" } | { kind: "albums" };
+export type FitMode = "fit" | "fill";
 
 export interface Toast {
   id: string;
@@ -42,6 +43,10 @@ interface State {
   allItems: MediaItem[];
   allLoaded: boolean;
   allStale: boolean;
+  albums: Album[];
+  albumsLoaded: boolean;
+  fitMode: FitMode;
+  driveOpen: boolean;
   loading: string | null;
   busy: boolean;
   toasts: Toast[];
@@ -73,6 +78,14 @@ interface Actions {
   trashItem(item: MediaItem): Promise<boolean>;
   loadAll(force?: boolean): Promise<MediaItem[]>;
   openDupes(): void;
+  openAlbums(): void;
+  loadAlbums(force?: boolean): Promise<Album[]>;
+  addAlbumRoot(absPath: string): void;
+  removeAlbumRoot(path: string): void;
+  setAlbumRating(album: Album, rating: number | null): void;
+  moveAlbum(album: Album, targetId: string): Promise<boolean>;
+  openAlbum(album: Album): Promise<void>;
+  toggleFit(): void;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -116,6 +129,14 @@ function sortItems(items: MediaItem[]): MediaItem[] {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
+function loadFit(): FitMode {
+  try {
+    return localStorage.getItem("mediasorter.fit") === "fill" ? "fill" : "fit";
+  } catch {
+    return "fit";
+  }
+}
+
 export const useStore = create<Store>((set, get) => ({
   root: null,
   library: null,
@@ -128,6 +149,10 @@ export const useStore = create<Store>((set, get) => ({
   allItems: [],
   allLoaded: false,
   allStale: false,
+  albums: [],
+  albumsLoaded: false,
+  fitMode: loadFit(),
+  driveOpen: false,
   loading: null,
   busy: false,
   toasts: [],
@@ -176,6 +201,8 @@ export const useStore = create<Store>((set, get) => ({
         allItems: [],
         allLoaded: false,
         allStale: false,
+        albums: [],
+        albumsLoaded: false,
       });
       get().toast(`${unsorted.length} unsorted items`, "ok");
     } catch (e) {
@@ -191,6 +218,8 @@ export const useStore = create<Store>((set, get) => ({
       unsorted: [],
       allItems: [],
       allLoaded: false,
+      albums: [],
+      albumsLoaded: false,
       queue: [],
       index: 0,
       screen: "welcome",
@@ -206,7 +235,7 @@ export const useStore = create<Store>((set, get) => ({
     set({ loading: "Scanning folder…" });
     try {
       const unsorted = sortItems(await api.scanUnsorted(root, library));
-      const patch: Partial<State> = { unsorted, loading: null, allStale: true };
+      const patch: Partial<State> = { unsorted, loading: null, allStale: true, albumsLoaded: false };
       if (source.kind === "unsorted") {
         const cur = get().queue[get().index];
         const queue = get().shuffle ? shuffled(unsorted) : unsorted;
@@ -326,7 +355,7 @@ export const useStore = create<Store>((set, get) => ({
     if (allLoaded && !allStale && !force) return allItems;
     set({ loading: "Scanning folder…" });
     try {
-      const items = sortItems(await api.scanAll(root, library));
+      const items = sortItems(await api.scanAll(root, library, false));
       set({ allItems: items, allLoaded: true, allStale: false, loading: null });
       return items;
     } catch (e) {
@@ -338,6 +367,103 @@ export const useStore = create<Store>((set, get) => ({
 
   openDupes() {
     set({ screen: "dupes", settingsOpen: false, trashOpen: false });
+  },
+
+  openAlbums() {
+    set({ screen: "albums", settingsOpen: false, trashOpen: false });
+  },
+
+  async loadAlbums(force = false) {
+    const { root, library, albumsLoaded, albums } = get();
+    if (!root || !library) return [];
+    if (albumsLoaded && !force) return albums;
+    try {
+      const list = await api.scanAlbums(root, library);
+      set({ albums: list, albumsLoaded: true });
+      return list;
+    } catch (e) {
+      get().toast(String(e), "error");
+      return albums;
+    }
+  },
+
+  addAlbumRoot(absPath) {
+    const { root, library } = get();
+    if (!root || !library) return;
+    const path = storedPath(root, absPath);
+    if (library.albumRoots.includes(path)) return;
+    set({ library: { ...library, albumRoots: [...library.albumRoots, path] }, albumsLoaded: false });
+    get().saveLibrary();
+    void get().rescan(true);
+  },
+
+  removeAlbumRoot(path) {
+    const { library } = get();
+    if (!library) return;
+    set({ library: { ...library, albumRoots: library.albumRoots.filter((p) => p !== path) }, albumsLoaded: false });
+    get().saveLibrary();
+    void get().rescan(true);
+  },
+
+  setAlbumRating(album, rating) {
+    const { library } = get();
+    if (!library) return;
+    const albumRatings = { ...library.albumRatings };
+    if (rating == null) delete albumRatings[album.key];
+    else albumRatings[album.key] = rating;
+    set({ library: { ...library, albumRatings } });
+    get().saveLibrary();
+  },
+
+  async moveAlbum(album, targetId) {
+    const { root, library, busy } = get();
+    const target = library?.targets.find((t) => t.id === targetId);
+    if (!root || !library || !target || busy) return false;
+    set({ busy: true });
+    try {
+      const newPath = await api.moveDir(root, album.path, target.path);
+      const albumRatings = { ...library.albumRatings };
+      const newKey = storedPath(root, newPath);
+      if (album.key in albumRatings) {
+        albumRatings[newKey] = albumRatings[album.key];
+        delete albumRatings[album.key];
+      }
+      set({
+        library: { ...library, albumRatings },
+        albums: get().albums.filter((a) => a.key !== album.key),
+        allStale: true,
+      });
+      get().saveLibrary();
+      get().toast(`Album → ${target.name}`, "ok");
+      return true;
+    } catch (e) {
+      get().toast(String(e), "error");
+      return false;
+    } finally {
+      set({ busy: false });
+    }
+  },
+
+  async openAlbum(album) {
+    const { root } = get();
+    if (!root) return;
+    try {
+      const items = sortItems(await api.scanDir(root, album.path));
+      set({ screen: "viewer", queue: items, index: 0, source: { kind: "albums" }, shuffle: false });
+    } catch (e) {
+      get().toast(String(e), "error");
+    }
+  },
+
+  toggleFit() {
+    const fitMode: FitMode = get().fitMode === "fit" ? "fill" : "fit";
+    try {
+      localStorage.setItem("mediasorter.fit", fitMode);
+    } catch {
+      /* ignore */
+    }
+    set({ fitMode });
+    get().toast(fitMode === "fit" ? "Fit: whole image visible" : "Fill: edge to edge, may crop");
   },
 
   async undo() {

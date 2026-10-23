@@ -21,6 +21,10 @@ export function Settings() {
     const dir = await pickFolder("Choose a target folder", s.lastTargetParent ?? s.root ?? undefined);
     if (dir) s.addTarget(dir);
   };
+  const addAlbumRoot = async () => {
+    const dir = await pickFolder("Choose a folder whose subfolders are albums", s.root ?? undefined);
+    if (dir) s.addAlbumRoot(dir);
+  };
 
   const setHotkey = (id: string, raw: string) => {
     const k = raw.trim().toLowerCase().slice(-1);
@@ -63,7 +67,30 @@ export function Settings() {
 
       <hr className="rule" />
       <section>
-        <h3>Theme</h3>
+        <div className="sec-head">
+          <h3>Album folders</h3>
+          <button className="btn sm" onClick={() => void addAlbumRoot()}>
+            + Add album folder
+          </button>
+        </div>
+        <p className="dim small">Each subfolder of an album folder is an album: kept out of the grid and the queue, rated and moved as a whole.</p>
+        <div className="target-list">
+          {(s.library?.albumRoots ?? []).map((r) => (
+            <div key={r} className="side-row">
+              <span className="mono faint small ellipsis grow" title={r}>
+                {r}
+              </span>
+              <button className="btn sm danger" onClick={() => s.removeAlbumRoot(r)}>
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <hr className="rule" />
+      <section>
+        <h3>Theme & display</h3>
         <div className="theme-list">
           {themes.map((t) => (
             <button
@@ -78,6 +105,9 @@ export function Settings() {
               {t.name}
             </button>
           ))}
+          <button className="btn" onClick={s.toggleFit} title="Fit shows the whole image; fill covers the screen and may crop">
+            Image: {s.fitMode === "fit" ? "fit (whole image)" : "fill (crop to screen)"} <kbd className="kbd">X</kbd>
+          </button>
         </div>
       </section>
 
@@ -104,6 +134,9 @@ export function Settings() {
       <section className="row">
         <button className="btn" onClick={() => void s.rescan()}>
           Rescan folder
+        </button>
+        <button className="btn accent2" onClick={() => s.set({ driveOpen: true, settingsOpen: false })}>
+          Drive health
         </button>
         <button className="btn ghost" onClick={s.closeRoot}>
           Close folder

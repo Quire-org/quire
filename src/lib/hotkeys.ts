@@ -3,7 +3,7 @@ export const RESERVED_KEYS = new Set([
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
   " ", "arrowleft", "arrowright", "arrowup", "arrowdown",
   "backspace", "delete", "escape", "enter", "tab",
-  "z", "s", "f", "b", "u", "h", "g", "i", "?", "m", ",", ".", "d",
+  "z", "s", "f", "b", "u", "h", "g", "i", "?", "m", ",", ".", "d", "a", "x",
 ]);
 
 export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
@@ -18,6 +18,8 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["S"], label: "Shuffle queue" },
   { keys: ["B"], label: "Browse everything" },
   { keys: ["D"], label: "Find duplicates" },
+  { keys: ["A"], label: "Albums" },
+  { keys: ["X"], label: "Fit / fill the screen" },
   { keys: ["G"], label: "Open settings" },
   { keys: ["H"], label: "Hide / show HUD" },
   { keys: ["I"], label: "Show file info" },

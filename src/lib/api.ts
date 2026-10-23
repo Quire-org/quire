@@ -1,6 +1,6 @@
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc, Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { ImageHashResult, Library, MediaItem, MoveResult, TrashInfo } from "./types";
+import type { Album, Benchmark, DriveInfo, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
 
 export const api = {
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
@@ -10,8 +10,18 @@ export const api = {
     invoke<MediaItem[]>("scan_unsorted", { root, library }),
   scanDir: (root: string, dir: string) =>
     invoke<MediaItem[]>("scan_dir", { root, dir }),
-  scanAll: (root: string, library: Library) =>
-    invoke<MediaItem[]>("scan_all", { root, library }),
+  scanAll: (root: string, library: Library, includeAlbums = false) =>
+    invoke<MediaItem[]>("scan_all", { root, library, includeAlbums }),
+  scanAlbums: (root: string, library: Library) => invoke<Album[]>("scan_albums", { root, library }),
+  moveDir: (root: string, dir: string, dest: string) => invoke<string>("move_dir", { root, dir, dest }),
+  driveInfo: (root: string) => invoke<DriveInfo>("drive_info", { root }),
+  readBenchmark: (root: string, maxBytes = 128 * 1024 * 1024) => invoke<Benchmark>("read_benchmark", { root, maxBytes }),
+  verifyReadability: (root: string, onProgress: (p: VerifyProgress) => void) => {
+    const ch = new Channel<VerifyProgress>();
+    ch.onmessage = onProgress;
+    return invoke<VerifyResult>("verify_readability", { root, onProgress: ch });
+  },
+  cancelVerify: () => invoke<void>("cancel_verify"),
   imageHash: (path: string, isRaw: boolean) =>
     invoke<ImageHashResult>("image_hash", { path, isRaw }),
   fileFingerprint: (path: string) => invoke<string>("file_fingerprint", { path }),

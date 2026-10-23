@@ -7,20 +7,21 @@ import type { MediaItem } from "../lib/types";
  * Full-bleed display of one item: image, RAW (via embedded preview) or video
  * with a small custom control bar.
  */
-export function MediaStage({ item, videoRef }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null> }) {
-  if (item.kind === "video") return <VideoStage item={item} videoRef={videoRef} />;
-  if (item.kind === "raw") return <RawStage item={item} />;
-  return <ImageStage item={item} />;
+export function MediaStage({ item, videoRef, fit = "fit" }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; fit?: "fit" | "fill" }) {
+  const cls = `stage-media ${fit === "fill" ? "fill" : ""}`;
+  if (item.kind === "video") return <VideoStage item={item} videoRef={videoRef} cls={cls} />;
+  if (item.kind === "raw") return <RawStage item={item} cls={cls} />;
+  return <ImageStage item={item} cls={cls} />;
 }
 
-function ImageStage({ item }: { item: MediaItem }) {
+function ImageStage({ item, cls }: { item: MediaItem; cls: string }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [item.primary]);
   if (failed) return <Unavailable item={item} reason="The webview cannot decode this image format." />;
   return (
     <img
       key={item.primary}
-      className="stage-media"
+      className={cls}
       src={fileSrc(item.primary)}
       alt={item.name}
       draggable={false}
@@ -29,7 +30,7 @@ function ImageStage({ item }: { item: MediaItem }) {
   );
 }
 
-function RawStage({ item }: { item: MediaItem }) {
+function RawStage({ item, cls }: { item: MediaItem; cls: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -45,10 +46,10 @@ function RawStage({ item }: { item: MediaItem }) {
   }, [item.primary]);
   if (error) return <Unavailable item={item} reason={error} />;
   if (!url) return <div className="stage-loading mono">DECODING RAW PREVIEW…</div>;
-  return <img className="stage-media" src={url} alt={item.name} draggable={false} />;
+  return <img className={cls} src={url} alt={item.name} draggable={false} />;
 }
 
-function VideoStage({ item, videoRef }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null> }) {
+function VideoStage({ item, videoRef, cls }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; cls: string }) {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -77,7 +78,7 @@ function VideoStage({ item, videoRef }: { item: MediaItem; videoRef: RefObject<H
       <video
         key={item.primary}
         ref={videoRef}
-        className="stage-media"
+        className={cls}
         src={fileSrc(item.primary)}
         autoPlay
         loop

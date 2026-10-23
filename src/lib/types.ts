@@ -29,6 +29,72 @@ export interface Library {
   targets: Target[];
   ratings: Record<string, number>;
   trashDir: string;
+  /** Folders whose immediate subfolders are albums. */
+  albumRoots: string[];
+  albumRatings: Record<string, number>;
+}
+
+export interface Album {
+  key: string;
+  path: string;
+  name: string;
+  albumRoot: string;
+  count: number;
+  bytes: number;
+  images: number;
+  videos: number;
+  modified: number;
+  cover: MediaItem | null;
+}
+
+export interface SmartInfo {
+  passed: boolean | null;
+  temperatureC: number | null;
+  powerOnHours: number | null;
+  percentUsed: number | null;
+  reallocatedSectors: number | null;
+  pendingSectors: number | null;
+  model: string | null;
+  rawError: string | null;
+}
+
+export interface DriveInfo {
+  mountPoint: string;
+  device: string | null;
+  fileSystem: string | null;
+  totalBytes: number;
+  availableBytes: number;
+  removable: boolean;
+  bus: string;
+  model: string | null;
+  solidState: boolean | null;
+  smartStatus: string | null;
+  smartctlAvailable: boolean;
+  smart: SmartInfo | null;
+}
+
+export interface Benchmark {
+  bytes: number;
+  millis: number;
+  mbPerS: number;
+  files: number;
+}
+
+export interface VerifyProgress {
+  files: number;
+  totalFiles: number;
+  bytes: number;
+  totalBytes: number;
+  errors: number;
+  current: string;
+}
+
+export interface VerifyResult {
+  files: number;
+  bytes: number;
+  millis: number;
+  errors: [string, string][];
+  cancelled: boolean;
 }
 
 export interface MoveResult {

@@ -55,9 +55,6 @@
   padding: 0;
   transition: padding 200ms ease;
 }
-.viewer:not(.hud-hidden) .stage {
-  padding: 56px 0 130px;
-}
 .stage-media {
   width: 100%;
   height: 100%;
@@ -111,7 +108,7 @@
 }
 .video-controls {
   position: absolute;
-  bottom: 24px;
+  bottom: 44px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -216,14 +213,16 @@
   min-width: 0;
 }
 .hud-left {
-  flex: 1;
+  flex: 0 1 auto;
 }
 .hud-center {
-  flex: 2;
+  flex: 1 1 auto;
+  min-width: 0;
   justify-content: center;
+  overflow: hidden;
 }
 .hud-right {
-  flex: 1;
+  flex: 0 0 auto;
   justify-content: flex-end;
 }
 .brand {
@@ -665,4 +664,235 @@ section p {
 .dupe-actions {
   display: flex;
   gap: 6px;
+}
+
+/* ---------- Folder picker ---------- */
+.fp {
+  position: relative;
+}
+.fp-btn {
+  width: 100%;
+  justify-content: space-between;
+}
+.fp-pop {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  width: 320px;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  background: var(--bg-2);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+  clip-path: none;
+}
+.fp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.fp-list {
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.fp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.fp-row:hover {
+  background: var(--bg-3);
+}
+.fp-row.off .fp-name {
+  color: var(--fg-faint);
+}
+.fp-name {
+  flex: 1;
+}
+
+/* ---------- Scan pill ---------- */
+.scan-pill {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 280px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(8px);
+  z-index: 90;
+  cursor: pointer;
+  border-color: var(--accent-2);
+}
+.viewer ~ .scan-pill {
+  bottom: 150px;
+}
+.scan-pill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ---------- Thumb extras ---------- */
+.thumb-media {
+  position: relative;
+}
+.thumb-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--accent-2);
+  color: var(--accent-2);
+  font-size: 14px;
+  pointer-events: none;
+}
+.badge.ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+/* ---------- Albums ---------- */
+.album-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 16px;
+  align-content: start;
+}
+.album-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+}
+.album-cover {
+  aspect-ratio: 4 / 3;
+  background: var(--bg);
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+.album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.album-cover .thumb-ph {
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.album-count {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(0, 0, 0, 0.65);
+}
+.album-name {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.album-rating {
+  display: flex;
+  gap: 3px;
+}
+.album-rating .rating-seg {
+  width: 16px;
+  height: 16px;
+  clip-path: none;
+}
+.album-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ---------- Drive ---------- */
+.drive-grid {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+.cap-bar {
+  height: 10px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  margin: 4px 0;
+}
+.cap-fill {
+  height: 100%;
+  background: var(--accent);
+}
+.verdict {
+  padding: 10px 12px;
+  border-left: 4px solid var(--accent-2);
+  background: var(--bg);
+}
+.verdict.good {
+  border-left-color: var(--ok);
+}
+.verdict.bad {
+  border-left-color: var(--danger);
+}
+.verdict.unknown {
+  border-left-color: var(--warn);
+}
+.reco {
+  margin: 6px 0 0 18px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+.reco li {
+  margin: 2px 0;
+}
+.err-list {
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--danger);
+}
+
+/* ---------- Dupes estimate ---------- */
+.estimate {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.estimate .big {
+  font-size: 20px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+/* ---------- Viewer fit ---------- */
+.stage-media.fill {
+  object-fit: cover;
+}
+.viewer:not(.hud-hidden) .stage {
+  padding: var(--hud-top-h, 56px) 0 var(--hud-bottom-h, 130px);
 }

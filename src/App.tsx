@@ -7,6 +7,9 @@ import { Welcome } from "./screens/Welcome";
 import { Viewer } from "./screens/Viewer";
 import { Browse } from "./screens/Browse";
 import { Dupes } from "./screens/Dupes";
+import { Albums } from "./screens/Albums";
+import { Drive } from "./screens/Drive";
+import { ScanPill } from "./components/ScanPill";
 import { Settings } from "./screens/Settings";
 import { Trash } from "./screens/Trash";
 import { Help } from "./screens/Help";
@@ -18,6 +21,7 @@ export default function App() {
   const settingsOpen = useStore((s) => s.settingsOpen);
   const trashOpen = useStore((s) => s.trashOpen);
   const helpOpen = useStore((s) => s.helpOpen);
+  const driveOpen = useStore((s) => s.driveOpen);
   const openRoot = useStore((s) => s.openRoot);
 
   // Open a folder passed on the command line / MEDIA_SORTER_ROOT, if any.
@@ -33,6 +37,9 @@ export default function App() {
       {screen === "viewer" && <Viewer />}
       {screen === "browse" && <Browse />}
       {screen === "dupes" && <Dupes />}
+      {screen === "albums" && <Albums />}
+      {driveOpen && <Drive />}
+      <ScanPill />
       {settingsOpen && <Settings />}
       {trashOpen && <Trash />}
       {helpOpen && <Help />}

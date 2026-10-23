@@ -12,8 +12,27 @@ export function Viewer() {
   const current = useStore(selectCurrent);
   const rating = useStore(selectRating);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const targets = s.library?.targets ?? [];
-  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen;
+  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen;
+
+  // Keep the stage clear of the HUD bars whatever their height (target buttons may wrap).
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const top = el.querySelector<HTMLElement>(".hud-top");
+    const bottom = el.querySelector<HTMLElement>(".hud-bottom");
+    if (!top || !bottom) return;
+    const apply = () => {
+      el.style.setProperty("--hud-top-h", `${top.offsetHeight}px`);
+      el.style.setProperty("--hud-bottom-h", `${bottom.offsetHeight}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(top);
+    ro.observe(bottom);
+    return () => ro.disconnect();
+  }, []);
 
   const addTarget = useCallback(async () => {
     const dir = await pickFolder("Choose a target folder", s.lastTargetParent ?? s.root ?? undefined);
@@ -28,14 +47,16 @@ export function Viewer() {
       const cur = st.queue[st.index];
 
       if (key === "escape") {
-        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen) {
-          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false });
+        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen) {
+          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false });
         } else if (st.fullscreen) {
           void st.toggleFullscreen();
         } else if (st.source.kind === "browse") {
           st.openBrowse();
         } else if (st.source.kind === "dupes") {
           st.openDupes();
+        } else if (st.source.kind === "albums") {
+          st.openAlbums();
         }
         return;
       }
@@ -71,6 +92,12 @@ export function Viewer() {
           return;
         case "d":
           st.openDupes();
+          return;
+        case "a":
+          st.openAlbums();
+          return;
+        case "x":
+          st.toggleFit();
           return;
         case "g":
           st.set({ settingsOpen: true });
@@ -123,10 +150,10 @@ export function Viewer() {
   const upcoming = s.queue.slice(s.index + 1, s.index + 3).filter((i) => i.kind === "image");
 
   return (
-    <div className={`viewer ${s.hudHidden ? "hud-hidden" : ""}`}>
+    <div ref={rootRef} className={`viewer ${s.hudHidden ? "hud-hidden" : ""}`}>
       <div className="stage">
         {current ? (
-          <MediaStage item={current} videoRef={videoRef} />
+          <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} />
         ) : (
           <div className="stage-empty panel">
             <div className="label">Queue empty</div>
@@ -184,15 +211,22 @@ export function Viewer() {
           )}
         </div>
         <div className="hud-right">
-          <span className="mono counter">
-            {s.queue.length ? s.index + 1 : 0} / {s.queue.length}
+          <span className="mono counter" title="Position in the current queue">
+            {s.queue.length ? s.index + 1 : 0} of {s.queue.length}
           </span>
+          <button className={`btn sm ghost ${s.fitMode === "fill" ? "active" : ""}`} onClick={s.toggleFit} title="Fit whole image / fill screen (X)">
+            {s.fitMode === "fit" ? "Fit" : "Fill"} <kbd className="kbd">X</kbd>
+          </button>
           <button className={`btn sm ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
             Shuffle <kbd className="kbd">S</kbd>
           </button>
           {s.source.kind === "dupes" ? (
             <button className="btn sm accent2" onClick={s.openDupes} title="Back to duplicates (Esc)">
               Duplicates <kbd className="kbd">Esc</kbd>
+            </button>
+          ) : s.source.kind === "albums" ? (
+            <button className="btn sm accent2" onClick={s.openAlbums} title="Back to albums (Esc)">
+              Albums <kbd className="kbd">Esc</kbd>
             </button>
           ) : s.source.kind === "browse" ? (
             <button className="btn sm accent2" onClick={s.openBrowse} title="Back to browse (Esc)">
@@ -202,6 +236,9 @@ export function Viewer() {
             <>
               <button className="btn sm accent2" onClick={s.openBrowse} title="Browse everything (B)">
                 Browse <kbd className="kbd">B</kbd>
+              </button>
+              <button className="btn sm" onClick={s.openAlbums} title="Albums (A)">
+                Albums <kbd className="kbd">A</kbd>
               </button>
               <button className="btn sm" onClick={s.openDupes} title="Find duplicates (D)">
                 Dupes <kbd className="kbd">D</kbd>

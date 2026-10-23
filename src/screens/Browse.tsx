@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store";
+import { useDupes } from "../dupesStore";
 import { Thumb } from "../components/Thumb";
+import { FolderPicker } from "../components/FolderPicker";
 import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, shuffled } from "../lib/format";
+import { cacheValid } from "../lib/dupes";
 import type { MediaItem } from "../lib/types";
 
 type LocationSel = "all" | "unsorted" | string;
@@ -11,14 +14,17 @@ type SortSel = "name" | "date" | "rating" | "size";
 
 /**
  * Everything under the opened folder (and any target folders outside it) as one
- * grid, narrowed down by location, type, subfolder, rating and name.
+ * grid, narrowed down by location, type, folders, rating and name. Album
+ * folders are kept out; they have their own screen.
  */
 export function Browse() {
   const s = useStore();
+  const sigCache = useDupes((d) => d.cache);
+  const loadCache = useDupes((d) => d.loadCache);
   const targets = s.library?.targets ?? [];
   const [location, setLocation] = useState<LocationSel>("all");
   const [kind, setKind] = useState<KindSel>("all");
-  const [folder, setFolder] = useState<string>("");
+  const [folders, setFolders] = useState<Set<string> | null>(null);
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortSel>("name");
   const [desc, setDesc] = useState(false);
@@ -30,6 +36,7 @@ export function Browse() {
 
   useEffect(() => {
     void s.loadAll();
+    void loadCache();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.root, s.allStale]);
 
@@ -46,25 +53,12 @@ export function Browse() {
     return c;
   }, [all]);
 
-  const folders = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const i of all) {
-      const parts = i.dir ? i.dir.split("/") : [];
-      // Count the item for the folder and every ancestor so parents include children.
-      for (let k = 0; k <= parts.length; k++) {
-        const key = parts.slice(0, k).join("/");
-        m.set(key, (m.get(key) ?? 0) + 1);
-      }
-    }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [all]);
-
   const items = useMemo(() => {
     let list: MediaItem[] = all;
     if (location === "unsorted") list = list.filter((i) => !i.targetId);
     else if (location !== "all") list = list.filter((i) => i.targetId === location);
     if (kind !== "all") list = list.filter((i) => i.kind === kind);
-    if (folder) list = list.filter((i) => i.dir === folder || i.dir.startsWith(folder + "/"));
+    if (folders) list = list.filter((i) => folders.has(i.dir));
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       list = list.filter((i) => i.name.toLowerCase().includes(q) || i.dir.toLowerCase().includes(q));
@@ -81,17 +75,19 @@ export function Browse() {
     const out = list.slice().sort(cmp[sortBy]);
     return desc ? out.reverse() : out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, location, kind, folder, query, ratings, minRating, unratedOnly, random, seed, sortBy, desc]);
+  }, [all, location, kind, folders, query, ratings, minRating, unratedOnly, random, seed, sortBy, desc]);
 
   const totalBytes = useMemo(() => items.reduce((a, i) => a + i.size, 0), [items]);
+  const scannedCount = useMemo(() => items.filter((i) => cacheValid(sigCache[i.key], i) && !sigCache[i.key].error).length, [items, sigCache]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
-      if (s.settingsOpen || s.trashOpen) return;
+      if (s.settingsOpen || s.trashOpen || s.driveOpen) return;
       const key = e.key.toLowerCase();
       if (key === "escape" || key === "b") s.openSortQueue();
       if (key === "d") s.openDupes();
+      if (key === "a") s.openAlbums();
       if (key === "s") {
         setRandom((r) => !r);
         setSeed((x) => x + 1);
@@ -133,6 +129,9 @@ export function Browse() {
           ))}
         </div>
 
+        <div className="label">Folders</div>
+        <FolderPicker items={all} selected={folders} onChange={setFolders} />
+
         <div className="label">Type</div>
         <div className="chips">
           {(["all", "image", "raw", "video"] as KindSel[]).map((k) => (
@@ -141,15 +140,6 @@ export function Browse() {
             </button>
           ))}
         </div>
-
-        <div className="label">Folder</div>
-        <select className="input" value={folder} onChange={(e) => setFolder(e.target.value)}>
-          {folders.map(([f, n]) => (
-            <option key={f} value={f}>
-              {f ? `${"  ".repeat(f.split("/").length - 1)}${f.split("/").pop()}` : "All folders"} ({n})
-            </option>
-          ))}
-        </select>
 
         <div className="label">Rating</div>
         <div className="side-row">
@@ -195,6 +185,9 @@ export function Browse() {
         <button className="btn primary" disabled={!items.length} onClick={() => open(0)}>
           Slideshow <kbd className="kbd">⏎</kbd>
         </button>
+        <button className="btn sm" onClick={s.openAlbums}>
+          Albums <kbd className="kbd">A</kbd>
+        </button>
         <button className="btn sm" onClick={s.openDupes}>
           Find duplicates <kbd className="kbd">D</kbd>
         </button>
@@ -207,11 +200,19 @@ export function Browse() {
         <div className="browse-head">
           <span className="mono dim">
             {s.loading ? s.loading : `${items.length} of ${all.length} items · ${formatBytes(totalBytes)}`}
+            {scannedCount > 0 && <span className="faint"> · {scannedCount} fingerprinted ✓</span>}
           </span>
         </div>
         <div className="grid" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${zoom}px, 1fr))` }}>
           {items.map((it, i) => (
-            <Thumb key={it.primary} item={it} rating={ratings[it.key]} label={it.targetId ? targetName[it.targetId] : undefined} onClick={() => open(i)} />
+            <Thumb
+              key={it.primary}
+              item={it}
+              rating={ratings[it.key]}
+              label={it.targetId ? targetName[it.targetId] : undefined}
+              scanned={cacheValid(sigCache[it.key], it) && !sigCache[it.key].error}
+              onClick={() => open(i)}
+            />
           ))}
         </div>
       </main>

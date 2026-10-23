@@ -30,6 +30,12 @@ pub struct Library {
     pub ratings: BTreeMap<String, u8>,
     #[serde(default = "default_trash_dir")]
     pub trash_dir: String,
+    /// Folders whose immediate subfolders are albums (kept out of the main grid).
+    #[serde(default)]
+    pub album_roots: Vec<String>,
+    /// album key (relative path) -> rating 1..=10
+    #[serde(default)]
+    pub album_ratings: BTreeMap<String, u8>,
 }
 
 fn default_trash_dir() -> String {
@@ -43,6 +49,8 @@ impl Default for Library {
             targets: vec![],
             ratings: BTreeMap::new(),
             trash_dir: default_trash_dir(),
+            album_roots: vec![],
+            album_ratings: BTreeMap::new(),
         }
     }
 }
@@ -72,6 +80,10 @@ impl Library {
 
     pub fn trash_path(&self, root: &Path) -> PathBuf {
         resolve(root, &self.trash_dir)
+    }
+
+    pub fn album_root_paths(&self, root: &Path) -> Vec<PathBuf> {
+        self.album_roots.iter().map(|a| resolve(root, a)).collect()
     }
 }
 

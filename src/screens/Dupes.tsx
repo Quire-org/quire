@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { useStore } from "../store";
 import { useDupes, type Sensitivity } from "../dupesStore";
 import { Thumb } from "../components/Thumb";
+import { FolderPicker } from "../components/FolderPicker";
+import { fmtEta, useCountdown } from "../components/ScanPill";
 import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate } from "../lib/format";
 import { fmtTime, type DupeGroup, type DupeMember } from "../lib/dupes";
@@ -11,18 +13,23 @@ export function Dupes() {
   const d = useDupes();
   const targets = s.library?.targets ?? [];
   const targetName = Object.fromEntries(targets.map((t) => [t.id, t.name]));
+  const left = useCountdown(d.running ? d.progress.eta : null);
 
   useEffect(() => {
-    void s.loadAll();
+    void s.loadAll().then(() => {
+      void d.loadCache();
+      void d.refreshCandidates();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.root, s.allStale]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen) return;
+      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen) return;
       const key = e.key.toLowerCase();
       if (key === "escape" || key === "d") s.openSortQueue();
       if (key === "b") s.openBrowse();
+      if (key === "a") s.openAlbums();
       if (key === "g") s.set({ settingsOpen: true });
     };
     window.addEventListener("keydown", onKey);
@@ -45,6 +52,7 @@ export function Dupes() {
   const pct = d.progress.total ? Math.round((d.progress.done / d.progress.total) * 100) : 0;
   const chip = (active: boolean) => `btn sm ${active ? "active" : ""}`;
   const wasted = d.groups.reduce((a, g) => a + g.members.slice(1).reduce((b, m) => b + m.item.size, 0), 0);
+  const est = d.estimate;
 
   return (
     <div className="browse dupes">
@@ -75,6 +83,16 @@ export function Dupes() {
             </button>
           ))}
         </div>
+        <div className="label">Folders</div>
+        <FolderPicker items={s.allItems} selected={d.folders} onChange={(sel) => d.set({ folders: sel })} />
+        <label className="side-row check">
+          <input type="checkbox" checked={d.includeAlbums} onChange={(e) => d.set({ includeAlbums: e.target.checked })} disabled={d.running} />
+          Include album folders
+        </label>
+        <label className="side-row check">
+          <input type="checkbox" checked={d.includeVideos} onChange={(e) => d.set({ includeVideos: e.target.checked })} disabled={d.running} />
+          Analyse video footage
+        </label>
 
         <div className="label">Sensitivity</div>
         <div className="chips">
@@ -91,37 +109,50 @@ export function Dupes() {
             </button>
           ))}
         </div>
-        <label className="side-row check">
-          <input type="checkbox" checked={d.includeVideos} onChange={(e) => d.set({ includeVideos: e.target.checked })} disabled={d.running} />
-          Analyse videos (slower)
-        </label>
 
-        <hr className="rule" />
+        <div className="estimate">
+          <div className="side-row">
+            <span className="label">Estimate</span>
+            <span className="big">{est.seconds == null ? (est.total ? "nothing new" : "—") : `~${fmtEta(est.seconds)}`}</span>
+          </div>
+          <div className="mono dim small">
+            {est.total} files in scope · {est.cached} already fingerprinted
+          </div>
+          <div className="mono dim small">
+            new: {est.newStills} photos, {est.newVideos} videos ({formatBytes(est.newBytes)} to read)
+          </div>
+          <div className="side-row">
+            <span className="mono faint small">read speed: {d.readMBps ? `${d.readMBps.toFixed(0)} MB/s` : "assumed 40 MB/s"}</span>
+            <button className="btn sm ghost" onClick={() => void d.benchmark()} disabled={d.running} title="Read ~128 MB from the folder to measure the drive">
+              Measure
+            </button>
+          </div>
+        </div>
+
         {d.running ? (
           <button className="btn danger" onClick={d.cancel}>
             Cancel
           </button>
         ) : (
-          <button className="btn primary" onClick={() => void d.scan()} disabled={!s.allLoaded && !!s.loading}>
+          <button className="btn primary" onClick={() => void d.scan()} disabled={!!s.loading}>
             Scan for duplicates
           </button>
         )}
-        {(d.running || d.progress.stage === "done") && (
+        {d.running && (
           <div className="progress">
             <div className="side-row">
               <span className="label">{d.progress.stage}</span>
-              {d.progress.total > 0 && (
-                <span className="mono dim">
-                  {d.progress.done}/{d.progress.total}
-                </span>
-              )}
+              <span className="mono accent2">~{fmtEta(left)} left</span>
             </div>
-            {d.running && (
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${pct}%` }} />
-              </div>
-            )}
-            {d.progress.detail && <div className="mono faint small ellipsis">{d.progress.detail}</div>}
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="side-row">
+              <span className="mono dim small">
+                {d.progress.done}/{d.progress.total}
+              </span>
+              {d.progress.detail && <span className="mono faint small ellipsis">{d.progress.detail}</span>}
+            </div>
           </div>
         )}
         {d.progress.stage === "done" && (
@@ -142,8 +173,8 @@ export function Dupes() {
               ? d.progress.stage === "done"
                 ? "No duplicates in this scope."
                 : d.running
-                  ? "Scanning…"
-                  : "Pick a scope and start a scan. Results are cached next to your media, so later scans are quick."
+                  ? "Scanning… you can leave this screen, the scan keeps running."
+                  : "Pick a scope and start a scan. Fingerprints are cached next to your media, so only new files are read next time."
               : `${d.groups.length} groups`}
           </span>
         </div>

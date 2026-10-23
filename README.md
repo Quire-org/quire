@@ -32,6 +32,17 @@ so the same code builds for macOS, Linux and Windows.
   and any targets outside it, as one grid. Narrow it down by location (unsorted / a
   target), type, subfolder, rating, or a name search; order by name, date, size or
   rating, or shuffle.
+- **Albums** (`A`): pick one or more *album folders* in Settings. Every subfolder of an album
+  folder is an album: it never appears in the main grid or the sorting queue, and the Albums
+  screen shows it as one card with the first image as cover. Albums get their own 1 to 10
+  rating and can be moved to a target folder as a whole.
+- **Drive health** (Settings → Drive health) shows the volume's bus (SD, USB, NVMe...),
+  model, file system and capacity, SMART data when the device reports it (through
+  `smartctl` if smartmontools is installed), a cache-bypassing read-speed benchmark with
+  typical ranges for the device type, and a readability check that reads every byte of every
+  file and lists the ones that fail. SD cards expose no wear counters to a computer, so the
+  panel says so instead of guessing; read errors and sharp slowdowns are the reliable early
+  warnings, and the recommendations reflect that.
 - **Duplicates** (`D`) scans a scope and groups:
   - *exact copies*: identical content fingerprint (size plus hashed head, middle and
     tail chunks), works for any file type including large videos;
@@ -43,6 +54,11 @@ so the same code builds for macOS, Linux and Windows.
     longer video is reported as contained in it, with the offset. The first 10 minutes
     of each video are analysed. Each group offers *Keep this* (trash the rest) and
     per-file *Trash*; clicking a tile opens the group in the viewer.
+  - The scope is a location plus an include/exclude folder tree, optionally with album
+    folders. Before scanning, the panel shows how many files are already fingerprinted,
+    how many are new, and a time estimate (improved by *Measure*, a short read benchmark).
+    While running it shows a countdown, and a pill on every other screen shows progress
+    so you can keep sorting. Fingerprinted files carry a ✓ badge in Browse.
 
 ### Formats
 
@@ -67,6 +83,8 @@ so the same code builds for macOS, Linux and Windows.
 | `S` | Shuffle the queue |
 | `B` | Browse everything (`Esc` back) |
 | `D` | Find duplicates (`Esc` back) |
+| `A` | Albums (`Esc` back) |
+| `X` | Fit the whole image, or fill the screen (may crop) |
 | `G` | Settings |
 | `I` | File info |
 | `H` | Hide / show HUD |
@@ -87,6 +105,7 @@ MEDIA_SORTER_ROOT=/Volumes/CARD npm run tauri dev   # open a folder at launch
 npm run tauri build                     # bundle (.app on macOS, deb/AppImage, NSIS)
 npm run tauri build -- --bundles dmg    # also produce a .dmg (needs Finder automation permission)
 cd src-tauri && cargo test              # backend unit tests
+npm test                                # frontend unit tests (vitest)
 ```
 
 The app also accepts a folder as its first command line argument.
@@ -110,6 +129,8 @@ loaded in dev mode with `?mock` and is never bundled.
 src-tauri/src/
   lib.rs       Tauri commands (scan, move, trash, library, preview, hashes, cache)
   dupes.rs     Content fingerprints and perceptual image hashes (pHash, dHash)
+  albums.rs    Album folders: scan subfolders, move a folder as a whole
+  drive.rs     Drive info (sysinfo + diskutil + smartctl), read benchmark, readability check
   media.rs     Recursive scan + grouping of RAW/JPEG/sidecar/live-photo pairs
   library.rs   .mediasorter.json on the volume (targets, ratings, trash dir)
   ops.rs       Group moves with collision-safe renaming, trash purge
@@ -118,7 +139,9 @@ src/
   store.ts     App state (zustand): queue, ratings, moves, undo, full item list
   dupesStore.ts Duplicate scan: fingerprint/hash passes, cache, grouping
   lib/dupes.ts Hash helpers, canvas/video hashing, group and subset matching
-  screens/     Welcome, Viewer (full-screen sorting), Browse (grid), Dupes, Settings, Trash, Help
+  screens/     Welcome, Viewer, Browse, Dupes, Albums, Drive, Settings, Trash, Help
+  components/  FolderPicker (include/exclude tree), ScanPill (background scan), Thumb, …
+  lib/poster.ts Video poster frames for tiles (WebKit paints nothing until play)
   components/  MediaStage (image/raw/video), RatingBar, TargetBar, Thumb, Modal, Toasts
   themes/      base.css (tokens + components), cp2077.css, ghost.css, index.ts (registry)
   dev/mock.ts  Browser-only Tauri bridge mock

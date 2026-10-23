@@ -287,21 +287,24 @@ export function matchVideos(a: VideoSig, b: VideoSig, opts: MatchOptions): Video
   const informativeTotal = S.informative.filter(Boolean).length;
   if (S.frames.length < 3 || informativeTotal < 3) return null;
   const allowedMisses = Math.floor((1 - opts.minMatchRatio) * informativeTotal);
-  let best: { ratio: number; offset: number } | null = null;
+  let best: { ratio: number; offset: number; dist: number } | null = null;
   for (let off = 0; off + S.frames.length <= L.frames.length; off++) {
     let matched = 0;
     let misses = 0;
+    let dist = 0; // distance at the exact alignment, used to break ties between neighbouring offsets
     for (let i = 0; i < S.frames.length; i++) {
       if (!S.informative[i]) continue;
       let d = 64;
       for (let j = Math.max(0, off + i - 1); j <= Math.min(L.frames.length - 1, off + i + 1); j++) {
         d = Math.min(d, hamming(S.frames[i], L.frames[j]));
       }
+      dist += hamming(S.frames[i], L.frames[off + i]);
       if (d <= opts.frameThreshold) matched++;
       else if (++misses > allowedMisses) break;
     }
     const ratio = matched / informativeTotal;
-    if (ratio >= opts.minMatchRatio && (!best || ratio > best.ratio)) best = { ratio, offset: off };
+    // Best ratio wins; on ties the closest alignment (smallest summed distance).
+    if (ratio >= opts.minMatchRatio && (!best || ratio > best.ratio || (ratio === best.ratio && dist < best.dist))) best = { ratio, offset: off, dist };
   }
   if (!best) return null;
   const lengthDiff = Math.abs(L.frames.length - S.frames.length);
