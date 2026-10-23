@@ -176,15 +176,6 @@ export function Albums() {
           <input type="range" min={180} max={520} step={20} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
         </div>
 
-        <div className="label">Folder names</div>
-        <label className="side-row check" title="Folders like My%20Trip become My Trip whenever albums are scanned">
-          <input type="checkbox" checked={!!s.library?.autoDecodeAlbumNames} onChange={(e) => s.setAutoDecodeAlbumNames(e.target.checked)} />
-          Auto-decode URL-escaped names
-        </label>
-        <button className="btn sm" onClick={() => void checkNames()} disabled={checking || roots.length === 0}>
-          {checking ? "Checking…" : "Check names now"}
-        </button>
-
         <hr className="rule" />
         <button className="btn primary" disabled={!albums.length || s.busy} onClick={() => void s.openAlbums_Slideshow(albums)} title="Flip through everything in the visible albums">
           Slideshow <kbd className="kbd">⏎</kbd>
@@ -195,6 +186,18 @@ export function Albums() {
         <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })}>
           Settings <kbd className="kbd">G</kbd>
         </button>
+
+        <details className="advanced">
+          <summary className="label">Advanced</summary>
+          <p className="dim small">Folder names like <span className="mono">My%20Trip</span> can be decoded to their real names.</p>
+          <label className="side-row check" title="Decode whenever albums are scanned">
+            <input type="checkbox" checked={!!s.library?.autoDecodeAlbumNames} onChange={(e) => s.setAutoDecodeAlbumNames(e.target.checked)} />
+            Auto-decode on scan
+          </label>
+          <button className="btn sm" onClick={() => void checkNames()} disabled={checking || roots.length === 0}>
+            {checking ? "Checking…" : "Check names now"}
+          </button>
+        </details>
       </aside>
       <main className="browse-main">
         <div className="browse-head">

@@ -906,6 +906,25 @@ section p {
   align-items: center;
 }
 
+.advanced {
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.advanced summary {
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.advanced summary::before {
+  content: "▸ ";
+}
+.advanced[open] summary::before {
+  content: "▾ ";
+}
+
 /* ---------- Drive ---------- */
 .drive-grid {
   display: grid;
