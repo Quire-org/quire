@@ -30,9 +30,11 @@ const seed: Entry[] = [
   { rel: "Albums/Iceland 2025/IMG_1005.png", kind: "image", files: ["Albums/Iceland 2025/IMG_1005.png"] },
   { rel: "Albums/Iceland 2025/CLIP_0003.mp4", kind: "video", files: ["Albums/Iceland 2025/CLIP_0003.mp4"] },
   { rel: "Albums/Birthday/IMG_1012.png", kind: "image", files: ["Albums/Birthday/IMG_1012.png"] },
+  { rel: "Albums/Z%C3%BCrich%20Trip/IMG_1004.png", kind: "image", files: ["Albums/Z%C3%BCrich%20Trip/IMG_1004.png"] },
+  { rel: "Albums/Caf%C3%A9%20Night/IMG_1006.png", kind: "image", files: ["Albums/Caf%C3%A9%20Night/IMG_1006.png"] },
 ];
 
-let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {} };
+let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false };
 let items: MediaItem[] = seed.map((e) => toItem(e.files.map((f) => `${ROOT}/${f}`), `${ROOT}/${e.rel}`, e.kind));
 let pickCount = 0;
 
@@ -123,6 +125,37 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         }
       }
       return out;
+    }
+    case "album_rename_plan": {
+      const lib = args.library as Library;
+      const plan = [];
+      for (const r of lib.albumRoots) {
+        const dir = resolve(r);
+        const names = [...new Set(items.filter((i) => under(i.primary, dir)).map((i) => i.primary.slice(dir.length + 1).split("/")[0]))];
+        for (const n of names) {
+          if (!/%[0-9a-f]{2}/i.test(n)) continue;
+          let to = n;
+          try {
+            to = decodeURIComponent(n);
+          } catch {
+            continue;
+          }
+          plan.push({ from: `${dir}/${n}`, to: `${dir}/${to}`, fromKey: `${r}/${n}`, toKey: `${r}/${to}` });
+        }
+      }
+      return plan;
+    }
+    case "album_rename_apply": {
+      const plan = args.plan as { from: string; to: string }[];
+      for (const r of plan) {
+        items = items.map((i) => {
+          if (!under(i.primary, r.from)) return i;
+          const files = i.files.map((f) => r.to + f.slice(r.from.length));
+          files.forEach((f, k) => origin.set(f, served(i.files[k])));
+          return toItem(files, r.to + i.primary.slice(r.from.length), i.kind);
+        });
+      }
+      return plan;
     }
     case "move_dir": {
       const dir = args.dir as string;

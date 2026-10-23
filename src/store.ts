@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, storedPath } from "./lib/api";
 import { suggestHotkey } from "./lib/hotkeys";
 import { basename, shuffled, uid } from "./lib/format";
-import type { Album, Library, MediaItem, Target } from "./lib/types";
+import type { Album, AlbumRename, Library, MediaItem, Target } from "./lib/types";
 
 export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums";
 
@@ -86,6 +86,11 @@ interface Actions {
   moveAlbum(album: Album, targetId: string): Promise<boolean>;
   openAlbum(album: Album): Promise<void>;
   toggleFit(): void;
+  /** Album folders with URL-escaped names and their decoded names. */
+  albumRenamePlan(): Promise<AlbumRename[]>;
+  /** Rename those folders (all of the plan, or a chosen subset) and re-key their ratings. */
+  applyAlbumRenames(plan: AlbumRename[]): Promise<number>;
+  setAutoDecodeAlbumNames(on: boolean): void;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -378,7 +383,11 @@ export const useStore = create<Store>((set, get) => ({
     if (!root || !library) return [];
     if (albumsLoaded && !force) return albums;
     try {
-      const list = await api.scanAlbums(root, library);
+      if (library.autoDecodeAlbumNames) {
+        const plan = await api.albumRenamePlan(root, library);
+        if (plan.length) await get().applyAlbumRenames(plan);
+      }
+      const list = await api.scanAlbums(root, get().library ?? library);
       set({ albums: list, albumsLoaded: true });
       return list;
     } catch (e) {
@@ -453,6 +462,50 @@ export const useStore = create<Store>((set, get) => ({
     } catch (e) {
       get().toast(String(e), "error");
     }
+  },
+
+  async albumRenamePlan() {
+    const { root, library } = get();
+    if (!root || !library) return [];
+    try {
+      return await api.albumRenamePlan(root, library);
+    } catch (e) {
+      get().toast(String(e), "error");
+      return [];
+    }
+  },
+
+  async applyAlbumRenames(plan) {
+    const { root } = get();
+    if (!root || plan.length === 0) return 0;
+    try {
+      const done = await api.albumRenameApply(plan);
+      const library = get().library!;
+      const albumRatings = { ...library.albumRatings };
+      for (const r of done) {
+        // The album itself and anything keyed below it.
+        for (const key of Object.keys(albumRatings)) {
+          if (key === r.fromKey || key.startsWith(r.fromKey + "/")) {
+            albumRatings[r.toKey + key.slice(r.fromKey.length)] = albumRatings[key];
+            delete albumRatings[key];
+          }
+        }
+      }
+      set({ library: { ...library, albumRatings }, albumsLoaded: false, allStale: true });
+      get().saveLibrary();
+      if (done.length) get().toast(`Renamed ${done.length} album folder${done.length === 1 ? "" : "s"}`, "ok");
+      return done.length;
+    } catch (e) {
+      get().toast(String(e), "error");
+      return 0;
+    }
+  },
+
+  setAutoDecodeAlbumNames(on) {
+    const { library } = get();
+    if (!library) return;
+    set({ library: { ...library, autoDecodeAlbumNames: on }, albumsLoaded: false });
+    get().saveLibrary();
   },
 
   toggleFit() {

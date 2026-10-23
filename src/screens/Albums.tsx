@@ -4,13 +4,23 @@ import { fileSrc, pickFolder, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
 import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate } from "../lib/format";
-import type { Album } from "../lib/types";
+import type { Album, AlbumRename } from "../lib/types";
 import { FitImage } from "../components/FitImage";
 
 /** Album folders: rated, categorised and opened as a whole. */
 export function Albums() {
   const s = useStore();
   const roots = s.library?.albumRoots ?? [];
+  const [plan, setPlan] = useState<AlbumRename[] | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const checkNames = async () => {
+    setChecking(true);
+    const p = await s.albumRenamePlan();
+    setPlan(p);
+    setChecking(false);
+    if (p.length === 0) s.toast("No URL-encoded album names found", "ok");
+  };
 
   useEffect(() => {
     void s.loadAlbums();
@@ -66,6 +76,14 @@ export function Albums() {
             + Add album folder
           </button>
         </div>
+        <div className="label">Folder names</div>
+        <label className="side-row check" title="Folders like My%20Trip become My Trip whenever albums are scanned">
+          <input type="checkbox" checked={!!s.library?.autoDecodeAlbumNames} onChange={(e) => s.setAutoDecodeAlbumNames(e.target.checked)} />
+          Auto-decode URL-escaped names
+        </label>
+        <button className="btn sm" onClick={() => void checkNames()} disabled={checking || roots.length === 0}>
+          {checking ? "Checking…" : "Check names now"}
+        </button>
         <hr className="rule" />
         <button className="btn sm" onClick={s.openBrowse}>
           Browse <kbd className="kbd">B</kbd>
@@ -80,6 +98,51 @@ export function Albums() {
             {s.albums.length} albums · {formatBytes(s.albums.reduce((a, b) => a + b.bytes, 0))}
           </span>
         </div>
+        {plan && plan.length > 0 && (
+          <section className="rename-plan panel">
+            <div className="sec-head">
+              <h3>Decode {plan.length} folder name{plan.length === 1 ? "" : "s"}</h3>
+              <span className="row">
+                <button
+                  className="btn sm primary"
+                  disabled={s.busy}
+                  onClick={async () => {
+                    await s.applyAlbumRenames(plan);
+                    setPlan(null);
+                  }}
+                >
+                  Rename all
+                </button>
+                <button className="btn sm ghost" onClick={() => setPlan(null)}>
+                  Cancel
+                </button>
+              </span>
+            </div>
+            <div className="rename-list mono">
+              {plan.map((r) => (
+                <div key={r.from} className="rename-row">
+                  <span className="dim ellipsis" title={r.from}>
+                    {r.fromKey.split("/").pop()}
+                  </span>
+                  <span className="faint">→</span>
+                  <span className="accent-text ellipsis" title={r.to}>
+                    {r.toKey.split("/").pop()}
+                  </span>
+                  <button
+                    className="btn sm ghost"
+                    disabled={s.busy}
+                    onClick={async () => {
+                      await s.applyAlbumRenames([r]);
+                      setPlan((p) => p?.filter((x) => x !== r) ?? null);
+                    }}
+                  >
+                    Rename
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="album-grid">
           {s.albums.map((a) => (
             <AlbumCard key={a.key} album={a} />

@@ -853,6 +853,23 @@ section p {
   gap: 4px;
 }
 
+.rename-plan {
+  margin: 16px 16px 0;
+  padding: 12px 14px;
+}
+.rename-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.rename-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
 /* ---------- Drive ---------- */
 .drive-grid {
   display: grid;

@@ -59,7 +59,7 @@ describe("duplicate scan", () => {
     fake.hashes.clear();
     useStore.setState({
       root: "/root",
-      library: { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: [], albumRatings: {} },
+      library: { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: [], albumRatings: {}, autoDecodeAlbumNames: false },
       allItems: [],
       allLoaded: true,
       allStale: false,

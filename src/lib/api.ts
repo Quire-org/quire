@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc, Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Album, Benchmark, DriveInfo, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
+import type { Album, AlbumRename, Benchmark, DriveInfo, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
 
 export const api = {
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
@@ -14,6 +14,8 @@ export const api = {
     invoke<MediaItem[]>("scan_all", { root, library, includeAlbums }),
   scanAlbums: (root: string, library: Library) => invoke<Album[]>("scan_albums", { root, library }),
   moveDir: (root: string, dir: string, dest: string) => invoke<string>("move_dir", { root, dir, dest }),
+  albumRenamePlan: (root: string, library: Library) => invoke<AlbumRename[]>("album_rename_plan", { root, library }),
+  albumRenameApply: (plan: AlbumRename[]) => invoke<AlbumRename[]>("album_rename_apply", { plan }),
   driveInfo: (root: string) => invoke<DriveInfo>("drive_info", { root }),
   readBenchmark: (root: string, maxBytes = 128 * 1024 * 1024) => invoke<Benchmark>("read_benchmark", { root, maxBytes }),
   verifyReadability: (root: string, onProgress: (p: VerifyProgress) => void) => {

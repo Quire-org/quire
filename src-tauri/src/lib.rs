@@ -195,6 +195,19 @@ async fn scan_albums(root: String, library: Library) -> Result<Vec<albums::Album
     Ok(albums::scan_albums(&root, &roots))
 }
 
+/// Album folders with URL-escaped names and what they would be renamed to.
+#[tauri::command]
+fn album_rename_plan(root: String, library: Library) -> Vec<albums::Rename> {
+    let root = PathBuf::from(root);
+    albums::rename_plan(&root, &library.album_root_paths(&root))
+}
+
+/// Perform (a subset of) a rename plan. Returns the renames actually done.
+#[tauri::command]
+fn album_rename_apply(plan: Vec<albums::Rename>) -> Result<Vec<albums::Rename>, String> {
+    albums::rename_apply(&plan)
+}
+
 /// Move a whole album folder into a target folder. Returns the new absolute path.
 #[tauri::command]
 async fn move_dir(root: String, dir: String, dest: String) -> Result<String, String> {
@@ -313,6 +326,8 @@ pub fn run() {
             scan_all,
             scan_dir,
             scan_albums,
+            album_rename_plan,
+            album_rename_apply,
             move_dir,
             drive_info,
             read_benchmark,

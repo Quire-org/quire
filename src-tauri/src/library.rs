@@ -36,6 +36,9 @@ pub struct Library {
     /// album key (relative path) -> rating 1..=10
     #[serde(default)]
     pub album_ratings: BTreeMap<String, u8>,
+    /// Decode URL-escaped album folder names (`My%20Trip`) whenever albums are scanned.
+    #[serde(default)]
+    pub auto_decode_album_names: bool,
 }
 
 fn default_trash_dir() -> String {
@@ -51,6 +54,7 @@ impl Default for Library {
             trash_dir: default_trash_dir(),
             album_roots: vec![],
             album_ratings: BTreeMap::new(),
+            auto_decode_album_names: false,
         }
     }
 }

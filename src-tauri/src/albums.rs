@@ -129,3 +129,147 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 }
+
+/// A planned or performed folder rename, with the rating keys it affects.
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Rename {
+    pub from: String,
+    pub to: String,
+    pub from_key: String,
+    pub to_key: String,
+}
+
+/// Decode percent-escapes in a folder name (`Z%C3%BCrich%20Trip` -> `Zürich Trip`).
+/// Returns None when the name would not change. Control characters and path
+/// separators that appear after decoding are replaced so the result is a
+/// valid single path component.
+pub fn decode_name(name: &str) -> Option<String> {
+    if !name.contains('%') {
+        return None;
+    }
+    let bytes = name.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    let mut changed = false;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() && name.is_char_boundary(i + 1) && name.is_char_boundary(i + 3) {
+            let hex = &name[i + 1..i + 3];
+            if let Ok(v) = u8::from_str_radix(hex, 16) {
+                out.push(v);
+                changed = true;
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    if !changed {
+        return None;
+    }
+    let decoded = String::from_utf8_lossy(&out).into_owned();
+    let cleaned: String = decoded
+        .chars()
+        .map(|c| if c.is_control() || c == '/' || c == '\\' || c == ':' { ' ' } else { c })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let cleaned = cleaned.trim_matches(|c| c == '.' || c == ' ').to_string();
+    if cleaned.is_empty() || cleaned == name {
+        return None;
+    }
+    Some(cleaned)
+}
+
+/// Album folders whose names contain URL escapes, with the decoded name they
+/// would get. Collisions get a ` (n)` suffix.
+pub fn rename_plan(root: &Path, album_roots: &[PathBuf]) -> Vec<Rename> {
+    let mut plan = vec![];
+    for dir in album_roots {
+        let Ok(rd) = fs::read_dir(dir) else { continue };
+        let mut subdirs: Vec<PathBuf> = rd
+            .filter_map(Result::ok)
+            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .map(|e| e.path())
+            .collect();
+        subdirs.sort();
+        let mut taken: Vec<String> = subdirs.iter().filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned())).collect();
+        for sub in subdirs {
+            let name = sub.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            let Some(mut new_name) = decode_name(&name) else { continue };
+            let mut n = 1;
+            let base = new_name.clone();
+            while taken.iter().any(|t| t != &name && t.eq_ignore_ascii_case(&new_name)) {
+                new_name = format!("{base} ({n})");
+                n += 1;
+            }
+            taken.push(new_name.clone());
+            let to = dir.join(&new_name);
+            plan.push(Rename {
+                from: sub.to_string_lossy().into_owned(),
+                to: to.to_string_lossy().into_owned(),
+                from_key: media::rel_key(root, &sub),
+                to_key: media::rel_key(root, &to),
+            });
+        }
+    }
+    plan
+}
+
+/// Perform renames from a plan. Entries whose source vanished or whose
+/// destination now exists are skipped; the performed ones are returned.
+pub fn rename_apply(plan: &[Rename]) -> Result<Vec<Rename>, String> {
+    let mut done = vec![];
+    for r in plan {
+        let from = Path::new(&r.from);
+        let to = Path::new(&r.to);
+        if !from.is_dir() || to.exists() {
+            continue;
+        }
+        fs::rename(from, to).map_err(|e| format!("rename {}: {e}", from.display()))?;
+        done.push(r.clone());
+    }
+    Ok(done)
+}
+
+#[cfg(test)]
+mod rename_tests {
+    use super::*;
+
+    #[test]
+    fn decodes_escapes_and_cleans() {
+        assert_eq!(decode_name("Z%C3%BCrich%20Trip").as_deref(), Some("Zürich Trip"));
+        assert_eq!(decode_name("Plain name"), None);
+        assert_eq!(decode_name("100%"), None); // not an escape
+        assert_eq!(decode_name("a%2Fb%12c").as_deref(), Some("a b c")); // slash and control char
+        assert_eq!(decode_name("%20%20").is_none(), true); // decodes to nothing
+    }
+
+    #[test]
+    fn plans_and_applies_with_collisions() {
+        let root = std::env::temp_dir().join(format!("ms-rename-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let ar = root.join("Albums");
+        fs::create_dir_all(ar.join("My%20Trip")).unwrap();
+        fs::create_dir_all(ar.join("My Trip")).unwrap();
+        fs::create_dir_all(ar.join("Caf%C3%A9")).unwrap();
+        fs::create_dir_all(ar.join("Fine")).unwrap();
+
+        let plan = rename_plan(&root, &[ar.clone()]);
+        let names: Vec<(String, String)> = plan
+            .iter()
+            .map(|r| (Path::new(&r.from).file_name().unwrap().to_string_lossy().into_owned(), Path::new(&r.to).file_name().unwrap().to_string_lossy().into_owned()))
+            .collect();
+        assert_eq!(names, vec![("Caf%C3%A9".to_string(), "Café".to_string()), ("My%20Trip".to_string(), "My Trip (1)".to_string())]);
+        assert_eq!(plan[0].to_key, "Albums/Café");
+
+        let done = rename_apply(&plan).unwrap();
+        assert_eq!(done.len(), 2);
+        assert!(ar.join("Café").is_dir());
+        assert!(ar.join("My Trip (1)").is_dir());
+        assert!(!ar.join("My%20Trip").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+}

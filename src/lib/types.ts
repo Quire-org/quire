@@ -32,6 +32,15 @@ export interface Library {
   /** Folders whose immediate subfolders are albums. */
   albumRoots: string[];
   albumRatings: Record<string, number>;
+  /** Decode URL-escaped album folder names whenever albums are scanned. */
+  autoDecodeAlbumNames: boolean;
+}
+
+export interface AlbumRename {
+  from: string;
+  to: string;
+  fromKey: string;
+  toKey: string;
 }
 
 export interface Album {
