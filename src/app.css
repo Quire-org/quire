@@ -350,6 +350,37 @@
   text-overflow: ellipsis;
 }
 
+/* ---------- Screen with top nav ---------- */
+.screen {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.screen > .browse {
+  flex: 1;
+  min-height: 0;
+}
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.topnav .hud-left {
+  flex: 1;
+}
+.topnav-tabs {
+  display: flex;
+  gap: 6px;
+}
+.topnav .hud-right {
+  flex: 1;
+  gap: 6px;
+}
+
 /* ---------- Browse ---------- */
 .browse {
   height: 100%;
@@ -790,9 +821,9 @@ section p {
 }
 .album-foot {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
   padding: 0 2px;
 }

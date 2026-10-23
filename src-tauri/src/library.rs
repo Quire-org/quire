@@ -39,6 +39,11 @@ pub struct Library {
     /// Decode URL-escaped album folder names (`My%20Trip`) whenever albums are scanned.
     #[serde(default)]
     pub auto_decode_album_names: bool,
+    /// Where this folder is backed up to, and when that last finished (ms).
+    #[serde(default)]
+    pub backup_dest: Option<String>,
+    #[serde(default)]
+    pub last_backup: Option<u64>,
 }
 
 fn default_trash_dir() -> String {
@@ -55,6 +60,8 @@ impl Default for Library {
             album_roots: vec![],
             album_ratings: BTreeMap::new(),
             auto_decode_album_names: false,
+            backup_dest: None,
+            last_backup: None,
         }
     }
 }

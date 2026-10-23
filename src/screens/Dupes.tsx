@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useStore } from "../store";
 import { useDupes, type Sensitivity } from "../dupesStore";
 import { Thumb } from "../components/Thumb";
+import { TopNav } from "../components/TopNav";
 import { FolderPicker } from "../components/FolderPicker";
 import { fmtEta, useCountdown } from "../components/ScanPill";
 import { isTypingTarget } from "../lib/hotkeys";
@@ -25,7 +26,7 @@ export function Dupes() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen) return;
+      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen) return;
       const key = e.key.toLowerCase();
       if (key === "escape" || key === "d") s.openSortQueue();
       if (key === "b") s.openBrowse();
@@ -55,14 +56,10 @@ export function Dupes() {
   const est = d.estimate;
 
   return (
+    <div className="screen">
+      <TopNav current="dupes" />
     <div className="browse dupes">
       <aside className="browse-side panel">
-        <div className="side-head">
-          <span className="brand">MEDIA SORTER</span>
-          <button className="btn sm accent2" onClick={s.openSortQueue} title="Back to sorting (Esc)">
-            Sort <kbd className="kbd">Esc</kbd>
-          </button>
-        </div>
         <h3>Duplicates</h3>
         <p className="dim small">
           Exact copies by content fingerprint, similar photos by perceptual hash, and videos whose footage matches or is
@@ -161,9 +158,6 @@ export function Dupes() {
             <span className="mono">{formatBytes(wasted)}</span> reclaimable.
           </div>
         )}
-        <button className="btn sm ghost" onClick={s.openBrowse}>
-          Browse <kbd className="kbd">B</kbd>
-        </button>
       </aside>
 
       <main className="browse-main">
@@ -220,6 +214,7 @@ export function Dupes() {
           ))}
         </div>
       </main>
+    </div>
     </div>
   );
 }

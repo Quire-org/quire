@@ -11,6 +11,49 @@ export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums";
 export type QueueSource = { kind: "unsorted" } | { kind: "browse" } | { kind: "dupes" } | { kind: "albums" };
 export type FitMode = "fit" | "fill";
 
+export interface BrowseFilters {
+  location: string;
+  kind: "all" | "image" | "raw" | "video";
+  folders: string[] | null;
+  query: string;
+  sortBy: "name" | "date" | "rating" | "size";
+  desc: boolean;
+  minRating: number;
+  unratedOnly: boolean;
+  random: boolean;
+  zoom: number;
+  layout: "masonry" | "grid";
+}
+export interface AlbumFilters {
+  query: string;
+  rootSel: string;
+  kind: "all" | "photos" | "videos" | "mixed";
+  minRating: number;
+  unratedOnly: boolean;
+  sortBy: "name" | "date" | "size" | "count" | "rating";
+  desc: boolean;
+  random: boolean;
+  zoom: number;
+}
+const DEFAULT_BROWSE: BrowseFilters = { location: "all", kind: "all", folders: null, query: "", sortBy: "name", desc: false, minRating: 0, unratedOnly: false, random: false, zoom: 220, layout: "masonry" };
+const DEFAULT_ALBUMS: AlbumFilters = { query: "", rootSel: "all", kind: "all", minRating: 0, unratedOnly: false, sortBy: "name", desc: false, random: false, zoom: 260 };
+
+function loadPref<T extends object>(key: string, def: T): T {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? "null");
+    return v && typeof v === "object" ? { ...def, ...v } : def;
+  } catch {
+    return def;
+  }
+}
+function savePref(key: string, v: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(v));
+  } catch {
+    /* ignore */
+  }
+}
+
 export interface Toast {
   id: string;
   text: string;
@@ -48,8 +91,12 @@ interface State {
   fitMode: FitMode;
   driveOpen: boolean;
   immersive: boolean;
+  backupOpen: boolean;
   /** item key -> last viewed (ms); lives in .mediasorter.history.json next to the media. */
   viewed: Record<string, number>;
+  /** Filter state of the list screens, kept until changed (and across launches). */
+  browseFilters: BrowseFilters;
+  albumFilters: AlbumFilters;
   loading: string | null;
   busy: boolean;
   toasts: Toast[];
@@ -101,6 +148,9 @@ interface Actions {
   /** Jump to a random item, favouring ones not seen lately. */
   surprise(): Promise<void>;
   toggleImmersive(): void;
+  setBrowseFilters(patch: Partial<BrowseFilters>): void;
+  setLibraryField(patch: Partial<Library>): void;
+  setAlbumFilters(patch: Partial<AlbumFilters>): void;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -180,7 +230,10 @@ export const useStore = create<Store>((set, get) => ({
   fitMode: loadFit(),
   driveOpen: false,
   immersive: false,
+  backupOpen: false,
   viewed: {},
+  browseFilters: loadPref("mediasorter.browseFilters", DEFAULT_BROWSE),
+  albumFilters: loadPref("mediasorter.albumFilters", DEFAULT_ALBUMS),
   loading: null,
   busy: false,
   toasts: [],
@@ -591,6 +644,25 @@ export const useStore = create<Store>((set, get) => ({
     const rest = shuffled(all.filter((_, k) => k !== pick));
     set({ screen: "viewer", queue: [all[pick], ...rest], index: 0, source: { kind: "browse" }, shuffle: true, settingsOpen: false, trashOpen: false });
     get().toast("Surprise!", "ok");
+  },
+
+  setLibraryField(patch) {
+    const { library } = get();
+    if (!library) return;
+    set({ library: { ...library, ...patch } });
+    get().saveLibrary();
+  },
+
+  setBrowseFilters(patch) {
+    const browseFilters = { ...get().browseFilters, ...patch };
+    set({ browseFilters });
+    savePref("mediasorter.browseFilters", browseFilters);
+  },
+
+  setAlbumFilters(patch) {
+    const albumFilters = { ...get().albumFilters, ...patch };
+    set({ albumFilters });
+    savePref("mediasorter.albumFilters", albumFilters);
   },
 
   toggleImmersive() {

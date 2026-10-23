@@ -34,7 +34,7 @@ const seed: Entry[] = [
   { rel: "Albums/Caf%C3%A9%20Night/IMG_1006.png", kind: "image", files: ["Albums/Caf%C3%A9%20Night/IMG_1006.png"] },
 ];
 
-let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false };
+let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false, backupDest: null, lastBackup: null };
 let items: MediaItem[] = seed.map((e) => toItem(e.files.map((f) => `${ROOT}/${f}`), `${ROOT}/${e.rel}`, e.kind));
 let pickCount = 0;
 let history: { version: number; viewed: Record<string, number> } | null = null;
@@ -199,6 +199,24 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     }
     case "cancel_verify":
       return null;
+    case "backup_plan": {
+      const files = items.flatMap((i) => i.files.map((f) => ({ rel: f.slice(ROOT.length + 1), size: 150_000, mtime: 1_700_000_000 })));
+      const copy = files.slice(0, 4);
+      const update = files.slice(4, 6);
+      return { copy, update, moves: [["DCIM/100CANON/IMG_1000.jpg", "Keep/IMG_1000.jpg"]], extra: [{ rel: "old/leftover.jpg", size: 1000, mtime: 1 }], unchanged: files.length - 6, unchangedBytes: (files.length - 6) * 150_000, bytesToCopy: 6 * 150_000, sourceFiles: files.length, sourceBytes: files.length * 150_000 };
+    }
+    case "backup_run": {
+      const ch = args.onProgress as { onmessage: (p: unknown) => void };
+      const plan = args.plan as { copy: unknown[]; update: unknown[]; moves: unknown[]; bytesToCopy: number };
+      const total = plan.copy.length + plan.update.length + plan.moves.length;
+      for (let i = 0; i < total; i++) {
+        await new Promise((r) => setTimeout(r, 120));
+        ch.onmessage({ stage: "copying", doneFiles: i + 1, totalFiles: total, doneBytes: Math.round(((i + 1) / total) * plan.bytesToCopy), totalBytes: plan.bytesToCopy, current: `file ${i + 1}`, errors: 0 });
+      }
+      return { copied: plan.copy.length, updated: plan.update.length, moved: plan.moves.length, deleted: 0, bytes: plan.bytesToCopy, millis: total * 120, verified: plan.copy.length + plan.update.length, errors: [], cancelled: false };
+    }
+    case "cancel_backup":
+      return null;
     case "scan_all": {
       const lib = args.library as Library;
       const trash = resolve(lib.trashDir);
@@ -279,6 +297,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return resolve(args.stored as string);
     case "plugin:dialog|open": {
       const names = ["Keep", "Portfolio", "Family", "Maybe"];
+      if ((args.options as { title?: string } | undefined)?.title?.includes("backup")) return "/Volumes/BACKUP_2TB/CANON_64";
       return `${ROOT}/${names[pickCount++ % names.length]}`;
     }
     case "plugin:window|is_fullscreen":

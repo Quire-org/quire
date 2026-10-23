@@ -56,6 +56,13 @@ so the same code builds for macOS, Linux and Windows.
   file and lists the ones that fail. SD cards expose no wear counters to a computer, so the
   panel says so instead of guessing; read errors and sharp slowdowns are the reliable early
   warnings, and the recommendations reflect that.
+- **Backup** (top bar or Settings → Backup…) mirrors the opened folder into a folder on
+  another drive, remembered in the library file. A plan is shown first: unchanged files
+  (same path, size and time) are skipped, new and changed files copied, files you moved
+  between folders are renamed in the backup instead of copied again, and files only in the
+  backup are listed and removed only when *Mirror deletions* is on. Copies keep the source
+  modification time, go through a temporary name, and can be verified by fingerprint.
+  Progress, throughput-based time remaining and a cancel button while it runs.
 - **Duplicates** (`D`) scans a scope and groups:
   - *exact copies*: identical content fingerprint (size plus hashed head, middle and
     tail chunks), works for any file type including large videos;
@@ -147,6 +154,7 @@ src-tauri/src/
   dupes.rs     Content fingerprints and perceptual image hashes (pHash, dHash)
   albums.rs    Album folders: scan subfolders, move a folder as a whole
   drive.rs     Drive info (sysinfo + diskutil + smartctl), read benchmark, readability check
+  backup.rs    Incremental backup: plan (new/changed/moved/extra), run with progress, mirror
   media.rs     Recursive scan + grouping of RAW/JPEG/sidecar/live-photo pairs
   library.rs   .mediasorter.json on the volume (targets, ratings, trash dir)
   ops.rs       Group moves with collision-safe renaming, trash purge

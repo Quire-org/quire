@@ -138,6 +138,9 @@ export function Settings() {
         <button className="btn accent2" onClick={() => s.set({ driveOpen: true, settingsOpen: false })}>
           Drive health
         </button>
+        <button className="btn accent2" onClick={() => s.set({ backupOpen: true, settingsOpen: false })}>
+          Backup…
+        </button>
         <button className="btn ghost" onClick={s.closeRoot}>
           Close folder
         </button>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { TopNav } from "../components/TopNav";
 import { useStore } from "../store";
 import { fileSrc, pickFolder, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
@@ -18,16 +19,14 @@ export function Albums() {
   const albumRatings = s.library?.albumRatings ?? {};
   const [plan, setPlan] = useState<AlbumRename[] | null>(null);
   const [checking, setChecking] = useState(false);
-  const [query, setQuery] = useState("");
-  const [rootSel, setRootSel] = useState<string>("all");
-  const [kind, setKind] = useState<KindSel>("all");
-  const [minRating, setMinRating] = useState(0);
-  const [unratedOnly, setUnratedOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<SortSel>("name");
-  const [desc, setDesc] = useState(false);
-  const [random, setRandom] = useState(false);
+  const f = s.albumFilters;
+  const setF = s.setAlbumFilters;
+  const { query, rootSel, kind, minRating, unratedOnly, sortBy, desc, random, zoom } = f;
   const [seed, setSeed] = useState(0);
-  const [zoom, setZoom] = useState(260);
+  const toggleRandom = () => {
+    setF({ random: !useStore.getState().albumFilters.random });
+    setSeed((x) => x + 1);
+  };
 
   const checkNames = async () => {
     setChecking(true);
@@ -69,16 +68,13 @@ export function Albums() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen) return;
+      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen) return;
       const key = e.key.toLowerCase();
       if (key === "escape" || key === "a") s.openSortQueue();
       if (key === "b") s.openBrowse();
       if (key === "d") s.openDupes();
       if (key === "g") s.set({ settingsOpen: true });
-      if (key === "s") {
-        setRandom((r) => !r);
-        setSeed((x) => x + 1);
-      }
+      if (key === "s") toggleRandom();
       if (key === "enter" && albums.length) void s.openAlbums_Slideshow(albums);
     };
     window.addEventListener("keydown", onKey);
@@ -93,28 +89,22 @@ export function Albums() {
   const totalBytes = albums.reduce((a, b) => a + b.bytes, 0);
 
   return (
+    <div className="screen">
+      <TopNav current="albums" />
     <div className="browse albums">
       <aside className="browse-side panel">
-        <div className="side-head">
-          <span className="brand">MEDIA SORTER</span>
-          <button className="btn sm accent2" onClick={s.openSortQueue} title="Back to sorting (Esc)">
-            Sort <kbd className="kbd">Esc</kbd>
-          </button>
-        </div>
-        <h3>Albums</h3>
-
-        <input className="input" placeholder="Search albums…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input className="input" placeholder="Search albums…" value={query} onChange={(e) => setF({ query: e.target.value })} />
 
         <div className="label">Album folders</div>
         <div className="side-list">
           {roots.length > 1 && (
-            <button className={chip(rootSel === "all")} onClick={() => setRootSel("all")}>
+            <button className={chip(rootSel === "all")} onClick={() => setF({ rootSel: "all" })}>
               All <span className="faint mono">{s.albums.length}</span>
             </button>
           )}
           {roots.map((r) => (
             <div key={r} className="side-row">
-              <button className={`${chip(rootSel === r)} grow`} onClick={() => setRootSel(roots.length > 1 && rootSel !== r ? r : "all")} title={r}>
+              <button className={`${chip(rootSel === r)} grow`} onClick={() => setF({ rootSel: roots.length > 1 && rootSel !== r ? r : "all" })} title={r}>
                 <span className="ellipsis">{r.split("/").pop() || r}</span>
                 <span className="faint mono">{s.albums.filter((a) => a.albumRoot === r).length}</span>
               </button>
@@ -131,7 +121,7 @@ export function Albums() {
         <div className="label">Contains</div>
         <div className="chips">
           {(["all", "photos", "videos", "mixed"] as KindSel[]).map((k) => (
-            <button key={k} className={chip(kind === k)} onClick={() => setKind(k)}>
+            <button key={k} className={chip(kind === k)} onClick={() => setF({ kind: k })}>
               {k === "all" ? "Any" : k === "photos" ? "Photos only" : k === "videos" ? "Videos" : "Both"}
             </button>
           ))}
@@ -139,11 +129,11 @@ export function Albums() {
 
         <div className="label">Rating</div>
         <div className="side-row">
-          <input type="range" min={0} max={10} value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} disabled={unratedOnly} />
+          <input type="range" min={0} max={10} value={minRating} onChange={(e) => setF({ minRating: Number(e.target.value) })} disabled={unratedOnly} />
           <span className="mono">{unratedOnly ? "—" : minRating === 0 ? "any" : `≥ ${minRating}`}</span>
         </div>
         <label className="side-row check">
-          <input type="checkbox" checked={unratedOnly} onChange={(e) => setUnratedOnly(e.target.checked)} /> Unrated only
+          <input type="checkbox" checked={unratedOnly} onChange={(e) => setF({ unratedOnly: e.target.checked })} /> Unrated only
         </label>
 
         <div className="label">Order</div>
@@ -152,11 +142,7 @@ export function Albums() {
             <button
               key={k}
               className={chip(!random && sortBy === k)}
-              onClick={() => {
-                if (sortBy === k && !random) setDesc((d) => !d);
-                setSortBy(k);
-                setRandom(false);
-              }}
+              onClick={() => setF({ sortBy: k, desc: sortBy === k && !random ? !desc : desc, random: false })}
             >
               {k} {!random && sortBy === k ? (desc ? "↓" : "↑") : ""}
             </button>
@@ -164,7 +150,7 @@ export function Albums() {
           <button
             className={chip(random)}
             onClick={() => {
-              setRandom(true);
+              setF({ random: true });
               setSeed((x) => x + 1);
             }}
           >
@@ -174,19 +160,14 @@ export function Albums() {
 
         <div className="label">Tile size</div>
         <div className="side-row">
-          <input type="range" min={180} max={520} step={20} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
+          <input type="range" min={180} max={520} step={20} value={zoom} onChange={(e) => setF({ zoom: Number(e.target.value) })} />
         </div>
 
         <hr className="rule" />
         <button className="btn primary" disabled={!albums.length || s.busy} onClick={() => void s.openAlbums_Slideshow(albums)} title="Flip through everything in the visible albums">
           Slideshow <kbd className="kbd">⏎</kbd>
         </button>
-        <button className="btn sm" onClick={s.openBrowse}>
-          Browse <kbd className="kbd">B</kbd>
-        </button>
-        <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })}>
-          Settings <kbd className="kbd">G</kbd>
-        </button>
+        <p className="dim small">Open an album to rate it: the rating keys in the viewer rate the whole album.</p>
 
         <Deco kind="sprout" className="deco-side" />
         <details className="advanced">
@@ -264,6 +245,7 @@ export function Albums() {
         </div>
       </main>
     </div>
+    </div>
   );
 }
 
@@ -272,7 +254,6 @@ function AlbumCard({ album }: { album: Album }) {
   const targets = s.library?.targets ?? [];
   const rating = s.library?.albumRatings[album.key];
   const [cover, setCover] = useState<string | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -285,7 +266,6 @@ function AlbumCard({ album }: { album: Album }) {
     };
   }, [album.cover]);
 
-  const shown = hover ?? rating ?? 0;
   return (
     <div className="album-card panel">
       <div className="album-cover" onClick={() => void s.openAlbum(album)} title="Open album">
@@ -309,17 +289,7 @@ function AlbumCard({ album }: { album: Album }) {
         <div className="album-name ellipsis" title={`${album.path}\n${formatDate(album.modified)}`}>
           {album.name}
         </div>
-        <div className="album-rating" onMouseLeave={() => setHover(null)} title="Rate this album">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              className={`rating-seg ${n <= shown ? "on" : ""} ${n <= shown && shown >= 9 ? "hot" : ""}`}
-              onMouseEnter={() => setHover(n)}
-              onClick={() => s.setAlbumRating(album, rating === n ? null : n)}
-              title={`Rate ${n}`}
-            />
-          ))}
-        </div>
+        {rating != null && <span className="mono accent-text small">{rating}/10</span>}
       </div>
     </div>
   );

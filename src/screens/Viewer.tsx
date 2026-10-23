@@ -56,7 +56,7 @@ export function Viewer() {
     if (albumKey) s.setAlbumRatingByKey(albumKey, r);
     else s.setRating(current, r);
   };
-  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen;
+  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen;
 
   // Keep the stage clear of the HUD bars whatever their height (target buttons may wrap).
   useEffect(() => {
@@ -89,8 +89,8 @@ export function Viewer() {
       const cur = st.queue[st.index];
 
       if (key === "escape") {
-        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen) {
-          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false });
+        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen) {
+          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false });
         } else if (st.immersive) {
           st.toggleImmersive();
         } else if (st.fullscreen) {
@@ -261,9 +261,20 @@ export function Viewer() {
       <div className="hud hud-top">
         <div className="hud-left">
           <span className="brand">MEDIA SORTER</span>
-          <span className="faint mono hud-root" title={s.root ?? ""}>
-            {s.root ? tailPath(s.root, 2) : ""}
-          </span>
+          {s.source.kind === "unsorted" && (
+            <span className="faint mono hud-root" title={s.root ?? ""}>
+              {s.root ? tailPath(s.root, 2) : ""}
+            </span>
+          )}
+          {s.source.kind !== "unsorted" && (
+            <button
+              className="btn sm accent2"
+              onClick={s.source.kind === "browse" ? s.openBrowse : s.source.kind === "albums" ? s.openAlbums : s.openDupes}
+              title="Back (Esc)"
+            >
+              ← Back to {s.source.kind === "browse" ? "Browse" : s.source.kind === "albums" ? "Albums" : "Duplicates"} <kbd className="kbd">Esc</kbd>
+            </button>
+          )}
         </div>
         <div className="hud-center">
           {current && (
@@ -291,31 +302,15 @@ export function Viewer() {
           <button className={`btn sm ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
             Shuffle <kbd className="kbd">S</kbd>
           </button>
-          {s.source.kind === "dupes" ? (
-            <button className="btn sm accent2" onClick={s.openDupes} title="Back to duplicates (Esc)">
-              Duplicates <kbd className="kbd">Esc</kbd>
-            </button>
-          ) : s.source.kind === "albums" ? (
-            <button className="btn sm accent2" onClick={s.openAlbums} title="Back to albums (Esc)">
-              Albums <kbd className="kbd">Esc</kbd>
-            </button>
-          ) : s.source.kind === "browse" ? (
-            <button className="btn sm accent2" onClick={s.openBrowse} title="Back to browse (Esc)">
-              Browse <kbd className="kbd">Esc</kbd>
-            </button>
-          ) : (
-            <>
-              <button className="btn sm accent2" onClick={s.openBrowse} title="Browse everything (B)">
-                Browse <kbd className="kbd">B</kbd>
-              </button>
-              <button className="btn sm" onClick={s.openAlbums} title="Albums (A)">
-                Albums <kbd className="kbd">A</kbd>
-              </button>
-              <button className="btn sm" onClick={s.openDupes} title="Find duplicates (D)">
-                Dupes <kbd className="kbd">D</kbd>
-              </button>
-            </>
-          )}
+          <button className="btn sm" onClick={s.openBrowse} title="Browse everything (B)">
+            Browse <kbd className="kbd">B</kbd>
+          </button>
+          <button className="btn sm" onClick={s.openAlbums} title="Albums (A)">
+            Albums <kbd className="kbd">A</kbd>
+          </button>
+          <button className="btn sm" onClick={s.openDupes} title="Find duplicates (D)">
+            Dupes <kbd className="kbd">D</kbd>
+          </button>
           <button className="btn sm" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
             Settings <kbd className="kbd">G</kbd>
           </button>
@@ -333,7 +328,7 @@ export function Viewer() {
 
       <div className="hud hud-bottom">
         <div className="hud-row">
-          <RatingBar value={albumKey ? albumRating : rating} onChange={rate} label={albumKey ? `Album${album ? ` · ${album.name}` : ""}` : "Rating"} />
+          <RatingBar value={albumKey ? albumRating : rating} onChange={rate} label={albumKey ? `Album rating${album ? ` · ${album.name}` : ""}` : "Rating"} />
           <div className="nav">
             <button className="btn" onClick={s.prev} disabled={s.queue.length < 2} title="Previous (←)">
               <kbd className="kbd">←</kbd> Prev

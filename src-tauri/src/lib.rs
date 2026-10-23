@@ -1,4 +1,5 @@
 mod albums;
+mod backup;
 mod drive;
 mod dupes;
 mod library;
@@ -254,6 +255,33 @@ fn cancel_verify() {
     drive::VERIFY_CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+#[tauri::command]
+async fn backup_plan(root: String, dest: String, library: Library, skip_trash: bool) -> Result<backup::Plan, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = PathBuf::from(root);
+        let trash = library.trash_path(&root);
+        backup::plan(&root, Path::new(&dest), if skip_trash { Some(trash.as_path()) } else { None })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn backup_run(root: String, dest: String, plan: backup::Plan, mirror: bool, verify: bool, on_progress: tauri::ipc::Channel<backup::Progress>) -> Result<backup::Outcome, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        backup::run(Path::new(&root), Path::new(&dest), &plan, mirror, verify, |p| {
+            let _ = on_progress.send(p);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn cancel_backup() {
+    backup::BACKUP_CANCEL.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
 /// Perceptual hashes of an image (or a RAW file's embedded preview).
 #[tauri::command]
 async fn image_hash(path: String, is_raw: bool) -> Result<dupes::ImageHash, String> {
@@ -361,6 +389,9 @@ pub fn run() {
             read_benchmark,
             verify_readability,
             cancel_verify,
+            backup_plan,
+            backup_run,
+            cancel_backup,
             move_item,
             trash_item,
             restore_files,

@@ -42,6 +42,45 @@ export interface Library {
   albumRatings: Record<string, number>;
   /** Decode URL-escaped album folder names whenever albums are scanned. */
   autoDecodeAlbumNames: boolean;
+  backupDest?: string | null;
+  lastBackup?: number | null;
+}
+
+export interface BackupEntry {
+  rel: string;
+  size: number;
+  mtime: number;
+}
+export interface BackupPlan {
+  copy: BackupEntry[];
+  update: BackupEntry[];
+  moves: [string, string][];
+  extra: BackupEntry[];
+  unchanged: number;
+  unchangedBytes: number;
+  bytesToCopy: number;
+  sourceFiles: number;
+  sourceBytes: number;
+}
+export interface BackupProgress {
+  stage: string;
+  doneFiles: number;
+  totalFiles: number;
+  doneBytes: number;
+  totalBytes: number;
+  current: string;
+  errors: number;
+}
+export interface BackupOutcome {
+  copied: number;
+  updated: number;
+  moved: number;
+  deleted: number;
+  bytes: number;
+  millis: number;
+  verified: number;
+  errors: [string, string][];
+  cancelled: boolean;
 }
 
 export interface AlbumRename {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from "react";
+import { TopNav } from "../components/TopNav";
 import { useStore } from "../store";
 import { useDupes } from "../dupesStore";
 import { Thumb } from "../components/Thumb";
@@ -15,16 +16,9 @@ type SortSel = "name" | "date" | "rating" | "size";
 type Layout = "masonry" | "grid";
 
 const GAP = 10;
+const DEFAULTS_RESET = { location: "all", kind: "all", folders: null, query: "", sortBy: "name", desc: false, minRating: 0, unratedOnly: false, random: false } as const;
 const META_H = 30; // caption row under each tile, must match .thumb-meta
 const OVERSCAN = 900;
-
-function loadLayout(): Layout {
-  try {
-    return localStorage.getItem("mediasorter.layout") === "grid" ? "grid" : "masonry";
-  } catch {
-    return "masonry";
-  }
-}
 
 /**
  * Everything under the opened folder (and any target folders outside it) as one
@@ -36,30 +30,26 @@ export function Browse() {
   const sigCache = useDupes((d) => d.cache);
   const loadCache = useDupes((d) => d.loadCache);
   const targets = s.library?.targets ?? [];
-  const [location, setLocation] = useState<LocationSel>("all");
-  const [kind, setKind] = useState<KindSel>("all");
-  const [folders, setFolders] = useState<Set<string> | null>(null);
-  const [query, setQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortSel>("name");
-  const [desc, setDesc] = useState(false);
-  const [minRating, setMinRating] = useState(0);
-  const [unratedOnly, setUnratedOnly] = useState(false);
-  const [random, setRandom] = useState(false);
+  const f = s.browseFilters;
+  const setF = s.setBrowseFilters;
+  const { location, kind, query, sortBy, desc, minRating, unratedOnly, random, zoom, layout } = f;
+  const folders = useMemo(() => (f.folders ? new Set(f.folders) : null), [f.folders]);
+  const setLocation = (v: LocationSel) => setF({ location: v });
+  const setKind = (v: KindSel) => setF({ kind: v });
+  const setFolders = (v: Set<string> | null) => setF({ folders: v ? [...v] : null });
+  const setQuery = (v: string) => setF({ query: v });
+  const setMinRating = (v: number) => setF({ minRating: v });
+  const setUnratedOnly = (v: boolean) => setF({ unratedOnly: v });
+  const setZoom = (v: number) => setF({ zoom: v });
+  const setLayout = (v: Layout) => setF({ layout: v });
   const [seed, setSeed] = useState(0);
-  const [zoom, setZoom] = useState(220);
-  const [layout, setLayoutState] = useState<Layout>(loadLayout);
+  const toggleRandom = () => {
+    setF({ random: !useStore.getState().browseFilters.random });
+    setSeed((x) => x + 1);
+  };
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const anchor = useRef<number | null>(null);
-
-  const setLayout = (l: Layout) => {
-    setLayoutState(l);
-    try {
-      localStorage.setItem("mediasorter.layout", l);
-    } catch {
-      /* ignore */
-    }
-  };
 
   useEffect(() => {
     void s.loadAll();
@@ -223,7 +213,7 @@ export function Browse() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
-      if (s.settingsOpen || s.trashOpen || s.driveOpen) return;
+      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen) return;
       const key = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && key === "a") {
         e.preventDefault();
@@ -252,10 +242,7 @@ export function Browse() {
       if (key === "d") s.openDupes();
       if (key === "a") s.openAlbums();
       if (key === "r") void s.surprise();
-      if (key === "s") {
-        setRandom((r) => !r);
-        setSeed((x) => x + 1);
-      }
+      if (key === "s") toggleRandom();
       if (key === "g") s.set({ settingsOpen: true });
       if (key === "enter" && items.length) open(0);
     };
@@ -270,15 +257,10 @@ export function Browse() {
   const maxY = viewport.top + viewport.h + OVERSCAN;
 
   return (
+    <div className="screen">
+      <TopNav current="browse" />
     <div className="browse">
       <aside className="browse-side panel">
-        <div className="side-head">
-          <span className="brand">MEDIA SORTER</span>
-          <button className="btn sm accent2" onClick={s.openSortQueue} title="Back to sorting (Esc)">
-            Sort <kbd className="kbd">Esc</kbd>
-          </button>
-        </div>
-
         <input className="input" placeholder="Search name or folder…" value={query} onChange={(e) => setQuery(e.target.value)} />
 
         <div className="label">Location</div>
@@ -329,11 +311,7 @@ export function Browse() {
             <button
               key={k}
               className={chip(!random && sortBy === k && location !== "recent")}
-              onClick={() => {
-                if (sortBy === k && !random) setDesc((d) => !d);
-                setSortBy(k);
-                setRandom(false);
-              }}
+              onClick={() => setF({ sortBy: k, desc: sortBy === k && !random ? !desc : desc, random: false })}
             >
               {k} {!random && sortBy === k ? (desc ? "↓" : "↑") : ""}
             </button>
@@ -341,7 +319,7 @@ export function Browse() {
           <button
             className={chip(random)}
             onClick={() => {
-              setRandom(true);
+              setF({ random: true });
               setSeed((x) => x + 1);
             }}
           >
@@ -374,14 +352,8 @@ export function Browse() {
         <button className={chip(selectMode)} onClick={() => setSelectMode((m) => !m)} title="Click selects instead of opening (⌘-click and ⇧-click always select)">
           Select mode
         </button>
-        <button className="btn sm" onClick={s.openAlbums}>
-          Albums <kbd className="kbd">A</kbd>
-        </button>
-        <button className="btn sm" onClick={s.openDupes}>
-          Find duplicates <kbd className="kbd">D</kbd>
-        </button>
-        <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })}>
-          Settings <kbd className="kbd">G</kbd>
+        <button className="btn sm ghost" onClick={() => setF({ ...DEFAULTS_RESET })} title="Reset all filters">
+          Reset filters
         </button>
         <Deco kind="mug" className="deco-side" />
       </aside>
@@ -453,6 +425,7 @@ export function Browse() {
           </div>
         </div>
       </main>
+    </div>
     </div>
   );
 }

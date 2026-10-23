@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc, Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Album, AlbumRename, Benchmark, DriveInfo, History, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
+import type { Album, AlbumRename, BackupOutcome, BackupPlan, BackupProgress, Benchmark, DriveInfo, History, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
 
 export const api = {
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
@@ -24,6 +24,13 @@ export const api = {
     return invoke<VerifyResult>("verify_readability", { root, onProgress: ch });
   },
   cancelVerify: () => invoke<void>("cancel_verify"),
+  backupPlan: (root: string, dest: string, library: Library, skipTrash: boolean) => invoke<BackupPlan>("backup_plan", { root, dest, library, skipTrash }),
+  backupRun: (root: string, dest: string, plan: BackupPlan, mirror: boolean, verify: boolean, onProgress: (p: BackupProgress) => void) => {
+    const ch = new Channel<BackupProgress>();
+    ch.onmessage = onProgress;
+    return invoke<BackupOutcome>("backup_run", { root, dest, plan, mirror, verify, onProgress: ch });
+  },
+  cancelBackup: () => invoke<void>("cancel_backup"),
   imageHash: (path: string, isRaw: boolean) =>
     invoke<ImageHashResult>("image_hash", { path, isRaw }),
   fileFingerprint: (path: string) => invoke<string>("file_fingerprint", { path }),
