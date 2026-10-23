@@ -300,13 +300,13 @@ export function Viewer() {
           <button className={`btn sm ghost ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
             <Shuffle /> <kbd className="kbd">S</kbd>
           </button>
-          <button className="btn sm" onClick={s.openBrowse} title="Browse everything (B)">
+          <button className="btn sm ghost" onClick={s.openBrowse} title="Browse everything (B)">
             <SquaresFour /> <kbd className="kbd">B</kbd>
           </button>
-          <button className="btn sm" onClick={s.openAlbums} title="Albums (A)">
+          <button className="btn sm ghost" onClick={s.openAlbums} title="Albums (A)">
             <Books /> <kbd className="kbd">A</kbd>
           </button>
-          <button className="btn sm" onClick={s.openDupes} title="Find duplicates (D)">
+          <button className="btn sm ghost" onClick={s.openDupes} title="Find duplicates (D)">
             <Copy /> <kbd className="kbd">D</kbd>
           </button>
           <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
