@@ -864,6 +864,12 @@ async fn edit_apply(vs: VS<'_>, root: String, library: Library, item: MediaItem,
 
 /* ---------------- misc ---------------- */
 
+/// Development aid: a passphrase from MEDIA_SORTER_PASSPHRASE unlocks the launch folder's vault without the prompt.
+#[tauri::command]
+fn dev_passphrase() -> Option<String> {
+    std::env::var("MEDIA_SORTER_PASSPHRASE").ok().filter(|p| !p.is_empty())
+}
+
 #[tauri::command]
 fn initial_root() -> Option<String> {
     std::env::args().nth(1).filter(|a| !a.starts_with('-')).or_else(|| std::env::var("MEDIA_SORTER_ROOT").ok()).filter(|p| Path::new(p).is_dir())
@@ -951,12 +957,19 @@ pub fn run() {
         // vault://localhost/<id>  (http://vault.localhost/<id> on Windows): decrypts on demand with Range support.
         .register_asynchronous_uri_scheme_protocol("vault", |ctx, request, responder| {
             let app = ctx.app_handle().clone();
+            let debug = std::env::var_os("MEDIA_SORTER_DEBUG").is_some();
+            if debug {
+                eprintln!("[vault://] {} {} range={:?}", request.method(), request.uri(), request.headers().get("range"));
+            }
             let id = request.uri().path().trim_start_matches('/').to_string();
             let range = request.headers().get("range").and_then(|v| v.to_str().ok()).map(String::from);
             std::thread::spawn(move || {
                 let state = app.state::<VaultState>();
                 let guard = state.0.lock().unwrap_or_else(|p| p.into_inner());
                 let reply = |status: u16, body: Vec<u8>, extra: Vec<(&str, String)>| {
+                    if debug {
+                        eprintln!("[vault://] -> {status} ({} bytes) {:?}", body.len(), extra.iter().map(|(k, v)| format!("{k}: {v}")).collect::<Vec<_>>());
+                    }
                     let mut b = tauri::http::Response::builder().status(status).header("Access-Control-Allow-Origin", "*").header("Accept-Ranges", "bytes");
                     for (k, v) in extra {
                         b = b.header(k, v);
@@ -1036,6 +1049,7 @@ pub fn run() {
             fs_delete,
             fs_import,
             initial_root,
+            dev_passphrase,
             path_exists,
             create_dir,
             resolve_path,

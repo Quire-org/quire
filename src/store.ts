@@ -315,9 +315,22 @@ export const useStore = create<Store>((set, get) => ({
       setCurrentRoot(root);
       const vault = await api.vaultStatus(root).catch(() => null);
       if (vault?.exists && !vault.unlocked) {
-        // Ask for the passphrase first; unlockVault calls openRoot again.
-        set({ loading: null, vault, pendingRoot: root, screen: "welcome" });
-        return;
+        // Development aid: MEDIA_SORTER_PASSPHRASE skips the prompt.
+        const dev = await api.devPassphrase().catch(() => null);
+        let unlocked = false;
+        if (dev) {
+          try {
+            await api.vaultUnlock(root, dev);
+            unlocked = true;
+          } catch {
+            /* fall through to the prompt */
+          }
+        }
+        if (!unlocked) {
+          // Ask for the passphrase first; unlockVault calls openRoot again.
+          set({ loading: null, vault, pendingRoot: root, screen: "welcome" });
+          return;
+        }
       }
       set({ vault, pendingRoot: null });
       const library = await api.loadLibrary(root);

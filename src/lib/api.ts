@@ -96,6 +96,7 @@ export const api = {
     invoke<MediaItem[]>("scan_trash", { root, library }),
   rawPreview: (path: string) => invoke<ArrayBuffer>("raw_preview", { root: currentRoot(), path }),
   initialRoot: () => invoke<string | null>("initial_root"),
+  devPassphrase: () => invoke<string | null>("dev_passphrase"),
   pathExists: (path: string) => invoke<boolean>("path_exists", { path }),
   createDir: (path: string) => invoke<void>("create_dir", { path }),
   resolvePath: (root: string, stored: string) =>

@@ -720,3 +720,22 @@ mod kdf_bench {
         }
     }
 }
+
+#[cfg(test)]
+mod fixture {
+    /// `MS_FIXTURE_DIR=/path cargo test --release make_vault_fixture -- --ignored` builds a
+    /// small vault (passphrase "fixture passphrase") from the plain files already in that folder.
+    #[test]
+    #[ignore]
+    fn make_vault_fixture() {
+        let Some(dir) = std::env::var_os("MS_FIXTURE_DIR") else { return };
+        let root = std::path::PathBuf::from(dir);
+        let mut v = super::Vault::create(&root, "fixture passphrase").unwrap();
+        for f in crate::media::walk_files(&root, &[]) {
+            let rel = crate::media::rel_key(&root, &f.path);
+            v.add_file(&f.path, &rel).unwrap();
+            std::fs::remove_file(&f.path).unwrap();
+        }
+        eprintln!("fixture vault with {} entries at {}", v.entries().len(), root.display());
+    }
+}

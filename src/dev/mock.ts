@@ -107,6 +107,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return null;
     case "initial_root":
       return ROOT;
+    case "dev_passphrase":
+      return null;
     case "load_library":
       return library;
     case "save_library":
