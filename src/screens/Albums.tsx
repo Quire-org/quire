@@ -189,7 +189,7 @@ export function Albums() {
           </span>
         </div>
         {advanced && (
-          <Modal title="Advanced" onClose={() => setAdvanced(false)}>
+          <Modal title="Advanced" onClose={() => setAdvanced(false)} wide>
             <OptionRow
               title="Decode URL-escaped folder names"
               info={
