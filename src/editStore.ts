@@ -42,19 +42,41 @@ export function describe(p: Pipeline): string[] {
 
 interface EditState {
   pipeline: Pipeline;
+  /** Natural size of the source after rotation (for result-size captions). */
+  frame: { w: number; h: number } | null;
   /** Crop tool armed: dragging on the preview draws the rectangle. */
   cropping: boolean;
   cropAspect: number | null;
   set(patch: Partial<Pipeline>): void;
-  setState(patch: Partial<Pick<EditState, "cropping" | "cropAspect">>): void;
+  setState(patch: Partial<Pick<EditState, "cropping" | "cropAspect" | "frame">>): void;
   reset(): void;
 }
 
 export const useEdit = create<EditState>((set) => ({
   pipeline: EMPTY,
+  frame: null,
   cropping: false,
   cropAspect: null,
   set: (patch) => set((s) => ({ pipeline: { ...s.pipeline, ...patch } })),
   setState: (patch) => set(patch),
-  reset: () => set({ pipeline: EMPTY, cropping: false, cropAspect: null }),
+  reset: () => set({ pipeline: EMPTY, cropping: false, cropAspect: null, frame: null }),
 }));
+
+/** Pixel size the saved file will have, given the frame (post-rotation) and the pipeline. */
+export function resultSize(frame: { w: number; h: number } | null, p: Pipeline): { w: number; h: number } | null {
+  if (!frame) return null;
+  let w = frame.w;
+  let h = frame.h;
+  if (p.crop) {
+    w = Math.round(w * p.crop[2]);
+    h = Math.round(h * p.crop[3]);
+  }
+  if (p.upscale) {
+    w *= p.upscale;
+    h *= p.upscale;
+  } else if (p.resizeWidth) {
+    h = Math.round((h * p.resizeWidth) / Math.max(1, w));
+    w = p.resizeWidth;
+  }
+  return { w, h };
+}

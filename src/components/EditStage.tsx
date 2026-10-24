@@ -66,6 +66,7 @@ function Preview({ item }: { item: MediaItem }) {
   const cropping = useEdit((s) => s.cropping);
   const cropAspect = useEdit((s) => s.cropAspect);
   const setP = useEdit((s) => s.set);
+  const setEditState = useEdit((s) => s.setState);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const [nat, setNat] = useState<Natural | null>(null); // size of what is displayed in the frame
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -100,6 +101,16 @@ function Preview({ item }: { item: MediaItem }) {
     ctx.restore();
     setNat({ w: c.width, h: c.height });
   };
+
+  // Publish the post-rotation source size for the Size / Format popovers.
+  useEffect(() => {
+    const img = imgRef.current;
+    const v = videoRef.current;
+    const w = isVideo ? v?.videoWidth : img?.naturalWidth;
+    const h = isVideo ? v?.videoHeight : img?.naturalHeight;
+    if (w && h) setEditState({ frame: rotated ? { w: h, h: w } : { w, h } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rotated, nat]);
 
   useEffect(() => {
     if (isVideo || !url) return;

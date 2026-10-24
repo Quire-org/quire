@@ -4,7 +4,9 @@ import { api } from "../lib/api";
 import { describe, isIdentity, LOSSY, useEdit } from "../editStore";
 import type { EditTools, MediaItem } from "../lib/types";
 import { ArrowClockwise, ArrowCounterClockwise, ArrowsHorizontal, ArrowsVertical, Check, Crop, FloppyDisk, Scissors, SpeakerSlash, Warning, X } from "@phosphor-icons/react";
+import { Popover } from "./Popover";
 import { Select } from "./Select";
+import { resultSize } from "../editStore";
 
 const IMAGE_TARGETS: [string, string][] = [["jpg", "JPEG"], ["png", "PNG"], ["webp", "WebP"], ["tiff", "TIFF"]];
 const VIDEO_TARGETS: [string, string][] = [["mp4-h264", "MP4 H.264"], ["mp4-h265", "MP4 H.265"], ["webm-vp9", "WebM"], ["gif", "GIF"], ["mp3", "MP3 audio"]];
@@ -18,6 +20,25 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
   const [tools, setTools] = useState<EditTools | null>(null);
   const [busy, setBusy] = useState(false);
   const [prog, setProg] = useState<{ done: number; total: number; frac: number } | null>(null);
+  const [sizeOpen, setSizeOpen] = useState(false);
+  const [fmtOpen, setFmtOpen] = useState(false);
+  // Drafts for the popovers; applied to the pipeline only on Apply.
+  const [sizeDraft, setSizeDraft] = useState("");
+  const [fmtDraft, setFmtDraft] = useState("");
+  const [qDraft, setQDraft] = useState<"small" | "balanced" | "high">("balanced");
+  const frame = useEdit((st) => st.frame);
+  const sizeNow = resultSize(frame, p);
+  const sizeIf = resultSize(frame, { ...p, upscale: sizeDraft.startsWith("x") ? (Number(sizeDraft.slice(1)) as 2 | 4) : null, resizeWidth: sizeDraft && !sizeDraft.startsWith("x") ? Number(sizeDraft) : null });
+  const openSize = () => {
+    setSizeDraft(p.upscale ? `x${p.upscale}` : p.resizeWidth ? String(p.resizeWidth) : "");
+    setSizeOpen(true);
+  };
+  const openFmt = () => {
+    setFmtDraft(p.format ?? "");
+    setQDraft(p.quality);
+    setFmtOpen(true);
+  };
+  const fmtLabel = (v: string) => [...IMAGE_TARGETS, ...VIDEO_TARGETS].find(([k]) => k === v)?.[1] ?? v.toUpperCase();
   const isVideo = item.kind === "video";
   const targets = isVideo ? VIDEO_TARGETS : IMAGE_TARGETS;
   const needsFfmpeg = isVideo || (item.kind !== "raw" && !/\.(jpe?g|png|webp|gif|bmp|tiff?)$/i.test(item.primary));
@@ -83,25 +104,58 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
         )}
 
         <span className="label">Size</span>
-        <Select
-          compact
-          disabled={dis}
-          value={p.upscale ? `x${p.upscale}` : p.resizeWidth ? String(p.resizeWidth) : ""}
-          onChange={(v) => {
-            if (!v) e.set({ upscale: null, resizeWidth: null });
-            else if (v.startsWith("x")) e.set({ upscale: Number(v.slice(1)) as 2 | 4, resizeWidth: null });
-            else e.set({ resizeWidth: Number(v), upscale: null });
-          }}
-          options={[
-            { value: "", label: "Keep size" },
-            { value: "x2", label: "Upscale 2×" },
-            { value: "x4", label: "Upscale 4×" },
-            { value: "3840", label: "3840 wide (4K)" },
-            { value: "1920", label: "1920 wide" },
-            { value: "1280", label: "1280 wide" },
-            { value: "800", label: "800 wide" },
-          ]}
-        />
+        <Popover
+          open={sizeOpen}
+          onClose={() => setSizeOpen(false)}
+          trigger={
+            <button className={chip(!!(p.upscale || p.resizeWidth))} disabled={dis} onClick={() => (sizeOpen ? setSizeOpen(false) : openSize())} title="Resize or upscale (applied on save)">
+              {p.upscale ? `${p.upscale}× → ${sizeNow?.w ?? "?"}×${sizeNow?.h ?? "?"}` : p.resizeWidth ? `→ ${sizeNow?.w ?? "?"}×${sizeNow?.h ?? "?"}` : "Size"}
+            </button>
+          }
+        >
+          <div className="pop-title">Output size</div>
+          <div className="pop-list">
+            {[
+              ["", "Keep"],
+              ["x2", "Upscale 2×"],
+              ["x4", "Upscale 4×"],
+              ["3840", "3840 wide (4K)"],
+              ["1920", "1920 wide"],
+              ["1280", "1280 wide"],
+              ["800", "800 wide"],
+            ].map(([v, l]) => (
+              <button key={v} className={`btn sm ${sizeDraft === v ? "active" : "ghost"}`} onClick={() => setSizeDraft(v)}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <div className="mono small dim pop-note">
+            {frame ? `${sizeNow?.w}×${sizeNow?.h} → ${sizeIf?.w}×${sizeIf?.h}` : "reading size…"}
+            {sizeDraft.startsWith("x") && " · Lanczos, no invented detail"}
+          </div>
+          <div className="row pop-actions">
+            <button className="btn sm ghost" onClick={() => setSizeOpen(false)}>
+              Cancel
+            </button>
+            <span className="grow" />
+            <button
+              className="btn sm primary"
+              onClick={() => {
+                if (!sizeDraft) e.set({ upscale: null, resizeWidth: null });
+                else if (sizeDraft.startsWith("x")) e.set({ upscale: Number(sizeDraft.slice(1)) as 2 | 4, resizeWidth: null });
+                else e.set({ resizeWidth: Number(sizeDraft), upscale: null });
+                setSizeOpen(false);
+              }}
+            >
+              Apply
+            </button>
+          </div>
+        </Popover>
+        {(p.upscale || p.resizeWidth) && (
+          <button className="btn sm ghost" onClick={() => e.set({ upscale: null, resizeWidth: null })} title="Clear size change">
+            <X />
+          </button>
+        )}
 
         {isVideo && (
           <>
@@ -147,15 +201,59 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
         )}
 
         <span className="label">Format</span>
-        <Select compact disabled={dis} value={p.format ?? ""} onChange={(v) => e.set({ format: v || null })} options={[{ value: "", label: "Keep format" }, ...(p.extractFrame != null ? IMAGE_TARGETS : targets).map(([value, label]) => ({ value, label }))]} />
-        {p.format && LOSSY.has(p.format) && (
-          <span className="chips">
-            {(["small", "balanced", "high"] as const).map((q) => (
-              <button key={q} className={chip(p.quality === q)} onClick={() => e.set({ quality: q })} disabled={dis}>
-                {q}
+        <Popover
+          open={fmtOpen}
+          onClose={() => setFmtOpen(false)}
+          trigger={
+            <button className={chip(!!p.format)} disabled={dis} onClick={() => (fmtOpen ? setFmtOpen(false) : openFmt())} title="Convert on save">
+              {p.format ? `→ ${fmtLabel(p.format)}${LOSSY.has(p.format) ? ` · ${p.quality}` : ""}` : "Format"}
+            </button>
+          }
+        >
+          <div className="pop-title">Output format</div>
+          <div className="pop-list">
+            <button className={`btn sm ${fmtDraft === "" ? "active" : "ghost"}`} onClick={() => setFmtDraft("")}>
+              Keep ({item.primary.split(".").pop()?.toUpperCase()})
+            </button>
+            {(p.extractFrame != null ? IMAGE_TARGETS : targets).map(([v, l]) => (
+              <button key={v} className={`btn sm ${fmtDraft === v ? "active" : "ghost"}`} onClick={() => setFmtDraft(v)}>
+                {l}
               </button>
             ))}
-          </span>
+          </div>
+          {fmtDraft && LOSSY.has(fmtDraft) && (
+            <>
+              <div className="label pop-sub">Quality</div>
+              <div className="chips">
+                {(["small", "balanced", "high"] as const).map((q) => (
+                  <button key={q} className={`btn sm ${qDraft === q ? "active" : ""}`} onClick={() => setQDraft(q)}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {fmtDraft && !LOSSY.has(fmtDraft) && <div className="mono small dim pop-note">Lossless format, no quality setting.</div>}
+          <div className="row pop-actions">
+            <button className="btn sm ghost" onClick={() => setFmtOpen(false)}>
+              Cancel
+            </button>
+            <span className="grow" />
+            <button
+              className="btn sm primary"
+              onClick={() => {
+                e.set({ format: fmtDraft || null, quality: qDraft });
+                setFmtOpen(false);
+              }}
+            >
+              Apply
+            </button>
+          </div>
+        </Popover>
+        {p.format && (
+          <button className="btn sm ghost" onClick={() => e.set({ format: null })} title="Clear conversion">
+            <X />
+          </button>
         )}
       </div>
 
