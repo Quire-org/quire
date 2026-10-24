@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, storedPath } from "./lib/api";
+import { api, setCurrentRoot, storedPath } from "./lib/api";
 import { suggestHotkey } from "./lib/hotkeys";
 import { identityOf, reconcile } from "./lib/reconcile";
 import { applyTheme, loadThemeId } from "./themes";
 import { basename, shuffled, uid } from "./lib/format";
-import type { Album, AlbumRename, History, Library, MediaItem, Target } from "./lib/types";
+import type { Album, AlbumRename, History, Library, MediaItem, Target, VaultStatus } from "./lib/types";
 
-export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums";
+export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums" | "files";
 
 /** Where the viewer's queue came from. */
 export type QueueSource = { kind: "unsorted" } | { kind: "browse" } | { kind: "dupes" } | { kind: "albums" };
@@ -94,6 +94,13 @@ interface State {
   driveOpen: boolean;
   immersive: boolean;
   backupOpen: boolean;
+  vaultOpen: boolean;
+  /** Vault state of the open folder, or of the folder waiting to be unlocked. */
+  vault: VaultStatus | null;
+  /** A folder with a locked vault that is waiting for a passphrase. */
+  pendingRoot: string | null;
+  /** Set after a recovery-code unlock: the user should choose a new passphrase. */
+  needsNewPassphrase: boolean;
   /** item key -> last viewed (ms); lives in .mediasorter.history.json next to the media. */
   viewed: Record<string, number>;
   /** Filter state of the list screens, kept until changed (and across launches). */
@@ -165,6 +172,10 @@ interface Actions {
   setSlideshowInterval(seconds: number): void;
   setLibraryField(patch: Partial<Library>): void;
   setAlbumFilters(patch: Partial<AlbumFilters>): void;
+  refreshVault(): Promise<void>;
+  unlockVault(secret: string, recovery: boolean): Promise<boolean>;
+  lockVault(): Promise<void>;
+  openFiles(): void;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -245,6 +256,10 @@ export const useStore = create<Store>((set, get) => ({
   driveOpen: false,
   immersive: false,
   backupOpen: false,
+  vaultOpen: false,
+  vault: null,
+  pendingRoot: null,
+  needsNewPassphrase: false,
   viewed: {},
   navCollapsed: loadPref<{ v: boolean }>("mediasorter.navCollapsed", { v: false }).v,
   theme: loadThemeId(),
@@ -278,6 +293,14 @@ export const useStore = create<Store>((set, get) => ({
   async openRoot(root) {
     set({ loading: "Reading library…" });
     try {
+      setCurrentRoot(root);
+      const vault = await api.vaultStatus(root).catch(() => null);
+      if (vault?.exists && !vault.unlocked) {
+        // Ask for the passphrase first; unlockVault calls openRoot again.
+        set({ loading: null, vault, pendingRoot: root, screen: "welcome" });
+        return;
+      }
+      set({ vault, pendingRoot: null });
       const library = await api.loadLibrary(root);
       const history = await api.loadHistory(root).catch(() => null);
       set({ loading: "Scanning folder…", viewed: history?.viewed ?? {} });
@@ -313,7 +336,11 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   closeRoot() {
+    setCurrentRoot(null);
     set({
+      vault: null,
+      pendingRoot: null,
+      vaultOpen: false,
       root: null,
       library: null,
       unsorted: [],
@@ -681,6 +708,39 @@ export const useStore = create<Store>((set, get) => ({
     const rest = shuffled(all.filter((_, k) => k !== pick));
     set({ screen: "viewer", queue: [all[pick], ...rest], index: 0, source: { kind: "browse" }, shuffle: true, settingsOpen: false, trashOpen: false });
     get().toast("Surprise!", "ok");
+  },
+
+  async refreshVault() {
+    const root = get().root ?? get().pendingRoot;
+    if (!root) return;
+    const vault = await api.vaultStatus(root).catch(() => null);
+    set({ vault });
+  },
+
+  async unlockVault(secret, recovery) {
+    const root = get().pendingRoot ?? get().root;
+    if (!root) return false;
+    try {
+      if (recovery) await api.vaultUnlockRecovery(root, secret);
+      else await api.vaultUnlock(root, secret);
+    } catch (e) {
+      get().toast(String(e), "error");
+      return false;
+    }
+    set({ pendingRoot: null, needsNewPassphrase: recovery });
+    await get().openRoot(root);
+    if (recovery) set({ vaultOpen: true });
+    return true;
+  },
+
+  async lockVault() {
+    await api.vaultLock().catch(() => {});
+    get().toast("Vault locked");
+    get().closeRoot();
+  },
+
+  openFiles() {
+    set({ screen: "files", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
   setLibraryField(patch) {

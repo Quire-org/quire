@@ -26,12 +26,13 @@ export function Dupes() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen) return;
+      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen) return;
       const key = e.key.toLowerCase();
       if (key === "escape" || key === "d") s.openSortQueue();
       if (key === "b") s.openBrowse();
       if (key === "a") s.openAlbums();
       if (key === "g") s.set({ settingsOpen: true });
+      if (key === "e") s.openFiles();
       if (key === "h") s.toggleNav();
     };
     window.addEventListener("keydown", onKey);

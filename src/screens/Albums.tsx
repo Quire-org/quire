@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { TopNav } from "../components/TopNav";
 import { FolderPlus, Play, Star, X } from "@phosphor-icons/react";
 import { useStore } from "../store";
-import { fileSrc, pickFolder, rawPreviewUrl } from "../lib/api";
+import { mediaUrl, pickFolder, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
 import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate, shuffled } from "../lib/format";
@@ -69,12 +69,13 @@ export function Albums() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen) return;
+      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen) return;
       const key = e.key.toLowerCase();
       if (key === "escape" || key === "a") s.openSortQueue();
       if (key === "b") s.openBrowse();
       if (key === "d") s.openDupes();
       if (key === "g") s.set({ settingsOpen: true });
+      if (key === "e") s.openFiles();
       if (key === "h") s.toggleNav();
       if (key === "s") toggleRandom();
       if (key === "enter" && albums.length) void s.openAlbums_Slideshow(albums);
@@ -261,7 +262,7 @@ function AlbumCard({ album }: { album: Album }) {
     let alive = true;
     const c = album.cover;
     if (!c) return;
-    const p = c.kind === "image" ? Promise.resolve(fileSrc(c.primary)) : c.kind === "raw" ? rawPreviewUrl(c.primary) : videoPoster(fileSrc(c.primary));
+    const p = c.kind === "image" ? Promise.resolve(mediaUrl(c)) : c.kind === "raw" ? rawPreviewUrl(c.primary) : videoPoster(mediaUrl(c));
     p.then((u) => alive && setCover(u)).catch(() => {});
     return () => {
       alive = false;

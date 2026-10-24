@@ -3,7 +3,7 @@ export const RESERVED_KEYS = new Set([
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
   " ", "arrowleft", "arrowright", "arrowup", "arrowdown",
   "backspace", "delete", "escape", "enter", "tab",
-  "z", "s", "f", "b", "u", "g", "h", "i", "?", "m", ",", ".", "d", "a", "x", "c", "r", "[", "]", "\\",
+  "z", "s", "f", "b", "u", "g", "h", "i", "?", "m", ",", ".", "d", "a", "x", "c", "r", "e", "[", "]", "\\",
 ]);
 
 export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
@@ -24,6 +24,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["B"], label: "Browse everything" },
   { keys: ["D"], label: "Find duplicates" },
   { keys: ["A"], label: "Albums" },
+  { keys: ["E"], label: "Files: every file and folder, drag and drop, encrypt on the way in" },
   { keys: ["X"], label: "Fit / fill the screen" },
   { keys: ["G"], label: "Open settings" },
   { keys: ["I"], label: "Show file info" },

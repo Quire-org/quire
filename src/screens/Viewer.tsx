@@ -5,7 +5,7 @@ import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { TargetBar } from "../components/TargetBar";
-import { fileSrc, pickFolder } from "../lib/api";
+import { mediaUrl, pickFolder } from "../lib/api";
 import { isTypingTarget } from "../lib/hotkeys";
 import { basename, ext, formatBytes, formatDate, tailPath } from "../lib/format";
 
@@ -54,7 +54,7 @@ export function Viewer() {
 
   // Slideshow: images advance after the interval, videos when they end.
   const show = s.slideshow;
-  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen;
+  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen;
   useEffect(() => {
     if (!show.playing || !current || modalOpen) return;
     if (current.kind === "video") return; // handled by onEnded
@@ -67,7 +67,7 @@ export function Viewer() {
     if (albumKey) s.setAlbumRatingByKey(albumKey, r);
     else s.setRating(current, r);
   };
-  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen;
+  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen;
 
   // Keep the stage clear of the HUD bars whatever their height (target buttons may wrap).
   useEffect(() => {
@@ -100,8 +100,8 @@ export function Viewer() {
       const cur = st.queue[st.index];
 
       if (key === "escape") {
-        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen) {
-          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false });
+        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen || st.vaultOpen) {
+          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false, vaultOpen: false });
         } else if (st.slideshow.playing) {
           st.toggleSlideshow();
         } else if (st.immersive) {
@@ -173,6 +173,9 @@ export function Viewer() {
           return;
         case "a":
           st.openAlbums();
+          return;
+        case "e":
+          st.openFiles();
           return;
         case "x":
           st.toggleFit();
@@ -257,7 +260,7 @@ export function Viewer() {
           <div key={`${current.key}-${show.interval}`} className="slide-progress" style={{ animationDuration: `${show.interval}s` }} />
         )}
         {upcoming.map((i) => (
-          <img key={i.primary} src={fileSrc(i.primary)} alt="" className="preload" />
+          <img key={i.primary} src={mediaUrl(i)} alt="" className="preload" />
         ))}
         {s.infoOpen && current && (
           <div className="info panel mono">

@@ -14,6 +14,13 @@ pub fn embedded_jpeg(path: &Path) -> Result<Vec<u8>, String> {
         return Err("file too large to scan for a preview".into());
     }
     let data = fs::read(path).map_err(|e| e.to_string())?;
+    embedded_jpeg_bytes(&data)
+}
+
+pub fn embedded_jpeg_bytes(data: &[u8]) -> Result<Vec<u8>, String> {
+    if data.len() as u64 > MAX_SCAN {
+        return Err("file too large to scan for a preview".into());
+    }
 
     let mut best: Option<(usize, usize)> = None; // (start, end exclusive)
     let mut i = 0usize;

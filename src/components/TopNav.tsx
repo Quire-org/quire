@@ -1,7 +1,7 @@
-import { Books, CaretUp, Copy, GearSix, List, Question, SquaresFour, SlidersHorizontal } from "@phosphor-icons/react";
+import { Books, CaretUp, Copy, FolderOpen, GearSix, List, LockKey, Question, SquaresFour, SlidersHorizontal } from "@phosphor-icons/react";
 import { useStore, type Screen } from "../store";
 
-const LABEL: Record<string, string> = { viewer: "Sort", browse: "Browse", albums: "Albums", dupes: "Duplicates" };
+const LABEL: Record<string, string> = { viewer: "Sort", browse: "Browse", albums: "Albums", dupes: "Duplicates", files: "Files" };
 
 /** The same navigation bar on every list screen. H collapses it and the sidebar to a thin strip. */
 export function TopNav({ current, children }: { current: Screen; children?: React.ReactNode }) {
@@ -33,9 +33,15 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
         {tab("browse", "Browse", "B", <SquaresFour />, s.openBrowse)}
         {tab("albums", "Albums", "A", <Books />, s.openAlbums)}
         {tab("dupes", "Duplicates", "D", <Copy />, s.openDupes)}
+        {tab("files", "Files", "E", <FolderOpen />, s.openFiles)}
       </div>
       <div className="hud-right">
         {children}
+        {s.vault?.unlocked && (
+          <button className="btn sm ghost accent2" onClick={() => void s.lockVault()} title="Vault unlocked. Click to lock and close">
+            <LockKey />
+          </button>
+        )}
         <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
           <GearSix /> <kbd className="kbd">G</kbd>
         </button>

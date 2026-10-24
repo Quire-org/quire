@@ -12,6 +12,9 @@ import { Dupes } from "./screens/Dupes";
 import { Albums } from "./screens/Albums";
 import { Drive } from "./screens/Drive";
 import { Backup } from "./screens/Backup";
+import { VaultDialog } from "./screens/VaultDialog";
+import { VaultUnlock } from "./screens/VaultUnlock";
+import { Files } from "./screens/Files";
 import { ScanPill } from "./components/ScanPill";
 import { Settings } from "./screens/Settings";
 import { Trash } from "./screens/Trash";
@@ -26,6 +29,8 @@ export default function App() {
   const helpOpen = useStore((s) => s.helpOpen);
   const driveOpen = useStore((s) => s.driveOpen);
   const backupOpen = useStore((s) => s.backupOpen);
+  const vaultOpen = useStore((s) => s.vaultOpen);
+  const pendingRoot = useStore((s) => s.pendingRoot);
   const theme = useStore((s) => s.theme);
   const iconWeight = themes.find((t) => t.id === theme)?.iconWeight ?? "regular";
   const openRoot = useStore((s) => s.openRoot);
@@ -64,8 +69,11 @@ export default function App() {
       {screen === "browse" && <Browse />}
       {screen === "dupes" && <Dupes />}
       {screen === "albums" && <Albums />}
+      {screen === "files" && <Files />}
       {driveOpen && <Drive />}
       {backupOpen && <Backup />}
+      {vaultOpen && <VaultDialog />}
+      {pendingRoot && <VaultUnlock />}
       <ScanPill />
       {settingsOpen && <Settings />}
       {trashOpen && <Trash />}

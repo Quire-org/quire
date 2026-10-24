@@ -58,6 +58,23 @@ so the same code builds for macOS, Linux and Windows.
   file and lists the ones that fail. SD cards expose no wear counters to a computer, so the
   panel says so instead of guessing; read errors and sharp slowdowns are the reliable early
   warnings, and the recommendations reflect that.
+- **Vault** (Settings → Encrypt folder…): optional per-folder encryption. Every file becomes
+  an opaque blob with a random name under `.vault/objects/`; file names, folders, sizes and
+  times exist only in an encrypted index, and the library, history and hash cache are
+  encrypted too. Keys: Argon2id from your passphrase wraps a random data key, so the
+  passphrase can change without re-encrypting; files use XChaCha20-Poly1305 in 64 KiB chunks
+  so videos stay seekable, served to the viewer through a `vault://` protocol with Range
+  support. A **recovery code** is shown once at creation (a second key slot); it unlocks the
+  vault and lets you set a new passphrase. Files the camera writes later stay plain until
+  you press *Encrypt new files*; they still show and sort in the meantime. *Export* writes
+  readable copies elsewhere, *Remove vault* decrypts everything back in place. Forgetting
+  both passphrase and code means the files are gone: there is no other way in, by design.
+  What a vault cannot do: stop someone who has your passphrase, or who sits at your unlocked
+  Mac, from reading the files. Blob sizes also remain visible.
+- **Files** (`E`): a file manager over the opened folder, for every file and folder, not
+  only media. Drag files from the desktop onto it to add them (encrypted on the way in when
+  a vault is open), drag rows onto folders or breadcrumbs to move them, rename, delete,
+  export, new folder.
 - **Backup** (top bar or Settings → Backup…) mirrors the opened folder into a folder on
   another drive, remembered in the library file. A plan is shown first: unchanged files
   (same path, size and time) are skipped, new and changed files copied, files you moved
@@ -106,6 +123,7 @@ so the same code builds for macOS, Linux and Windows.
 | `B` | Browse everything (`Esc` back) |
 | `D` | Find duplicates (`Esc` back) |
 | `A` | Albums (`Esc` back) |
+| `E` | Files |
 | `X` | Fit the whole image, or fill the screen (may crop) |
 | `⏎` | Slideshow: auto-advance on a timer (2 to 60 s, picked next to the button); videos play to the end. Hides the HUD like H by default (toggle next to the interval); Esc pauses |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
@@ -159,6 +177,8 @@ src-tauri/src/
   albums.rs    Album folders: scan subfolders, move a folder as a whole
   drive.rs     Drive info (sysinfo + diskutil + smartctl), read benchmark, readability check
   backup.rs    Incremental backup: plan (new/changed/moved/extra), run with progress, mirror
+  vault.rs     Encrypted vault: key slots (passphrase, recovery code), chunked objects, index, meta
+  fsx.rs       Storage layer treating plain files and vault entries alike (scan, move, read)
   media.rs     Recursive scan + grouping of RAW/JPEG/sidecar/live-photo pairs
   library.rs   .mediasorter.json on the volume (targets, ratings, trash dir)
   ops.rs       Group moves with collision-safe renaming, trash purge

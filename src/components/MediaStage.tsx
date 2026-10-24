@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { fileSrc, rawPreviewUrl } from "../lib/api";
+import { mediaUrl, rawPreviewUrl } from "../lib/api";
 import { formatTime } from "../lib/format";
 import type { MediaItem } from "../lib/types";
 import { FitImage, useFitSize, type FitMode, type Natural } from "./FitImage";
@@ -23,7 +23,7 @@ function ImageStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [item.primary]);
   if (failed) return <Unavailable item={item} reason="The webview cannot decode this image format." />;
-  return <FitImage src={fileSrc(item.primary)} mode={fit} alt={item.name} onError={() => setFailed(true)} />;
+  return <FitImage src={mediaUrl(item)} mode={fit} alt={item.name} onError={() => setFailed(true)} />;
 }
 
 function RawStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
@@ -110,7 +110,7 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
         ref={videoRef}
         className={`stage-media ${size ? "sized" : ""}`}
         style={size ?? undefined}
-        src={fileSrc(item.primary)}
+        src={mediaUrl(item)}
         autoPlay
         loop={loop}
         onEnded={onEnded}
@@ -177,7 +177,7 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
           }}
         >
           <div className="vbar-fill" style={{ width: duration ? `${(time / duration) * 100}%` : "0%" }} />
-          {hover && <ScrubPreview src={fileSrc(item.primary)} time={hover.t} x={hover.x} />}
+          {hover && <ScrubPreview src={mediaUrl(item)} time={hover.t} x={hover.x} />}
         </div>
         <span className="mono vtime">{formatTime(duration)}</span>
         <button

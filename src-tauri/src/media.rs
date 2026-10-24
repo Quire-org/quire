@@ -54,6 +54,17 @@ pub struct MediaItem {
     /// Key of the album (album-root subfolder) containing this item, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub album_key: Option<String>,
+    /// Vault object id of the primary file, when it is encrypted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vault_id: Option<String>,
+}
+
+/// One file as the scanner sees it: a logical path plus the metadata we need.
+#[derive(Debug, Clone)]
+pub struct FileRef {
+    pub path: PathBuf,
+    pub size: u64,
+    pub modified: u64,
 }
 
 fn ext_of(p: &Path) -> Option<String> {
@@ -107,12 +118,8 @@ fn display_rank(kind: MediaKind) -> u8 {
     }
 }
 
-/// Scan `dir` recursively. `exclude` holds absolute directories that are
-/// skipped entirely (the trash folder, target folders inside the root).
-pub fn scan(root: &Path, dir: &Path, exclude: &[PathBuf]) -> Vec<MediaItem> {
-    // (directory, lowercase stem) -> files
-    let mut groups: BTreeMap<(PathBuf, String), Vec<PathBuf>> = BTreeMap::new();
-
+/// Walk `dir` for plain files on disk (hidden entries and excluded dirs skipped).
+pub fn walk_files(dir: &Path, exclude: &[PathBuf]) -> Vec<FileRef> {
     let walker = WalkDir::new(dir)
         .follow_links(false)
         .into_iter()
@@ -130,70 +137,71 @@ pub fn scan(root: &Path, dir: &Path, exclude: &[PathBuf]) -> Vec<MediaItem> {
             true
         });
 
-    for entry in walker.filter_map(Result::ok) {
-        if !entry.file_type().is_file() {
-            continue;
-        }
-        let p = entry.path();
+    walker
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| {
+            let m = e.metadata().ok()?;
+            let modified = m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+            Some(FileRef { path: e.into_path(), size: m.len(), modified })
+        })
+        .collect()
+}
+
+/// Scan `dir` recursively on disk. `exclude` holds absolute directories that
+/// are skipped entirely (the trash folder, target folders inside the root).
+#[allow(dead_code)]
+pub fn scan(root: &Path, dir: &Path, exclude: &[PathBuf]) -> Vec<MediaItem> {
+    build_items(root, dir, walk_files(dir, exclude))
+}
+
+/// Group files (RAW + JPEG, live photos, sidecars) into items. Paths are
+/// logical: for vault entries they do not exist on disk.
+pub fn build_items(root: &Path, dir: &Path, files: Vec<FileRef>) -> Vec<MediaItem> {
+    // (directory, lowercase stem) -> files
+    let mut groups: BTreeMap<(PathBuf, String), Vec<FileRef>> = BTreeMap::new();
+    for f in files {
+        let p = &f.path;
         if classify(p).is_none() && !is_sidecar(p) {
             continue;
         }
         let parent = p.parent().unwrap_or(dir).to_path_buf();
-        let stem = p
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_ascii_lowercase())
-            .unwrap_or_default();
-        groups.entry((parent, stem)).or_default().push(p.to_path_buf());
+        let stem = p.file_stem().map(|s| s.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+        groups.entry((parent, stem)).or_default().push(f);
     }
 
     let mut items = Vec::with_capacity(groups.len());
     for ((parent, _stem), mut files) in groups {
-        files.sort();
-        // Pick the display file.
-        let mut best: Option<(u8, &PathBuf, MediaKind)> = None;
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+        let mut best: Option<(u8, usize, MediaKind)> = None;
         let mut has_raw = false;
         let mut has_video = false;
-        for f in &files {
-            if let Some(kind) = classify(f) {
+        for (i, f) in files.iter().enumerate() {
+            if let Some(kind) = classify(&f.path) {
                 has_raw |= kind == MediaKind::Raw;
                 has_video |= kind == MediaKind::Video;
                 let r = display_rank(kind);
                 if best.map(|(br, _, _)| r < br).unwrap_or(true) {
-                    best = Some((r, f, kind));
+                    best = Some((r, i, kind));
                 }
             }
         }
-        // Group consisting only of sidecars: nothing to show.
-        let Some((_, primary, kind)) = best else { continue };
-
-        let meta = std::fs::metadata(primary).ok();
-        let size = files
-            .iter()
-            .filter_map(|f| std::fs::metadata(f).ok())
-            .map(|m| m.len())
-            .sum();
-        let modified = meta
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_millis() as u64)
-            .unwrap_or(0);
-
+        let Some((_, pi, kind)) = best else { continue };
+        let primary = &files[pi];
         items.push(MediaItem {
-            key: rel_key(root, primary),
-            primary: primary.to_string_lossy().into_owned(),
-            files: files.iter().map(|f| f.to_string_lossy().into_owned()).collect(),
+            key: rel_key(root, &primary.path),
+            primary: primary.path.to_string_lossy().into_owned(),
+            files: files.iter().map(|f| f.path.to_string_lossy().into_owned()).collect(),
             kind,
-            name: primary
-                .file_stem()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_default(),
+            name: primary.path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(),
             dir: rel_key(dir, &parent),
-            size,
-            modified,
+            size: files.iter().map(|f| f.size).sum(),
+            modified: primary.modified,
             has_raw,
             has_video,
             target_id: None,
             album_key: None,
+            vault_id: None,
         });
     }
     items

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { fileSrc, rawPreviewUrl } from "../lib/api";
+import { mediaUrl, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
 import type { MediaItem } from "../lib/types";
 import { Check, Play, Star } from "@phosphor-icons/react";
@@ -49,7 +49,7 @@ export function Thumb({
     if (!visible) return;
     let alive = true;
     setUrl(null);
-    const p = item.kind === "image" ? Promise.resolve(fileSrc(item.primary)) : item.kind === "raw" ? rawPreviewUrl(item.primary) : videoPoster(fileSrc(item.primary));
+    const p = item.kind === "image" ? Promise.resolve(mediaUrl(item)) : item.kind === "raw" ? rawPreviewUrl(item.primary) : videoPoster(mediaUrl(item));
     p.then((u) => alive && setUrl(u)).catch(() => {});
     return () => {
       alive = false;

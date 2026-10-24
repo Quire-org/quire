@@ -16,6 +16,35 @@ export interface MediaItem {
   targetId?: string;
   /** Key of the album this item belongs to, when inside an album folder. */
   albumKey?: string;
+  /** Vault object id of the primary file, when it is encrypted. */
+  vaultId?: string;
+}
+
+export interface VaultStatus {
+  exists: boolean;
+  unlocked: boolean;
+  hasRecovery: boolean;
+  plaintextFiles: number;
+  plaintextBytes: number;
+  encryptedFiles: number;
+}
+
+export interface VaultProgress {
+  done: number;
+  total: number;
+  bytes: number;
+  totalBytes: number;
+  current: string;
+}
+
+export interface DirEntryInfo {
+  name: string;
+  path: string;
+  isDir: boolean;
+  size: number;
+  modified: number;
+  encrypted: boolean;
+  count: number;
 }
 
 export interface History {

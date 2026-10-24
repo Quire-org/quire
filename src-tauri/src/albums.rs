@@ -23,6 +23,24 @@ pub struct Album {
     pub cover: Option<MediaItem>,
 }
 
+/// Build an album card from the items found under `sub`.
+pub fn album_from_items(root: &Path, sub: &Path, stored_root: &str, items: Vec<MediaItem>) -> Album {
+    let cover = items.iter().find(|i| i.kind != MediaKind::Video).or_else(|| items.first()).cloned();
+    Album {
+        key: media::rel_key(root, sub),
+        path: sub.to_string_lossy().into_owned(),
+        name: sub.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+        album_root: stored_root.to_string(),
+        count: items.len(),
+        bytes: items.iter().map(|i| i.size).sum(),
+        images: items.iter().filter(|i| i.kind != MediaKind::Video).count(),
+        videos: items.iter().filter(|i| i.kind == MediaKind::Video).count(),
+        modified: items.iter().map(|i| i.modified).max().unwrap_or(0),
+        cover,
+    }
+}
+
+#[allow(dead_code)]
 pub fn scan_albums(root: &Path, album_roots: &[(String, PathBuf)]) -> Vec<Album> {
     let mut out = vec![];
     for (stored, dir) in album_roots {
@@ -60,6 +78,7 @@ pub fn scan_albums(root: &Path, album_roots: &[(String, PathBuf)]) -> Vec<Album>
 }
 
 /// Move a whole folder into `dest_dir`, keeping its name (suffixed on collision).
+#[allow(dead_code)]
 pub fn move_dir(dir: &Path, dest_dir: &Path) -> Result<PathBuf, String> {
     fs::create_dir_all(dest_dir).map_err(|e| format!("create {}: {e}", dest_dir.display()))?;
     let name = dir.file_name().ok_or("folder has no name")?.to_string_lossy().into_owned();
@@ -69,15 +88,20 @@ pub fn move_dir(dir: &Path, dest_dir: &Path) -> Result<PathBuf, String> {
         target = dest_dir.join(format!("{name} ({n})"));
         n += 1;
     }
-    if dest_dir.starts_with(dir) {
+    move_dir_to(dir, &target)?;
+    Ok(target)
+}
+
+/// Move a folder to an exact target path (rename, or copy + delete across devices).
+pub fn move_dir_to(dir: &Path, target: &Path) -> Result<(), String> {
+    if target.starts_with(dir) {
         return Err("cannot move a folder into itself".into());
     }
-    match fs::rename(dir, &target) {
-        Ok(()) => Ok(target),
+    match fs::rename(dir, target) {
+        Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices || e.raw_os_error() == Some(18) => {
-            copy_recursive(dir, &target)?;
-            fs::remove_dir_all(dir).map_err(|e| e.to_string())?;
-            Ok(target)
+            copy_recursive(dir, target)?;
+            fs::remove_dir_all(dir).map_err(|e| e.to_string())
         }
         Err(e) => Err(format!("move {}: {e}", dir.display())),
     }
@@ -185,6 +209,7 @@ pub fn decode_name(name: &str) -> Option<String> {
 
 /// Album folders whose names contain URL escapes, with the decoded name they
 /// would get. Collisions get a ` (n)` suffix.
+#[allow(dead_code)]
 pub fn rename_plan(root: &Path, album_roots: &[PathBuf]) -> Vec<Rename> {
     let mut plan = vec![];
     for dir in album_roots {
@@ -220,6 +245,7 @@ pub fn rename_plan(root: &Path, album_roots: &[PathBuf]) -> Vec<Rename> {
 
 /// Perform renames from a plan. Entries whose source vanished or whose
 /// destination now exists are skipped; the performed ones are returned.
+#[allow(dead_code)]
 pub fn rename_apply(plan: &[Rename]) -> Result<Vec<Rename>, String> {
     let mut done = vec![];
     for r in plan {

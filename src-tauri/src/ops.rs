@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 /// Move every file in `files` into `dest_dir`, keeping the group together.
 /// If a name collides, the same ` (n)` suffix is applied to the whole group.
 /// Returns the new absolute paths in the same order as `files`.
+#[allow(dead_code)]
 pub fn move_group(files: &[PathBuf], dest_dir: &Path) -> Result<Vec<PathBuf>, String> {
     fs::create_dir_all(dest_dir).map_err(|e| format!("create {}: {e}", dest_dir.display()))?;
 
@@ -42,7 +43,7 @@ pub fn move_group(files: &[PathBuf], dest_dir: &Path) -> Result<Vec<PathBuf>, St
     Ok(dests)
 }
 
-fn with_suffix(file: &Path, n: u32) -> PathBuf {
+pub fn with_suffix(file: &Path, n: u32) -> PathBuf {
     let name = file.file_name().map(|s| s.to_os_string()).unwrap_or_default();
     if n == 0 {
         return PathBuf::from(name);
@@ -55,7 +56,7 @@ fn with_suffix(file: &Path, n: u32) -> PathBuf {
 }
 
 /// Rename, falling back to copy + delete when crossing devices.
-fn move_file(src: &Path, dst: &Path) -> io::Result<()> {
+pub fn move_file(src: &Path, dst: &Path) -> io::Result<()> {
     match fs::rename(src, dst) {
         Ok(()) => Ok(()),
         Err(e) if is_cross_device(&e) => {
@@ -101,6 +102,7 @@ fn count_files(dir: &Path) -> usize {
         .count()
 }
 
+#[allow(dead_code)]
 pub fn dir_size(dir: &Path) -> (usize, u64) {
     walkdir::WalkDir::new(dir)
         .into_iter()

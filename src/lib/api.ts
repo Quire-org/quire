@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc, Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Album, AlbumRename, BackupOutcome, BackupPlan, BackupProgress, Benchmark, DriveInfo, History, ImageHashResult, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
+import type { Album, AlbumRename, BackupOutcome, BackupPlan, BackupProgress, Benchmark, DirEntryInfo, DriveInfo, History, ImageHashResult, VaultProgress, VaultStatus, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
 
 export const api = {
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
@@ -15,7 +15,38 @@ export const api = {
   scanAlbums: (root: string, library: Library) => invoke<Album[]>("scan_albums", { root, library }),
   moveDir: (root: string, dir: string, dest: string) => invoke<string>("move_dir", { root, dir, dest }),
   albumRenamePlan: (root: string, library: Library) => invoke<AlbumRename[]>("album_rename_plan", { root, library }),
-  albumRenameApply: (plan: AlbumRename[]) => invoke<AlbumRename[]>("album_rename_apply", { plan }),
+  albumRenameApply: (plan: AlbumRename[]) => invoke<AlbumRename[]>("album_rename_apply", { root: currentRoot(), plan }),
+  // vault
+  vaultStatus: (root: string) => invoke<VaultStatus>("vault_status", { root }),
+  vaultCreate: (root: string, passphrase: string) => invoke<string>("vault_create", { root, passphrase }),
+  vaultUnlock: (root: string, passphrase: string) => invoke<void>("vault_unlock", { root, passphrase }),
+  vaultUnlockRecovery: (root: string, code: string) => invoke<void>("vault_unlock_recovery", { root, code }),
+  vaultLock: () => invoke<void>("vault_lock"),
+  vaultChangePassphrase: (old: string, newPass: string) => invoke<void>("vault_change_passphrase", { old, new: newPass }),
+  vaultResetPassphrase: (newPass: string) => invoke<void>("vault_reset_passphrase", { new: newPass }),
+  vaultNewRecoveryCode: (passphrase: string) => invoke<string>("vault_new_recovery_code", { passphrase }),
+  vaultEncryptAll: (root: string, onProgress: (p: VaultProgress) => void) => {
+    const ch = new Channel<VaultProgress>();
+    ch.onmessage = onProgress;
+    return invoke<number>("vault_encrypt_all", { root, onProgress: ch });
+  },
+  vaultExport: (root: string, paths: string[], dest: string) => invoke<number>("vault_export", { root, paths, dest }),
+  vaultRemove: (root: string, onProgress: (p: VaultProgress) => void) => {
+    const ch = new Channel<VaultProgress>();
+    ch.onmessage = onProgress;
+    return invoke<number>("vault_remove", { root, onProgress: ch });
+  },
+  // files tab
+  listDir: (root: string, dir: string) => invoke<DirEntryInfo[]>("list_dir", { root, dir }),
+  fsMkdir: (root: string, dir: string, name: string) => invoke<string>("fs_mkdir", { root, dir, name }),
+  fsMove: (root: string, paths: string[], dest: string) => invoke<string[]>("fs_move", { root, paths, dest }),
+  fsRename: (root: string, path: string, newName: string) => invoke<string>("fs_rename", { root, path, newName }),
+  fsDelete: (root: string, paths: string[]) => invoke<number>("fs_delete", { root, paths }),
+  fsImport: (root: string, sources: string[], dest: string, onProgress: (p: VaultProgress) => void) => {
+    const ch = new Channel<VaultProgress>();
+    ch.onmessage = onProgress;
+    return invoke<number>("fs_import", { root, sources, dest, onProgress: ch });
+  },
   driveInfo: (root: string) => invoke<DriveInfo>("drive_info", { root }),
   readBenchmark: (root: string, maxBytes = 128 * 1024 * 1024) => invoke<Benchmark>("read_benchmark", { root, maxBytes }),
   verifyReadability: (root: string, onProgress: (p: VerifyProgress) => void) => {
@@ -32,8 +63,8 @@ export const api = {
   },
   cancelBackup: () => invoke<void>("cancel_backup"),
   imageHash: (path: string, isRaw: boolean) =>
-    invoke<ImageHashResult>("image_hash", { path, isRaw }),
-  fileFingerprint: (path: string) => invoke<string>("file_fingerprint", { path }),
+    invoke<ImageHashResult>("image_hash", { root: currentRoot(), path, isRaw }),
+  fileFingerprint: (path: string) => invoke<string>("file_fingerprint", { root: currentRoot(), path }),
   loadCache: (root: string) => invoke<unknown>("load_cache", { root }),
   loadHistory: (root: string) => invoke<History | null>("load_history", { root }),
   saveHistory: (root: string, history: History) => invoke<void>("save_history", { root, history }),
@@ -43,14 +74,14 @@ export const api = {
   trashItem: (root: string, library: Library, item: MediaItem) =>
     invoke<MoveResult>("trash_item", { root, library, item }),
   restoreFiles: (moves: [string, string][]) =>
-    invoke<void>("restore_files", { moves }),
+    invoke<void>("restore_files", { root: currentRoot(), moves }),
   trashInfo: (root: string, library: Library) =>
     invoke<TrashInfo>("trash_info", { root, library }),
   emptyTrash: (root: string, library: Library) =>
     invoke<number>("empty_trash", { root, library }),
   scanTrash: (root: string, library: Library) =>
     invoke<MediaItem[]>("scan_trash", { root, library }),
-  rawPreview: (path: string) => invoke<ArrayBuffer>("raw_preview", { path }),
+  rawPreview: (path: string) => invoke<ArrayBuffer>("raw_preview", { root: currentRoot(), path }),
   initialRoot: () => invoke<string | null>("initial_root"),
   pathExists: (path: string) => invoke<boolean>("path_exists", { path }),
   createDir: (path: string) => invoke<void>("create_dir", { path }),
@@ -58,8 +89,18 @@ export const api = {
     invoke<string>("resolve_path", { root, stored }),
 };
 
-/** URL the webview can load a file from. */
+/** The folder currently open; commands that resolve paths need it. */
+let rootForCommands = "";
+export const setCurrentRoot = (r: string | null) => {
+  rootForCommands = r ?? "";
+};
+const currentRoot = () => rootForCommands;
+
+/** URL the webview can load a plain file from. */
 export const fileSrc = (path: string) => convertFileSrc(path);
+
+/** URL for an item: through the vault protocol when encrypted, the asset protocol otherwise. */
+export const mediaUrl = (item: { primary: string; vaultId?: string }) => (item.vaultId ? convertFileSrc(item.vaultId, "vault") : convertFileSrc(item.primary));
 
 export async function pickFolder(title: string, defaultPath?: string) {
   const res = await open({ directory: true, multiple: false, title, defaultPath });

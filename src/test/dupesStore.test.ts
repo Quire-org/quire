@@ -23,6 +23,7 @@ vi.mock("../lib/api", () => ({
     readBenchmark: vi.fn(async () => ({ mbPerS: 100 })),
   },
   fileSrc: (p: string) => "file://" + p,
+  mediaUrl: (i: { primary: string }) => "file://" + i.primary,
   rawPreviewUrl: async (p: string) => "blob:" + p,
 }));
 

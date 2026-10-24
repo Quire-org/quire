@@ -9,9 +9,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Instant, UNIX_EPOCH};
 
 pub static BACKUP_CANCEL: AtomicBool = AtomicBool::new(false);
 
@@ -258,6 +258,7 @@ fn prune_empty_dirs(dir: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     fn write(p: PathBuf, data: &[u8], secs: u64) {
         fs::create_dir_all(p.parent().unwrap()).unwrap();

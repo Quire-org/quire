@@ -5,7 +5,7 @@ import { Modal } from "../components/Modal";
 import { themes } from "../themes";
 import { RESERVED_KEYS } from "../lib/hotkeys";
 import { formatBytes, tailPath } from "../lib/format";
-import { CloudArrowUp, FolderPlus, HardDrive, Palette } from "@phosphor-icons/react";
+import { CloudArrowUp, FolderPlus, HardDrive, LockKey, Palette } from "@phosphor-icons/react";
 import type { TrashInfo } from "../lib/types";
 
 export function Settings() {
@@ -140,6 +140,9 @@ export function Settings() {
         </button>
         <button className="btn accent2" onClick={() => s.set({ backupOpen: true, settingsOpen: false })}>
           <CloudArrowUp /> Backup…
+        </button>
+        <button className={`btn ${s.vault?.exists ? "accent2" : ""}`} onClick={() => s.set({ vaultOpen: true, settingsOpen: false })} title="Encrypt this folder">
+          <LockKey /> {s.vault?.exists ? "Vault" : "Encrypt folder…"}
         </button>
         <button className="btn ghost" onClick={s.closeRoot}>
           Close folder

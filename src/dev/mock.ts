@@ -44,6 +44,7 @@ const seed: Entry[] = [
 let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false, backupDest: null, lastBackup: null, ids: {} };
 let items: MediaItem[] = seed.map((e) => toItem(e.files.map((f) => `${ROOT}/${f}`), `${ROOT}/${e.rel}`, e.kind));
 let pickCount = 0;
+let mockVault = { exists: false, unlocked: false };
 let history: { version: number; viewed: Record<string, number> } | null = null;
 
 function fakeHash(text: string): bigint {
@@ -94,7 +95,7 @@ function moveTo(item: MediaItem, destDir: string) {
   for (const [from, to] of moved) origin.set(to, served(from));
   const files = moved.map((m) => m[1]);
   const primary = moved.find((m) => m[0] === item.primary)![1];
-  const next = toItem(files, primary, item.kind);
+  const next = { ...toItem(files, primary, item.kind), vaultId: item.vaultId };
   items = items.map((i) => (i.key === item.key ? next : i));
   return { moved, item: next };
 }
@@ -228,6 +229,99 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     }
     case "cancel_backup":
       return null;
+    case "vault_status":
+      return { exists: mockVault.exists, unlocked: mockVault.unlocked, hasRecovery: mockVault.exists, plaintextFiles: mockVault.exists ? items.filter((i) => !i.vaultId).length : 0, plaintextBytes: 0, encryptedFiles: items.filter((i) => i.vaultId).length };
+    case "vault_create":
+      mockVault = { exists: true, unlocked: true };
+      return "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-2345-6789";
+    case "vault_unlock":
+      if (args.passphrase !== "mock") throw new Error("wrong passphrase");
+      mockVault.unlocked = true;
+      return null;
+    case "vault_unlock_recovery":
+      mockVault.unlocked = true;
+      return null;
+    case "vault_lock":
+      mockVault.unlocked = false;
+      return null;
+    case "vault_change_passphrase":
+    case "vault_reset_passphrase":
+      return null;
+    case "vault_new_recovery_code":
+      return "NEW0-CODE-NEW0-CODE-NEW0-CODE-NEW0-CODE";
+    case "vault_encrypt_all": {
+      const ch = args.onProgress as { onmessage: (p: unknown) => void };
+      const plain = items.filter((i) => !i.vaultId);
+      for (let i = 0; i < plain.length; i++) {
+        await new Promise((r) => setTimeout(r, 60));
+        ch.onmessage({ done: i, total: plain.length, bytes: i * 150_000, totalBytes: plain.length * 150_000, current: plain[i].name });
+      }
+      items = items.map((i) => ({ ...i, vaultId: i.vaultId ?? "mock-" + i.key }));
+      return plain.length;
+    }
+    case "vault_export":
+      return (args.paths as string[]).length;
+    case "vault_remove": {
+      items = items.map(({ vaultId: _v, ...rest }) => rest);
+      mockVault = { exists: false, unlocked: false };
+      return items.length;
+    }
+    case "list_dir": {
+      const dir = resolve(args.dir as string);
+      const names = new Set<string>();
+      const files: { name: string }[] = [];
+      for (const i of items) {
+        for (const f of i.files) {
+          if (!under(f, dir)) continue;
+          const rest = f.slice(dir.length + 1);
+          if (rest.includes("/")) names.add(rest.split("/")[0]);
+          else files.push({ name: rest, path: f, isDir: false, size: i.size, modified: i.modified, encrypted: !!i.vaultId, count: 0 } as { name: string });
+        }
+      }
+      const dirs = [...names].sort().map((n) => ({ name: n, path: `${dir}/${n}`, isDir: true, size: 0, modified: 0, encrypted: false, count: items.filter((i) => under(i.primary, `${dir}/${n}`)).length }));
+      return [...dirs, ...files.sort((a, b) => a.name.localeCompare(b.name))];
+    }
+    case "fs_mkdir":
+      return `${resolve(args.dir as string)}/${args.name}`;
+    case "fs_move": {
+      const dest = resolve(args.dest as string);
+      const out: string[] = [];
+      for (const p of args.paths as string[]) {
+        const it = items.find((i) => i.files.includes(p));
+        if (!it) {
+          const name = p.split("/").pop()!;
+          items = items.map((i) => (under(i.primary, p) ? { ...toItem(i.files.map((f) => `${dest}/${name}/${f.slice(p.length + 1)}`), `${dest}/${name}/${i.primary.slice(p.length + 1)}`, i.kind), vaultId: i.vaultId } : i));
+          out.push(`${dest}/${name}`);
+        } else {
+          out.push(moveTo(it, dest).item.primary);
+        }
+      }
+      return out;
+    }
+    case "fs_rename": {
+      const p = args.path as string;
+      const target = `${p.slice(0, p.lastIndexOf("/"))}/${args.newName}`;
+      items = items.map((i) => (i.primary === p ? { ...toItem(i.files.map((f) => (f === p ? target : f)), target, i.kind), vaultId: i.vaultId } : i));
+      return target;
+    }
+    case "fs_delete":
+      items = items.filter((i) => !(args.paths as string[]).some((p) => i.files.includes(p) || under(i.primary, p)));
+      return (args.paths as string[]).length;
+    case "fs_import": {
+      const ch = args.onProgress as { onmessage: (p: unknown) => void };
+      const srcs = args.sources as string[];
+      for (let i = 0; i < srcs.length; i++) {
+        await new Promise((r) => setTimeout(r, 80));
+        ch.onmessage({ done: i, total: srcs.length, bytes: 0, totalBytes: 0, current: srcs[i].split("/").pop() });
+      }
+      const dest = resolve(args.dest as string);
+      for (const s of srcs) {
+        const rel = `${dest}/${s.split("/").pop()}`;
+        items.push({ ...toItem([rel], rel, "image"), vaultId: mockVault.unlocked ? "mock-" + rel : undefined });
+        origin.set(rel, `${ROOT}/DCIM/100CANON/IMG_1003.png`);
+      }
+      return srcs.length;
+    }
     case "scan_all": {
       const lib = args.library as Library;
       const trash = resolve(lib.trashDir);
@@ -311,6 +405,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       if ((args.options as { title?: string } | undefined)?.title?.includes("backup")) return "/Volumes/BACKUP_2TB/CANON_64";
       return `${ROOT}/${names[pickCount++ % names.length]}`;
     }
+    case "plugin:event|listen":
+      return 1;
+    case "plugin:event|unlisten":
+      return null;
     case "plugin:window|is_fullscreen":
       return false;
     case "plugin:window|set_fullscreen":
@@ -324,7 +422,14 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
 (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
   invoke,
   transformCallback: () => 0,
-  convertFileSrc: (p: string) => FILES_BASE + encodeURI(served(p).slice(ROOT.length + 1)),
+  unregisterListener: () => {},
+  convertFileSrc: (p: string, protocol?: string) => {
+    if (protocol === "vault") {
+      const it = items.find((i) => i.vaultId === p);
+      return it ? FILES_BASE + encodeURI(served(it.primary).slice(ROOT.length + 1)) : "";
+    }
+    return FILES_BASE + encodeURI(served(p).slice(ROOT.length + 1));
+  },
   metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main", windowLabel: "main" } },
   plugins: {},
 };

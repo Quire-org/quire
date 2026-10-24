@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, fileSrc, rawPreviewUrl } from "./lib/api";
+import { api, mediaUrl, rawPreviewUrl } from "./lib/api";
 import {
   cacheValid,
   findGroups,
@@ -270,7 +270,7 @@ export const useDupes = create<DupesState>((set, get) => ({
             } catch {
               // The webview may decode what Rust cannot (HEIC, AVIF...).
               try {
-                const url = item.kind === "raw" ? await rawPreviewUrl(item.primary) : fileSrc(item.primary);
+                const url = item.kind === "raw" ? await rawPreviewUrl(item.primary) : mediaUrl(item);
                 const sig: ImageSig = await hashImageUrl(url);
                 c.image = { phash: h64ToHex(sig.phash), dhash: h64ToHex(sig.dhash), width: sig.width, height: sig.height };
               } catch (e2) {
@@ -307,7 +307,7 @@ export const useDupes = create<DupesState>((set, get) => ({
           const c = cache[item.key] ?? { size: item.size, modified: item.modified };
           let framesThis = 0;
           try {
-            const sig: VideoSig = await hashVideoUrl(fileSrc(item.primary), cancelled, (i, n) => {
+            const sig: VideoSig = await hashVideoUrl(mediaUrl(item), cancelled, (i, n) => {
               framesDone += i - framesThis;
               framesThis = i;
               set({ progress: { stage: "videos", done: k, total: videos.length, detail: `${item.name}  ${i}/${n}s`, eta: videoEta() } });

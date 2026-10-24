@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from "react";
 import { TopNav } from "../components/TopNav";
+import { api, pickFolder } from "../lib/api";
 import { ArrowsClockwise, Play, Selection, Sparkle, Trash } from "@phosphor-icons/react";
 import { useStore } from "../store";
 import { useDupes } from "../dupesStore";
@@ -214,7 +215,7 @@ export function Browse() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
-      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen) return;
+      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen) return;
       const key = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && key === "a") {
         e.preventDefault();
@@ -245,6 +246,7 @@ export function Browse() {
       if (key === "r") void s.surprise();
       if (key === "s") toggleRandom();
       if (key === "g") s.set({ settingsOpen: true });
+      if (key === "e") s.openFiles();
       if (key === "h") s.toggleNav();
       if (key === "enter" && items.length) open(0);
     };
@@ -383,6 +385,23 @@ export function Browse() {
             </span>
             <button className="btn sm danger" disabled={s.busy} onClick={() => void trashSelected()}>
               <Trash /> Trash <kbd className="kbd">⌫</kbd>
+            </button>
+            <button
+              className="btn sm ghost"
+              disabled={s.busy}
+              title={s.vault?.unlocked ? "Write decrypted copies elsewhere" : "Copy the selection elsewhere"}
+              onClick={async () => {
+                const dest = await pickFolder("Choose where to write the copies");
+                if (!dest || !s.root) return;
+                try {
+                  const n = await api.vaultExport(s.root, selectedItems.flatMap((i) => i.files), dest);
+                  s.toast(`Exported ${n} files`, "ok");
+                } catch (e) {
+                  s.toast(String(e), "error");
+                }
+              }}
+            >
+              Export…
             </button>
             <button className="btn sm ghost" onClick={() => setSelected(new Set(items.map((i) => i.key)))}>
               All <kbd className="kbd">⌘A</kbd>

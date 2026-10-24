@@ -18,11 +18,12 @@
         "minWidth": 900,
         "minHeight": 600,
         "theme": "Dark",
-        "backgroundColor": "#07080c"
+        "backgroundColor": "#07080c",
+        "dragDropEnabled": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost blob: data:; media-src 'self' asset: http://asset.localhost blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost",
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost vault: http://vault.localhost blob: data:; media-src 'self' asset: http://asset.localhost vault: http://vault.localhost blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost vault: http://vault.localhost",
       "assetProtocol": {
         "enable": true,
         "scope": {

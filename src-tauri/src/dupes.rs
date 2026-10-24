@@ -29,15 +29,7 @@ const CHUNK: usize = 1024 * 1024;
 pub fn file_fingerprint(path: &Path) -> Result<String, String> {
     let mut f = File::open(path).map_err(|e| e.to_string())?;
     let size = f.metadata().map_err(|e| e.to_string())?.len();
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    size.hash(&mut h);
-    let mut buf = vec![0u8; CHUNK];
-    let offsets: Vec<u64> = if size <= 3 * CHUNK as u64 {
-        vec![0]
-    } else {
-        vec![0, size / 2 - CHUNK as u64 / 2, size - CHUNK as u64]
-    };
-    for off in offsets {
+    fingerprint_with(size, |off, buf| {
         f.seek(SeekFrom::Start(off)).map_err(|e| e.to_string())?;
         let mut read = 0;
         while read < buf.len() {
@@ -47,7 +39,19 @@ pub fn file_fingerprint(path: &Path) -> Result<String, String> {
             }
             read += n;
         }
-        buf[..read].hash(&mut h);
+        Ok(read)
+    })
+}
+
+/// Fingerprint over any random-access source: size + hashed head, middle and tail chunks.
+pub fn fingerprint_with(size: u64, mut read_at: impl FnMut(u64, &mut [u8]) -> Result<usize, String>) -> Result<String, String> {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    size.hash(&mut h);
+    let mut buf = vec![0u8; CHUNK];
+    let offsets: Vec<u64> = if size <= 3 * CHUNK as u64 { vec![0] } else { vec![0, size / 2 - CHUNK as u64 / 2, size - CHUNK as u64] };
+    for off in offsets {
+        let n = read_at(off, &mut buf)?;
+        buf[..n].hash(&mut h);
     }
     Ok(format!("{size:x}-{:016x}", h.finish()))
 }
@@ -64,8 +68,21 @@ pub fn image_hash(path: &Path, is_raw: bool) -> Result<ImageHash, String> {
             .decode()
             .map_err(|e| format!("decode: {e}"))?
     };
+    Ok(hash_image(&img))
+}
+
+pub fn image_hash_bytes(bytes: &[u8], is_raw: bool) -> Result<ImageHash, String> {
+    let img = if is_raw {
+        image::load_from_memory(&crate::preview::embedded_jpeg_bytes(bytes)?).map_err(|e| e.to_string())?
+    } else {
+        image::load_from_memory(bytes).map_err(|e| format!("decode: {e}"))?
+    };
+    Ok(hash_image(&img))
+}
+
+fn hash_image(img: &DynamicImage) -> ImageHash {
     let (width, height) = img.dimensions();
-    Ok(ImageHash { phash: format!("{:016x}", phash(&img)), dhash: format!("{:016x}", dhash(&img)), width, height })
+    ImageHash { phash: format!("{:016x}", phash(img)), dhash: format!("{:016x}", dhash(img)), width, height }
 }
 
 /// pHash: 32x32 grayscale -> DCT -> top-left 8x8 (minus DC) compared to median.
