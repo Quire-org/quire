@@ -76,6 +76,14 @@ so the same code builds for macOS, Linux and Windows.
   GNOME Keyring or KWallet). Only on that machine; passphrase and recovery code keep working.
   What a vault cannot do: stop someone who has your passphrase, or who sits at your unlocked
   Mac, from reading the files. Blob sizes also remain visible.
+- **Edit** (`T`, or the Edit button in the viewer and the Browse selection bar): rotate 90°
+  left/right/180°, upscale 2× or 4× (Lanczos), and convert: JPEG/PNG/WebP/TIFF for photos,
+  MP4 H.264 or H.265, WebM VP9, GIF or MP3 for videos, with small/balanced/high quality.
+  Photos in common formats are processed in Rust; videos, HEIC and anything else use
+  **ffmpeg** when installed (`brew install ffmpeg`), with video rotation as a lossless
+  display flag. Results are saved next to the original with a suffix, or replace it (the
+  original goes to the trash and the rating carries over). Works on vault items too.
+  EXIF metadata is not carried over to edited photos.
 - **Files** (`E`): a file manager over the opened folder, for every file and folder, not
   only media. Drag files from the desktop onto it to add them (encrypted on the way in when
   a vault is open), drag rows onto folders or breadcrumbs to move them, rename, delete,
@@ -129,6 +137,7 @@ so the same code builds for macOS, Linux and Windows.
 | `D` | Find duplicates (`Esc` back) |
 | `A` | Albums (`Esc` back) |
 | `E` | Files |
+| `T` | Edit: rotate, upscale, convert |
 | `X` | Fit the whole image, or fill the screen (may crop) |
 | `⏎` | Slideshow: auto-advance on a timer (2 to 60 s, picked next to the button); videos play to the end. Hides the HUD like H by default (toggle next to the interval); Esc pauses |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |

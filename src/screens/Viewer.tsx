@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, selectCurrent, selectRating } from "../store";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
-import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, EyeSlash, GearSix, MonitorPlay, Pause, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, EyeSlash, GearSix, MonitorPlay, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { TargetBar } from "../components/TargetBar";
@@ -54,7 +54,7 @@ export function Viewer() {
 
   // Slideshow: images advance after the interval, videos when they end.
   const show = s.slideshow;
-  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen;
+  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editOpen;
   useEffect(() => {
     if (!show.playing || !current || modalOpen) return;
     if (current.kind === "video") return; // handled by onEnded
@@ -67,7 +67,7 @@ export function Viewer() {
     if (albumKey) s.setAlbumRatingByKey(albumKey, r);
     else s.setRating(current, r);
   };
-  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen;
+  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editOpen;
 
   // Keep the stage clear of the HUD bars whatever their height (target buttons may wrap).
   useEffect(() => {
@@ -100,8 +100,8 @@ export function Viewer() {
       const cur = st.queue[st.index];
 
       if (key === "escape") {
-        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen || st.vaultOpen) {
-          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false, vaultOpen: false });
+        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen || st.vaultOpen || st.editOpen) {
+          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false, vaultOpen: false, editOpen: false });
         } else if (st.slideshow.playing) {
           st.toggleSlideshow();
         } else if (st.immersive) {
@@ -176,6 +176,9 @@ export function Viewer() {
           return;
         case "e":
           st.openFiles();
+          return;
+        case "t":
+          if (cur) st.openEdit([cur]);
           return;
         case "x":
           st.toggleFit();
@@ -378,6 +381,9 @@ export function Viewer() {
             </button>
             <button className="btn ghost" onClick={() => void s.undo()} disabled={s.undoStack.length === 0 || s.busy} title="Undo (⌘Z)">
               <ArrowCounterClockwise /> Undo <kbd className="kbd">⌘Z</kbd>
+            </button>
+            <button className="btn ghost" onClick={() => current && s.openEdit([current])} disabled={!current || s.busy} title="Edit: rotate, upscale, convert (T)">
+              <PencilSimple /> Edit <kbd className="kbd">T</kbd>
             </button>
             <button className="btn danger" onClick={() => void s.trashCurrent()} disabled={!current || s.busy} title="Delete (⌫)">
               <Trash /> Delete <kbd className="kbd">⌫</kbd>

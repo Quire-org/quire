@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc, Channel } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { Album, AlbumRename, BackupOutcome, BackupPlan, BackupProgress, Benchmark, DirEntryInfo, DriveInfo, History, ImageHashResult, VaultProgress, VaultStatus, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
+import type { Album, AlbumRename, BackupOutcome, BackupPlan, BackupProgress, Benchmark, DirEntryInfo, DriveInfo, EditOp, EditResult, EditTools, History, ImageHashResult, VaultProgress, VaultStatus, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
 
 export const api = {
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
@@ -38,6 +38,13 @@ export const api = {
     const ch = new Channel<VaultProgress>();
     ch.onmessage = onProgress;
     return invoke<number>("vault_remove", { root, onProgress: ch });
+  },
+  // edits
+  editTools: () => invoke<EditTools>("edit_tools"),
+  editApply: (root: string, library: Library, item: MediaItem, op: EditOp, replace: boolean, onProgress: (p: number) => void) => {
+    const ch = new Channel<number>();
+    ch.onmessage = onProgress;
+    return invoke<EditResult>("edit_apply", { root, library, item, op, replace, onProgress: ch });
   },
   // files tab
   listDir: (root: string, dir: string) => invoke<DirEntryInfo[]>("list_dir", { root, dir }),

@@ -5,7 +5,7 @@ import { suggestHotkey } from "./lib/hotkeys";
 import { identityOf, reconcile } from "./lib/reconcile";
 import { applyTheme, loadThemeId } from "./themes";
 import { basename, shuffled, uid } from "./lib/format";
-import type { Album, AlbumRename, History, Library, MediaItem, Target, VaultStatus } from "./lib/types";
+import type { Album, AlbumRename, EditOp, History, Library, MediaItem, Target, VaultStatus } from "./lib/types";
 
 export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums" | "files";
 
@@ -95,6 +95,9 @@ interface State {
   immersive: boolean;
   backupOpen: boolean;
   vaultOpen: boolean;
+  editOpen: boolean;
+  /** Items the Edit dialog works on (current item, or a Browse selection). */
+  editItems: MediaItem[];
   /** Vault state of the open folder, or of the folder waiting to be unlocked. */
   vault: VaultStatus | null;
   /** A folder with a locked vault that is waiting for a passphrase. */
@@ -177,6 +180,9 @@ interface Actions {
   unlockVaultQuick(): Promise<boolean>;
   lockVault(): Promise<void>;
   openFiles(): void;
+  openEdit(items: MediaItem[]): void;
+  /** Apply an edit to items in turn; updates queue, ratings and lists. */
+  applyEdit(items: MediaItem[], op: EditOp, replace: boolean, onProgress: (done: number, total: number, frac: number) => void): Promise<MediaItem[]>;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -258,6 +264,8 @@ export const useStore = create<Store>((set, get) => ({
   immersive: false,
   backupOpen: false,
   vaultOpen: false,
+  editOpen: false,
+  editItems: [],
   vault: null,
   pendingRoot: null,
   needsNewPassphrase: false,
@@ -752,6 +760,56 @@ export const useStore = create<Store>((set, get) => ({
     await api.vaultLock().catch(() => {});
     get().toast("Vault locked");
     get().closeRoot();
+  },
+
+  openEdit(items) {
+    if (items.length) set({ editOpen: true, editItems: items });
+  },
+
+  async applyEdit(items, op, replace, onProgress) {
+    const { root } = get();
+    if (!root) return [];
+    const results: MediaItem[] = [];
+    for (let k = 0; k < items.length; k++) {
+      const item = items[k];
+      const library = get().library!;
+      try {
+        const r = await api.editApply(root, library, item, op, replace, (f) => onProgress(k, items.length, f));
+        const s = get();
+        const lib = s.library!;
+        const ratings = { ...lib.ratings };
+        const ids = { ...(lib.ids ?? {}) };
+        if (replace && item.key in ratings) {
+          ratings[r.item.key] = ratings[item.key];
+          delete ratings[item.key];
+          if (ids[item.key]) {
+            ids[r.item.key] = { ...identityOf(r.item), f: undefined };
+            delete ids[item.key];
+          }
+        }
+        // Queue: replace in place, or insert the copy right after the original.
+        const qi = s.queue.findIndex((q) => q.key === item.key);
+        const queue = s.queue.slice();
+        if (qi >= 0) {
+          if (replace) queue[qi] = r.item;
+          else queue.splice(qi + 1, 0, r.item);
+        }
+        const drop = (list: MediaItem[]) => (replace ? list.filter((i) => i.key !== item.key) : list);
+        set({
+          library: { ...lib, ratings, ids },
+          queue,
+          index: replace ? s.index : Math.min(s.index, queue.length - 1),
+          unsorted: sortItems([...drop(s.unsorted), ...(!item.targetId && !item.albumKey ? [r.item] : [])]),
+          allItems: sortItems([...drop(s.allItems), r.item]),
+        });
+        get().saveLibrary();
+        results.push(r.item);
+      } catch (e) {
+        get().toast(`${item.name}: ${e}`, "error");
+      }
+    }
+    onProgress(items.length, items.length, 1);
+    return results;
   },
 
   openFiles() {

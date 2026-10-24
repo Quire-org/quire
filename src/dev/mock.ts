@@ -273,6 +273,30 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       mockVault = { exists: false, unlocked: false, remembered: false };
       return items.length;
     }
+    case "edit_tools":
+      return { ffmpeg: "/opt/homebrew/bin/ffmpeg", ffprobe: "/opt/homebrew/bin/ffprobe", version: "ffmpeg version 7.1.1", encoders: ["libx264", "libx265", "libvpx-vp9"] };
+    case "edit_apply": {
+      const ch = args.onProgress as { onmessage: (p: number) => void };
+      const it = args.item as MediaItem;
+      const op = args.op as { kind: string; degrees?: number; factor?: number; format?: string };
+      for (let i = 1; i <= 5; i++) {
+        await new Promise((r) => setTimeout(r, 60));
+        ch.onmessage(i / 5);
+      }
+      const ext = op.kind === "convert" ? (op.format!.startsWith("mp4") ? "mp4" : op.format!.startsWith("webm") ? "webm" : op.format!) : it.primary.split(".").pop()!;
+      const suffix = args.replace ? "" : op.kind === "rotate" ? ` rot${op.degrees}` : op.kind === "upscale" ? ` x${op.factor}` : "";
+      const base = it.primary.replace(/\.[^.]+$/, "");
+      const target = `${base}${suffix}.${ext}`;
+      const trashed: [string, string][] = [];
+      if (args.replace) {
+        for (const f of it.files) trashed.push([f, `${ROOT}/_deleted/${f.split("/").pop()}`]);
+        items = items.filter((i) => i.key !== it.key);
+      }
+      const ni = { ...toItem([target], target, it.kind), vaultId: it.vaultId ? "mock-" + target : undefined };
+      items.push(ni);
+      origin.set(target, served(it.primary));
+      return { item: ni, trashed };
+    }
     case "list_dir": {
       const dir = resolve(args.dir as string);
       const names = new Set<string>();

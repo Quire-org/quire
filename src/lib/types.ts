@@ -40,6 +40,20 @@ export interface VaultProgress {
   current: string;
 }
 
+export interface EditTools {
+  ffmpeg: string | null;
+  ffprobe: string | null;
+  version: string | null;
+  encoders: string[];
+}
+
+export type EditOp = { kind: "rotate"; degrees: 90 | 180 | 270 } | { kind: "upscale"; factor: 2 | 4 } | { kind: "convert"; format: string; quality: "small" | "balanced" | "high" };
+
+export interface EditResult {
+  item: MediaItem;
+  trashed: [string, string][];
+}
+
 export interface DirEntryInfo {
   name: string;
   path: string;

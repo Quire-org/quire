@@ -2,6 +2,7 @@ mod albums;
 mod backup;
 mod drive;
 mod dupes;
+mod edit;
 mod fsx;
 mod library;
 mod media;
@@ -819,6 +820,43 @@ fn fs_import(vs: VS, root: String, sources: Vec<String>, dest: String, on_progre
     })
 }
 
+/* ---------------- edits ---------------- */
+
+#[tauri::command]
+fn edit_tools() -> edit::Tools {
+    edit::tools()
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EditResult {
+    item: MediaItem,
+    /// (old, new) paths of originals moved to the trash when replacing.
+    trashed: Vec<(String, String)>,
+}
+
+#[tauri::command]
+async fn edit_apply(vs: VS<'_>, root: String, library: Library, item: MediaItem, op: edit::Op, replace: bool, on_progress: tauri::ipc::Channel<f32>) -> Result<EditResult, String> {
+    let root = PathBuf::from(root);
+    let trash = library.trash_path(&root);
+    let tools = edit::tools();
+    let primary = PathBuf::from(&item.primary);
+    let files: Vec<PathBuf> = item.files.iter().map(PathBuf::from).collect();
+    let (outcome, new_item) = with_ctx(&vs, &root, |ctx| {
+        let o = edit::apply(ctx, &tools, &primary, &files, &op, replace, &trash, |p| {
+            let _ = on_progress.send(p);
+        })?;
+        let dir = o.new_primary.parent().unwrap_or(&root).to_path_buf();
+        let items = ctx.scan(&dir, &[]);
+        let it = items.into_iter().find(|i| Path::new(&i.primary) == o.new_primary || i.files.iter().any(|f| Path::new(f) == o.new_primary)).ok_or("edited file not found after import")?;
+        Ok::<_, String>((o, it))
+    })?;
+    let mut new_item = new_item;
+    new_item.target_id = item.target_id.clone();
+    new_item.album_key = item.album_key.clone();
+    Ok(EditResult { item: new_item, trashed: outcome.trashed.iter().map(|(a, b)| (a.to_string_lossy().into_owned(), b.to_string_lossy().into_owned())).collect() })
+}
+
 /* ---------------- misc ---------------- */
 
 #[tauri::command]
@@ -946,6 +984,8 @@ pub fn run() {
             vault_encrypt_all,
             vault_export,
             vault_remove,
+            edit_tools,
+            edit_apply,
             list_dir,
             fs_mkdir,
             fs_move,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from "react";
 import { TopNav } from "../components/TopNav";
 import { api, pickFolder } from "../lib/api";
-import { ArrowsClockwise, Play, Selection, Sparkle, Trash } from "@phosphor-icons/react";
+import { ArrowsClockwise, PencilSimple, Play, Selection, Sparkle, Trash } from "@phosphor-icons/react";
 import { useStore } from "../store";
 import { useDupes } from "../dupesStore";
 import { Thumb } from "../components/Thumb";
@@ -215,7 +215,7 @@ export function Browse() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
-      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen) return;
+      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editOpen) return;
       const key = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && key === "a") {
         e.preventDefault();
@@ -237,6 +237,7 @@ export function Browse() {
         if (/^[0-9]$/.test(key)) return rateSelected(key === "0" ? 10 : Number(key));
         if (key === "u") return rateSelected(null);
         if (key === "backspace" || key === "delete") return void trashSelected();
+        if (key === "t") return s.openEdit(selectedItems);
         const t = targets.find((t) => t.hotkey.toLowerCase() === key);
         if (t) return void moveSelected(t.id);
       }
@@ -383,6 +384,9 @@ export function Browse() {
                 </button>
               ))}
             </span>
+            <button className="btn sm" disabled={s.busy} onClick={() => s.openEdit(selectedItems)} title="Rotate, upscale or convert the selection (T)">
+              <PencilSimple /> Edit
+            </button>
             <button className="btn sm danger" disabled={s.busy} onClick={() => void trashSelected()}>
               <Trash /> Trash <kbd className="kbd">⌫</kbd>
             </button>

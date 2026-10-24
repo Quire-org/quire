@@ -15,6 +15,7 @@ import { Backup } from "./screens/Backup";
 import { VaultDialog } from "./screens/VaultDialog";
 import { VaultUnlock } from "./screens/VaultUnlock";
 import { Files } from "./screens/Files";
+import { EditDialog } from "./screens/EditDialog";
 import { ScanPill } from "./components/ScanPill";
 import { Settings } from "./screens/Settings";
 import { Trash } from "./screens/Trash";
@@ -30,6 +31,7 @@ export default function App() {
   const driveOpen = useStore((s) => s.driveOpen);
   const backupOpen = useStore((s) => s.backupOpen);
   const vaultOpen = useStore((s) => s.vaultOpen);
+  const editOpen = useStore((s) => s.editOpen);
   const pendingRoot = useStore((s) => s.pendingRoot);
   const theme = useStore((s) => s.theme);
   const iconWeight = themes.find((t) => t.id === theme)?.iconWeight ?? "regular";
@@ -73,6 +75,7 @@ export default function App() {
       {driveOpen && <Drive />}
       {backupOpen && <Backup />}
       {vaultOpen && <VaultDialog />}
+      {editOpen && <EditDialog />}
       {pendingRoot && <VaultUnlock />}
       <ScanPill />
       {settingsOpen && <Settings />}
