@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { TopNav, SideToggle } from "../components/TopNav";
-import { FolderPlus, Play, Star, X } from "@phosphor-icons/react";
+import { FolderPlus, Play, SlidersHorizontal, Star, X } from "@phosphor-icons/react";
+import { Modal } from "../components/Modal";
 import { useStore } from "../store";
 import { mediaUrl, pickFolder, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
@@ -20,6 +21,7 @@ export function Albums() {
   const albumRatings = s.library?.albumRatings ?? {};
   const [plan, setPlan] = useState<AlbumRename[] | null>(null);
   const [checking, setChecking] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const f = s.albumFilters;
   const setF = s.setAlbumFilters;
   const { query, rootSel, kind, minRating, unratedOnly, sortBy, desc, random, zoom } = f;
@@ -35,6 +37,7 @@ export function Albums() {
     setPlan(p);
     setChecking(false);
     if (p.length === 0) s.toast("No URL-encoded album names found", "ok");
+    else setAdvanced(false); // the plan shows above the grid
   };
 
   useEffect(() => {
@@ -174,26 +177,9 @@ export function Albums() {
         <p className="dim small">Open an album to rate it as a whole.</p>
 
         <Deco kind="sprout" className="deco-side" />
-        <details className="advanced">
-          <summary className="label">Advanced</summary>
-          <p className="dim small">
-            Decode URL-escaped names (<span className="mono">My%20Trip</span>).
-          </p>
-          <label className="check side-row" title="Decode whenever albums are scanned">
-            <input type="checkbox" checked={!!s.library?.autoDecodeAlbumNames} onChange={(e) => s.setAutoDecodeAlbumNames(e.target.checked)} />
-            Automatically on scan
-          </label>
-          <button
-            className="btn sm"
-            onClick={() => {
-              if (roots.length === 0) s.toast("Add an album folder first", "warn");
-              else void checkNames();
-            }}
-            disabled={checking}
-          >
-            {checking ? "Checking…" : "Check names now"}
-          </button>
-        </details>
+        <button className="btn sm ghost advanced-btn" onClick={() => setAdvanced(true)}>
+          <SlidersHorizontal /> Advanced…
+        </button>
       </aside>
       <main className="browse-main">
         <div className="browse-head">
@@ -201,6 +187,35 @@ export function Albums() {
             {albums.length} of {s.albums.length} albums · {formatBytes(totalBytes)}
           </span>
         </div>
+        {advanced && (
+          <Modal title="Advanced" onClose={() => setAdvanced(false)}>
+            <section>
+              <h3>Folder names</h3>
+              <p className="dim small">
+                Some tools write folder names with URL escapes, so <span className="mono">Z%C3%BCrich%20Trip</span> is really{" "}
+                <span className="mono">Zürich Trip</span>. These can be decoded back to their real names. Album ratings follow the renamed
+                folders.
+              </p>
+              <label className="check side-row" title="Decode whenever albums are scanned">
+                <input type="checkbox" checked={!!s.library?.autoDecodeAlbumNames} onChange={(e) => s.setAutoDecodeAlbumNames(e.target.checked)} />
+                Decode automatically whenever albums are scanned
+              </label>
+              <div className="row" style={{ marginTop: 8 }}>
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    if (roots.length === 0) s.toast("Add an album folder first", "warn");
+                    else void checkNames();
+                  }}
+                  disabled={checking}
+                >
+                  {checking ? "Checking…" : "Check names now"}
+                </button>
+                <span className="dim small">Shows every planned rename first; nothing changes until you confirm.</span>
+              </div>
+            </section>
+          </Modal>
+        )}
         {plan && plan.length > 0 && (
           <section className="rename-plan panel">
             <div className="sec-head">

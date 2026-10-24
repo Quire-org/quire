@@ -1045,6 +1045,10 @@ section p {
   flex-direction: column;
   gap: 6px;
 }
+.advanced-btn {
+  margin-top: auto;
+  align-self: flex-start;
+}
 .advanced summary {
   cursor: pointer;
   list-style: none;
