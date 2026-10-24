@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from "react";
-import { TopNav } from "../components/TopNav";
+import { TopNav, SideToggle } from "../components/TopNav";
 import { api, pickFolder } from "../lib/api";
 import { ArrowsClockwise, PencilSimple, Play, Selection, Sparkle, Trash } from "@phosphor-icons/react";
 import { useStore } from "../store";
@@ -248,7 +248,7 @@ export function Browse() {
       if (key === "s") toggleRandom();
       if (key === "g") s.set({ settingsOpen: true });
       if (key === "e") s.openFiles();
-      if (key === "h") s.toggleNav();
+      if (key === "h") s.toggleChrome();
       if (key === "enter" && items.length) open(0);
     };
     window.addEventListener("keydown", onKey);
@@ -262,8 +262,9 @@ export function Browse() {
   const maxY = viewport.top + viewport.h + OVERSCAN;
 
   return (
-    <div className={`screen ${s.navCollapsed ? "chrome-hidden" : ""}`}>
+    <div className={`screen ${s.sideCollapsed ? "chrome-hidden" : ""}`}>
       <TopNav current="browse" />
+      <SideToggle />
     <div className="browse">
       <aside className="browse-side panel">
         <input className="input" placeholder="Search name or folder…" value={query} onChange={(e) => setQuery(e.target.value)} />

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useStore } from "../store";
 import { useDupes, type Sensitivity } from "../dupesStore";
 import { Thumb } from "../components/Thumb";
-import { TopNav } from "../components/TopNav";
+import { TopNav, SideToggle } from "../components/TopNav";
 import { FolderPicker } from "../components/FolderPicker";
 import { fmtEta, useCountdown } from "../components/ScanPill";
 import { isTypingTarget } from "../lib/hotkeys";
@@ -33,7 +33,7 @@ export function Dupes() {
       if (key === "a") s.openAlbums();
       if (key === "g") s.set({ settingsOpen: true });
       if (key === "e") s.openFiles();
-      if (key === "h") s.toggleNav();
+      if (key === "h") s.toggleChrome();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -58,8 +58,9 @@ export function Dupes() {
   const est = d.estimate;
 
   return (
-    <div className={`screen ${s.navCollapsed ? "chrome-hidden" : ""}`}>
+    <div className={`screen ${s.sideCollapsed ? "chrome-hidden" : ""}`}>
       <TopNav current="dupes" />
+      <SideToggle />
     <div className="browse dupes">
       <aside className="browse-side panel">
         <h3>Duplicates</h3>

@@ -1,4 +1,4 @@
-import { Books, CaretUp, Copy, FolderOpen, GearSix, List, LockKey, Question, SquaresFour, SlidersHorizontal } from "@phosphor-icons/react";
+import { Books, CaretDown, CaretLeft, CaretRight, CaretUp, Copy, FolderOpen, GearSix, LockKey, Question, SquaresFour, SlidersHorizontal } from "@phosphor-icons/react";
 import { useStore, type Screen } from "../store";
 
 const LABEL: Record<string, string> = { viewer: "Sort", browse: "Browse", albums: "Albums", dupes: "Duplicates", files: "Files" };
@@ -9,8 +9,10 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
   if (s.navCollapsed) {
     return (
       <div className="topnav collapsed">
-        <button className="btn sm ghost" onClick={s.toggleNav} title="Show the top bar and sidebar (H)">
-          <List /> <span className="label">{LABEL[current]}</span> <kbd className="kbd">H</kbd>
+        <span className="label">{LABEL[current]}</span>
+        <span className="grow" />
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Show the top bar">
+          <CaretDown />
         </button>
       </div>
     );
@@ -48,10 +50,22 @@ export function TopNav({ current, children }: { current: Screen; children?: Reac
         <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
           <Question />
         </button>
-        <button className="btn sm ghost" onClick={s.toggleNav} title="Hide the top bar and sidebar (H)">
-          <CaretUp /> <kbd className="kbd">H</kbd>
+        <button className="btn sm ghost" onClick={s.toggleNav} title="Hide the top bar (H hides the sidebar too)">
+          <CaretUp />
         </button>
       </div>
     </div>
+  );
+}
+
+
+/** Small tab on the sidebar's edge that collapses or restores it. */
+export function SideToggle() {
+  const collapsed = useStore((st) => st.sideCollapsed);
+  const toggle = useStore((st) => st.toggleSide);
+  return (
+    <button className={`side-toggle ${collapsed ? "collapsed" : ""}`} onClick={toggle} title={collapsed ? "Show the sidebar" : "Hide the sidebar (H hides the top bar too)"}>
+      {collapsed ? <CaretRight /> : <CaretLeft />}
+    </button>
   );
 }

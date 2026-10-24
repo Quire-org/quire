@@ -176,7 +176,7 @@ export function Files() {
       if (key === "a") s.openAlbums();
       if (key === "d") s.openDupes();
       if (key === "g") s.set({ settingsOpen: true });
-      if (key === "h") s.toggleNav();
+      if (key === "h") s.toggleChrome();
       if (key === "arrowup" && dir !== root) setDir(dir.slice(0, dir.lastIndexOf("/")));
     };
     window.addEventListener("keydown", onKey);

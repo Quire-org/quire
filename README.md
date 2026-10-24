@@ -155,7 +155,7 @@ so the same code builds for macOS, Linux and Windows.
 | `Z` / click | Loupe: 200% at the cursor, click again to fit; Z cycles fit / 100% / 200% |
 | `⏎` | Slideshow: auto-advance on a timer (2 to 60 s, picked next to the button); videos play to the end. Hides the HUD like H by default (toggle next to the interval); Esc pauses |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
-| `H` | Hide / show the HUD in the viewer, or the top bar and sidebar on the list screens |
+| `H` | Hide / show the HUD in the viewer, or both the top bar and sidebar on the list screens (each also has its own toggle) |
 | `R` | Surprise me |
 | `[` `]` `\` | Playback speed down / up / reset |
 | `G` | Settings |

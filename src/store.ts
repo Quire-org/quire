@@ -172,7 +172,13 @@ interface Actions {
   /** Re-attach ratings and history to files that were moved or renamed outside the app. */
   reconcileKeys(items: MediaItem[]): Promise<void>;
   navCollapsed: boolean;
+  sideCollapsed: boolean;
+  /** Top bar only (its own button). */
   toggleNav(): void;
+  /** Sidebar only (its own button). */
+  toggleSide(): void;
+  /** H: hide both, or show both when either is hidden. */
+  toggleChrome(): void;
   theme: string;
   setTheme(id: string): void;
   /** Auto-advance in the viewer: seconds per image; videos play to the end. */
@@ -281,6 +287,7 @@ export const useStore = create<Store>((set, get) => ({
   needsNewPassphrase: false,
   viewed: {},
   navCollapsed: loadPref<{ v: boolean }>("mediasorter.navCollapsed", { v: false }).v,
+  sideCollapsed: loadPref<{ v: boolean }>("mediasorter.sideCollapsed", { v: false }).v,
   theme: loadThemeId(),
   slideshow: { playing: false, hidByShow: false, ...loadPref<{ interval: number; hideUi: boolean }>("mediasorter.slideshow", { interval: 5, hideUi: true }) },
   browseFilters: loadPref("mediasorter.browseFilters", DEFAULT_BROWSE),
@@ -913,6 +920,20 @@ export const useStore = create<Store>((set, get) => ({
     const navCollapsed = !get().navCollapsed;
     set({ navCollapsed });
     savePref("mediasorter.navCollapsed", { v: navCollapsed });
+  },
+
+  toggleSide() {
+    const sideCollapsed = !get().sideCollapsed;
+    set({ sideCollapsed });
+    savePref("mediasorter.sideCollapsed", { v: sideCollapsed });
+  },
+
+  toggleChrome() {
+    const { navCollapsed, sideCollapsed } = get();
+    const hide = !(navCollapsed && sideCollapsed);
+    set({ navCollapsed: hide, sideCollapsed: hide });
+    savePref("mediasorter.navCollapsed", { v: hide });
+    savePref("mediasorter.sideCollapsed", { v: hide });
   },
 
   async reconcileKeys(items) {

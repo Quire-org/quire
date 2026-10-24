@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { TopNav } from "../components/TopNav";
+import { TopNav, SideToggle } from "../components/TopNav";
 import { FolderPlus, Play, Star, X } from "@phosphor-icons/react";
 import { useStore } from "../store";
 import { mediaUrl, pickFolder, rawPreviewUrl } from "../lib/api";
@@ -76,7 +76,7 @@ export function Albums() {
       if (key === "d") s.openDupes();
       if (key === "g") s.set({ settingsOpen: true });
       if (key === "e") s.openFiles();
-      if (key === "h") s.toggleNav();
+      if (key === "h") s.toggleChrome();
       if (key === "s") toggleRandom();
       if (key === "enter" && albums.length) void s.openAlbums_Slideshow(albums);
     };
@@ -92,8 +92,9 @@ export function Albums() {
   const totalBytes = albums.reduce((a, b) => a + b.bytes, 0);
 
   return (
-    <div className={`screen ${s.navCollapsed ? "chrome-hidden" : ""}`}>
+    <div className={`screen ${s.sideCollapsed ? "chrome-hidden" : ""}`}>
       <TopNav current="albums" />
+      <SideToggle />
     <div className="browse albums">
       <aside className="browse-side panel">
         <input className="input" placeholder="Search albums…" value={query} onChange={(e) => setF({ query: e.target.value })} />

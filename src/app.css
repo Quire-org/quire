@@ -406,7 +406,35 @@
 }
 .topnav.collapsed {
   min-height: 0;
-  padding: 2px 10px;
+  padding: 2px 10px 2px 16px;
+}
+.screen {
+  position: relative;
+}
+.side-toggle {
+  position: absolute;
+  left: 260px;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  cursor: pointer;
+  z-index: 20;
+  border-radius: var(--radius);
+  padding: 0;
+}
+.side-toggle:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+.side-toggle.collapsed {
+  left: 0;
+  transform: translate(0, -50%);
 }
 .screen.chrome-hidden .browse-side {
   display: none;

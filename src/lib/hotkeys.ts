@@ -17,7 +17,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: [",", "."], label: "Scrub 5s, or step frames when paused" },
   { keys: ["[", "]", "\\"], label: "Playback speed down / up / reset" },
   { keys: ["C"], label: "Immersive: hide the HUD, black background, hidden cursor (no button, key only)" },
-  { keys: ["H"], label: "Hide or show the HUD (viewer), or the top bar and sidebar (list screens)" },
+  { keys: ["H"], label: "Hide or show the HUD (viewer), or both the top bar and sidebar (list screens); each also has its own button" },
   { keys: ["R"], label: "Surprise me: a random item you haven't seen lately" },
   { keys: ["⏎"], label: "Slideshow: auto-advance on a timer (videos play to the end)" },
   { keys: ["S"], label: "Shuffle queue" },
