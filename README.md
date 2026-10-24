@@ -70,10 +70,12 @@ so the same code builds for macOS, Linux and Windows.
   readable copies elsewhere, *Remove vault* decrypts everything back in place. Forgetting
   both passphrase and code means the files are gone: there is no other way in, by design.
   **Quick unlock**: the Vault dialog can remember the vault on the current computer. The data
-  key goes into the OS credential store and is released only after a local prompt: Touch ID
-  (or the login password) on macOS, Windows Hello on Windows, and the Secret Service keyring
-  on Linux, which the desktop session unlocks (install `libdbus-1` / a keyring daemon such as
-  GNOME Keyring or KWallet). Only on that machine; passphrase and recovery code keep working.
+  key is written to a file only your user can read in the app's data folder and handed out
+  only after a local prompt: Touch ID (or the login password) on macOS, Windows Hello on
+  Windows. Linux has no standard prompt, so there the login session is the only gate. Only on
+  that machine; passphrase and recovery code keep working. (The macOS Keychain was avoided on
+  purpose: its trust is bound to the exact binary, and unsigned builds get an "allow access"
+  dialog that can hide behind the window.)
   What a vault cannot do: stop someone who has your passphrase, or who sits at your unlocked
   Mac, from reading the files. Blob sizes also remain visible.
 - **Edit** (`T`, or the Edit button in the viewer and the Browse selection bar): rotate 90°

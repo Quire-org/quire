@@ -1,26 +1,44 @@
-//! Quick unlock: the vault's data key is kept in the OS credential store on
-//! this machine and released only after a local authentication prompt.
-//! macOS: Touch ID (or the login password) through LocalAuthentication, then
-//! the Keychain. Windows: Windows Hello (UserConsentVerifier), then Credential
-//! Manager. Linux: the Secret Service keyring, which the desktop unlocks with
-//! the login session; no separate biometric prompt exists there.
+//! Quick unlock: the vault's data key is kept in a file only this user can
+//! read, inside the app's data folder, and handed out only after a local
+//! authentication prompt. macOS: Touch ID or the login password through
+//! LocalAuthentication. Windows: Windows Hello (UserConsentVerifier). Linux
+//! has no standard prompt, so there it is "unlock without passphrase on this
+//! computer", gated by the login session alone.
 //!
 //! The passphrase and recovery code stay valid; this is a convenience slot
 //! that lives only on this computer.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-const SERVICE: &str = "app.media-sorter.vault";
+/// Where remembered keys live: the app's own data folder, mode 0600. The
+/// Keychain was tried first, but its trust is bound to the exact binary and
+/// unsigned builds trigger an "allow access" dialog that can hide behind the
+/// window and look like a hang. A signed release build could move this to a
+/// Secure Enclave-bound Keychain item later.
+fn store_dir() -> Result<PathBuf, String> {
+    let base = if cfg!(target_os = "macos") {
+        std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library/Application Support"))
+    } else if cfg!(target_os = "windows") {
+        std::env::var_os("APPDATA").map(PathBuf::from)
+    } else {
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
+    }
+    .ok_or("no home directory")?;
+    let dir = base.join("app.media-sorter").join("quick-unlock");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+    }
+    Ok(dir)
+}
 
-fn account_for(root: &Path) -> String {
+fn key_file(root: &Path) -> Result<PathBuf, String> {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     root.to_string_lossy().hash(&mut h);
-    format!("vault-{:016x}", h.finish())
-}
-
-fn entry(root: &Path) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(SERVICE, &account_for(root)).map_err(|e| e.to_string())
+    Ok(store_dir()?.join(format!("vault-{:016x}.key", h.finish())))
 }
 
 /// What the current platform can offer, for the UI.
@@ -30,24 +48,49 @@ pub fn method() -> &'static str {
     } else if cfg!(target_os = "windows") {
         "hello"
     } else {
-        "keyring"
+        "none"
     }
 }
 
 pub fn is_remembered(root: &Path) -> bool {
-    entry(root).and_then(|e| e.get_password().map_err(|e| e.to_string())).is_ok()
+    key_file(root).map(|p| p.is_file()).unwrap_or(false)
 }
 
 pub fn remember(root: &Path, key: &[u8; 32]) -> Result<(), String> {
-    entry(root)?.set_password(&hex::encode(key)).map_err(|e| format!("could not store the key: {e}"))
+    let p = key_file(root)?;
+    std::fs::write(&p, hex::encode(key)).map_err(|e| format!("could not store the key: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
 }
 
 pub fn forget(root: &Path) -> Result<(), String> {
-    match entry(root)?.delete_credential() {
+    let p = key_file(root)?;
+    match std::fs::remove_file(&p) {
         Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(e.to_string()),
     }
+}
+
+/// Prompt the user, then return the stored key.
+pub fn unlock(root: &Path, reason: &str) -> Result<[u8; 32], String> {
+    let p = key_file(root)?;
+    if !p.is_file() {
+        return Err("this folder is not remembered on this computer".into());
+    }
+    authenticate(reason)?;
+    let hex_key = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
+    let bytes = hex::decode(hex_key.trim()).map_err(|_| "stored key is corrupted".to_string())?;
+    if bytes.len() != 32 {
+        return Err("stored key is corrupted".into());
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    Ok(key)
 }
 
 /// Confirm the user before storing a key (same prompt as unlocking).
@@ -55,21 +98,6 @@ pub fn authenticate_for_setup() -> Result<(), String> {
     authenticate("remember this vault on this computer")
 }
 
-/// Prompt the user, then return the stored key.
-pub fn unlock(root: &Path, reason: &str) -> Result<[u8; 32], String> {
-    authenticate(reason)?;
-    let hex_key = entry(root)?.get_password().map_err(|e| match e {
-        keyring::Error::NoEntry => "this folder is not remembered on this computer".to_string(),
-        e => e.to_string(),
-    })?;
-    let bytes = hex::decode(hex_key.trim()).map_err(|_| "stored key is corrupted".to_string())?;
-    let mut key = [0u8; 32];
-    if bytes.len() != 32 {
-        return Err("stored key is corrupted".into());
-    }
-    key.copy_from_slice(&bytes);
-    Ok(key)
-}
 
 #[cfg(target_os = "macos")]
 fn authenticate(reason: &str) -> Result<(), String> {
@@ -120,7 +148,6 @@ fn authenticate(reason: &str) -> Result<(), String> {
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn authenticate(_reason: &str) -> Result<(), String> {
-    // The Secret Service keyring is the gate: it is locked until the desktop
-    // session unlocks it, and may prompt for the keyring password itself.
+    // No portable local-authentication API on Linux desktops; the login session is the gate.
     Ok(())
 }

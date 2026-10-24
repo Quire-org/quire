@@ -37,7 +37,7 @@ fn with_ctx<T>(vs: &VS, root: &Path, f: impl FnOnce(&mut Ctx) -> T) -> T {
 /* ---------------- library / metadata ---------------- */
 
 #[tauri::command]
-fn load_library(vs: VS, root: String) -> Result<Library, String> {
+async fn load_library(vs: VS<'_>, root: String) -> Result<Library, String> {
     let root = PathBuf::from(root);
     with_ctx(&vs, &root, |ctx| {
         if ctx.vault.is_some() {
@@ -52,7 +52,7 @@ fn load_library(vs: VS, root: String) -> Result<Library, String> {
 }
 
 #[tauri::command]
-fn save_library(vs: VS, root: String, library: Library) -> Result<(), String> {
+async fn save_library(vs: VS<'_>, root: String, library: Library) -> Result<(), String> {
     let root = PathBuf::from(root);
     with_ctx(&vs, &root, |ctx| {
         if ctx.vault.is_some() {
@@ -72,26 +72,26 @@ fn save_json(vs: &VS, root: &str, name: &str, v: &serde_json::Value) -> Result<(
 }
 
 #[tauri::command]
-fn load_history(vs: VS, root: String) -> Result<serde_json::Value, String> {
+async fn load_history(vs: VS<'_>, root: String) -> Result<serde_json::Value, String> {
     load_json(&vs, &root, "history")
 }
 #[tauri::command]
-fn save_history(vs: VS, root: String, history: serde_json::Value) -> Result<(), String> {
+async fn save_history(vs: VS<'_>, root: String, history: serde_json::Value) -> Result<(), String> {
     save_json(&vs, &root, "history", &history)
 }
 #[tauri::command]
-fn load_cache(vs: VS, root: String) -> Result<serde_json::Value, String> {
+async fn load_cache(vs: VS<'_>, root: String) -> Result<serde_json::Value, String> {
     load_json(&vs, &root, "cache")
 }
 #[tauri::command]
-fn save_cache(vs: VS, root: String, cache: serde_json::Value) -> Result<(), String> {
+async fn save_cache(vs: VS<'_>, root: String, cache: serde_json::Value) -> Result<(), String> {
     save_json(&vs, &root, "cache", &cache)
 }
 
 /* ---------------- scanning ---------------- */
 
 #[tauri::command]
-fn scan_unsorted(vs: VS, root: String, library: Library) -> Result<Vec<MediaItem>, String> {
+async fn scan_unsorted(vs: VS<'_>, root: String, library: Library) -> Result<Vec<MediaItem>, String> {
     let root = PathBuf::from(root);
     if !root.is_dir() {
         return Err(format!("{} is not a directory", root.display()));
@@ -103,7 +103,7 @@ fn scan_unsorted(vs: VS, root: String, library: Library) -> Result<Vec<MediaItem
 }
 
 #[tauri::command]
-fn scan_all(vs: VS, root: String, library: Library, include_albums: bool) -> Result<Vec<MediaItem>, String> {
+async fn scan_all(vs: VS<'_>, root: String, library: Library, include_albums: bool) -> Result<Vec<MediaItem>, String> {
     let root = PathBuf::from(root);
     if !root.is_dir() {
         return Err(format!("{} is not a directory", root.display()));
@@ -139,14 +139,14 @@ fn scan_all(vs: VS, root: String, library: Library, include_albums: bool) -> Res
 }
 
 #[tauri::command]
-fn scan_dir(vs: VS, root: String, dir: String) -> Result<Vec<MediaItem>, String> {
+async fn scan_dir(vs: VS<'_>, root: String, dir: String) -> Result<Vec<MediaItem>, String> {
     let root = PathBuf::from(root);
     let dir = resolve(&root, &dir);
     Ok(with_ctx(&vs, &root, |ctx| ctx.scan(&dir, &[])))
 }
 
 #[tauri::command]
-fn scan_trash(vs: VS, root: String, library: Library) -> Result<Vec<MediaItem>, String> {
+async fn scan_trash(vs: VS<'_>, root: String, library: Library) -> Result<Vec<MediaItem>, String> {
     let root = PathBuf::from(root);
     let trash = library.trash_path(&root);
     Ok(with_ctx(&vs, &root, |ctx| ctx.scan(&trash, &[])))
@@ -161,15 +161,15 @@ struct TrashInfo {
 }
 
 #[tauri::command]
-fn trash_info(vs: VS, root: String, library: Library) -> TrashInfo {
+async fn trash_info(vs: VS<'_>, root: String, library: Library) -> Result<TrashInfo, String> {
     let root = PathBuf::from(root);
     let trash = library.trash_path(&root);
     let files = with_ctx(&vs, &root, |ctx| ctx.list_files(&trash, &[]));
-    TrashInfo { path: trash.to_string_lossy().into_owned(), files: files.len(), bytes: files.iter().map(|f| f.size).sum() }
+    Ok(TrashInfo { path: trash.to_string_lossy().into_owned(), files: files.len(), bytes: files.iter().map(|f| f.size).sum() })
 }
 
 #[tauri::command]
-fn empty_trash(vs: VS, root: String, library: Library) -> Result<usize, String> {
+async fn empty_trash(vs: VS<'_>, root: String, library: Library) -> Result<usize, String> {
     let root = PathBuf::from(root);
     let trash = library.trash_path(&root);
     with_ctx(&vs, &root, |ctx| {
@@ -218,14 +218,14 @@ fn move_item_to(vs: &VS, root: &Path, item: &MediaItem, dest_dir: &Path) -> Resu
 }
 
 #[tauri::command]
-fn move_item(vs: VS, root: String, item: MediaItem, dest: String) -> Result<MoveResult, String> {
+async fn move_item(vs: VS<'_>, root: String, item: MediaItem, dest: String) -> Result<MoveResult, String> {
     let root = PathBuf::from(root);
     let dest_dir = resolve(&root, &dest);
     move_item_to(&vs, &root, &item, &dest_dir)
 }
 
 #[tauri::command]
-fn trash_item(vs: VS, root: String, library: Library, item: MediaItem) -> Result<MoveResult, String> {
+async fn trash_item(vs: VS<'_>, root: String, library: Library, item: MediaItem) -> Result<MoveResult, String> {
     let root = PathBuf::from(root);
     let trash = library.trash_path(&root);
     move_item_to(&vs, &root, &item, &trash)
@@ -233,7 +233,7 @@ fn trash_item(vs: VS, root: String, library: Library, item: MediaItem) -> Result
 
 /// Undo helper: put files back exactly where they were.
 #[tauri::command]
-fn restore_files(vs: VS, root: String, moves: Vec<(String, String)>) -> Result<(), String> {
+async fn restore_files(vs: VS<'_>, root: String, moves: Vec<(String, String)>) -> Result<(), String> {
     let root = PathBuf::from(root);
     with_ctx(&vs, &root, |ctx| {
         for (orig, cur) in &moves {
@@ -248,7 +248,7 @@ fn restore_files(vs: VS, root: String, moves: Vec<(String, String)>) -> Result<(
 }
 
 #[tauri::command]
-fn move_dir(vs: VS, root: String, dir: String, dest: String) -> Result<String, String> {
+async fn move_dir(vs: VS<'_>, root: String, dir: String, dest: String) -> Result<String, String> {
     let root = PathBuf::from(root);
     let dest_dir = resolve(&root, &dest);
     with_ctx(&vs, &root, |ctx| ctx.move_dir(Path::new(&dir), &dest_dir).map(|p| p.to_string_lossy().into_owned()))
@@ -257,7 +257,7 @@ fn move_dir(vs: VS, root: String, dir: String, dest: String) -> Result<String, S
 /* ---------------- albums ---------------- */
 
 #[tauri::command]
-fn scan_albums(vs: VS, root: String, library: Library) -> Result<Vec<albums::Album>, String> {
+async fn scan_albums(vs: VS<'_>, root: String, library: Library) -> Result<Vec<albums::Album>, String> {
     let root = PathBuf::from(root);
     Ok(with_ctx(&vs, &root, |ctx| {
         let mut out = vec![];
@@ -274,9 +274,9 @@ fn scan_albums(vs: VS, root: String, library: Library) -> Result<Vec<albums::Alb
 }
 
 #[tauri::command]
-fn album_rename_plan(vs: VS, root: String, library: Library) -> Vec<albums::Rename> {
+async fn album_rename_plan(vs: VS<'_>, root: String, library: Library) -> Result<Vec<albums::Rename>, String> {
     let root = PathBuf::from(root);
-    with_ctx(&vs, &root, |ctx| {
+    Ok(with_ctx(&vs, &root, |ctx| {
         let mut plan = vec![];
         for dir in library.album_root_paths(&root) {
             let subs = ctx.subdirs(&dir);
@@ -296,11 +296,11 @@ fn album_rename_plan(vs: VS, root: String, library: Library) -> Vec<albums::Rena
             }
         }
         plan
-    })
+    }))
 }
 
 #[tauri::command]
-fn album_rename_apply(vs: VS, root: String, plan: Vec<albums::Rename>) -> Result<Vec<albums::Rename>, String> {
+async fn album_rename_apply(vs: VS<'_>, root: String, plan: Vec<albums::Rename>) -> Result<Vec<albums::Rename>, String> {
     let root = PathBuf::from(root);
     with_ctx(&vs, &root, |ctx| {
         let mut done = vec![];
@@ -320,7 +320,7 @@ fn album_rename_apply(vs: VS, root: String, plan: Vec<albums::Rename>) -> Result
 /* ---------------- hashing / preview ---------------- */
 
 #[tauri::command]
-fn image_hash(vs: VS, root: String, path: String, is_raw: bool) -> Result<dupes::ImageHash, String> {
+async fn image_hash(vs: VS<'_>, root: String, path: String, is_raw: bool) -> Result<dupes::ImageHash, String> {
     let p = PathBuf::from(&path);
     let bytes = with_ctx(&vs, Path::new(&root), |ctx| if ctx.vault_id(&p).is_some() { ctx.read_all(&p).map(Some) } else { Ok(None) })?;
     match bytes {
@@ -330,12 +330,12 @@ fn image_hash(vs: VS, root: String, path: String, is_raw: bool) -> Result<dupes:
 }
 
 #[tauri::command]
-fn file_fingerprint(vs: VS, root: String, path: String) -> Result<String, String> {
+async fn file_fingerprint(vs: VS<'_>, root: String, path: String) -> Result<String, String> {
     with_ctx(&vs, Path::new(&root), |ctx| ctx.fingerprint(Path::new(&path)))
 }
 
 #[tauri::command]
-fn raw_preview(vs: VS, root: String, path: String) -> Result<Response, String> {
+async fn raw_preview(vs: VS<'_>, root: String, path: String) -> Result<Response, String> {
     let p = PathBuf::from(&path);
     let bytes = with_ctx(&vs, Path::new(&root), |ctx| ctx.read_all(&p))?;
     preview::embedded_jpeg_bytes(&bytes).map(Response::new)
@@ -414,14 +414,14 @@ struct VaultStatus {
 }
 
 #[tauri::command]
-fn vault_status(vs: VS, root: String) -> VaultStatus {
+async fn vault_status(vs: VS<'_>, root: String) -> Result<VaultStatus, String> {
     let root = PathBuf::from(root);
     let exists = vault::exists(&root);
     let guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
     let unlocked = guard.as_ref().map(|v| v.root == root).unwrap_or(false);
     let encrypted_files = guard.as_ref().filter(|v| v.root == root).map(|v| v.entries().len()).unwrap_or(0);
     let plain = if exists { fsx::plaintext_files(&root) } else { vec![] };
-    VaultStatus {
+    Ok(VaultStatus {
         exists,
         unlocked,
         has_recovery: exists && Vault::has_recovery(&root),
@@ -430,7 +430,7 @@ fn vault_status(vs: VS, root: String) -> VaultStatus {
         encrypted_files,
         quick_method: quick::method().to_string(),
         quick_remembered: exists && quick::is_remembered(&root),
-    }
+    })
 }
 
 /// Migrate plaintext metadata files into the vault (or back out).
@@ -456,7 +456,7 @@ fn migrate_meta_out(v: &Vault, root: &Path) -> Result<(), String> {
 
 /// Create a vault and return its recovery code (shown once).
 #[tauri::command]
-fn vault_create(vs: VS, root: String, passphrase: String) -> Result<String, String> {
+async fn vault_create(vs: VS<'_>, root: String, passphrase: String) -> Result<String, String> {
     let root = PathBuf::from(root);
     let v = Vault::create(&root, &passphrase)?;
     let code = v.set_recovery_code()?;
@@ -466,14 +466,14 @@ fn vault_create(vs: VS, root: String, passphrase: String) -> Result<String, Stri
 }
 
 #[tauri::command]
-fn vault_unlock(vs: VS, root: String, passphrase: String) -> Result<(), String> {
+async fn vault_unlock(vs: VS<'_>, root: String, passphrase: String) -> Result<(), String> {
     let v = Vault::unlock(Path::new(&root), &passphrase)?;
     *vs.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(v);
     Ok(())
 }
 
 #[tauri::command]
-fn vault_unlock_recovery(vs: VS, root: String, code: String) -> Result<(), String> {
+async fn vault_unlock_recovery(vs: VS<'_>, root: String, code: String) -> Result<(), String> {
     let v = Vault::unlock_with_recovery(Path::new(&root), &code)?;
     *vs.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(v);
     Ok(())
@@ -481,7 +481,7 @@ fn vault_unlock_recovery(vs: VS, root: String, code: String) -> Result<(), Strin
 
 /// Remember the open vault on this computer (behind Touch ID / Windows Hello / the keyring).
 #[tauri::command]
-fn vault_remember(vs: VS) -> Result<(), String> {
+async fn vault_remember(vs: VS<'_>) -> Result<(), String> {
     let guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
     let v = guard.as_ref().ok_or("vault is locked")?;
     quick::authenticate_for_setup()?;
@@ -509,19 +509,19 @@ fn vault_lock(vs: VS) {
 }
 
 #[tauri::command]
-fn vault_change_passphrase(vs: VS, old: String, new: String) -> Result<(), String> {
+async fn vault_change_passphrase(vs: VS<'_>, old: String, new: String) -> Result<(), String> {
     let guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
     guard.as_ref().ok_or("vault is locked")?.change_passphrase(&old, &new)
 }
 
 #[tauri::command]
-fn vault_reset_passphrase(vs: VS, new: String) -> Result<(), String> {
+async fn vault_reset_passphrase(vs: VS<'_>, new: String) -> Result<(), String> {
     let guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
     guard.as_ref().ok_or("vault is locked")?.reset_passphrase(&new)
 }
 
 #[tauri::command]
-fn vault_new_recovery_code(vs: VS, passphrase: String) -> Result<String, String> {
+async fn vault_new_recovery_code(vs: VS<'_>, passphrase: String) -> Result<String, String> {
     let guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
     let v = guard.as_ref().ok_or("vault is locked")?;
     Vault::unlock(&v.root, &passphrase).map_err(|_| "passphrase is wrong".to_string())?;
@@ -540,7 +540,7 @@ struct VaultProgress {
 
 /// Encrypt every plain file in the root into the vault and remove the plaintext.
 #[tauri::command]
-fn vault_encrypt_all(vs: VS, root: String, on_progress: tauri::ipc::Channel<VaultProgress>) -> Result<usize, String> {
+async fn vault_encrypt_all(vs: VS<'_>, root: String, on_progress: tauri::ipc::Channel<VaultProgress>) -> Result<usize, String> {
     let root = PathBuf::from(root);
     let mut guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
     let v = guard.as_mut().filter(|v| v.root == root).ok_or("vault is locked")?;
@@ -594,7 +594,7 @@ fn prune_empty_dirs(root: &Path, dir: &Path) {
 
 /// Decrypt selected logical paths into `dest`, keeping their relative folders.
 #[tauri::command]
-fn vault_export(vs: VS, root: String, paths: Vec<String>, dest: String) -> Result<usize, String> {
+async fn vault_export(vs: VS<'_>, root: String, paths: Vec<String>, dest: String) -> Result<usize, String> {
     let root = PathBuf::from(root);
     let dest = PathBuf::from(dest);
     with_ctx(&vs, &root, |ctx| {
@@ -619,7 +619,7 @@ fn vault_export(vs: VS, root: String, paths: Vec<String>, dest: String) -> Resul
 
 /// Decrypt everything back to plain files and delete the vault.
 #[tauri::command]
-fn vault_remove(vs: VS, root: String, on_progress: tauri::ipc::Channel<VaultProgress>) -> Result<usize, String> {
+async fn vault_remove(vs: VS<'_>, root: String, on_progress: tauri::ipc::Channel<VaultProgress>) -> Result<usize, String> {
     let root = PathBuf::from(root);
     let mut guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
     let v = guard.as_mut().filter(|v| v.root == root).ok_or("vault is locked")?;
@@ -660,7 +660,7 @@ struct DirEntryInfo {
 }
 
 #[tauri::command]
-fn list_dir(vs: VS, root: String, dir: String) -> Result<Vec<DirEntryInfo>, String> {
+async fn list_dir(vs: VS<'_>, root: String, dir: String) -> Result<Vec<DirEntryInfo>, String> {
     let root = PathBuf::from(root);
     let dir = resolve(&root, &dir);
     Ok(with_ctx(&vs, &root, |ctx| {
@@ -685,7 +685,7 @@ fn list_dir(vs: VS, root: String, dir: String) -> Result<Vec<DirEntryInfo>, Stri
 }
 
 #[tauri::command]
-fn fs_mkdir(vs: VS, root: String, dir: String, name: String) -> Result<String, String> {
+async fn fs_mkdir(vs: VS<'_>, root: String, dir: String, name: String) -> Result<String, String> {
     let root = PathBuf::from(root);
     let target = resolve(&root, &dir).join(name.trim());
     if name.trim().is_empty() || name.contains('/') || name.contains('\\') {
@@ -705,7 +705,7 @@ fn fs_mkdir(vs: VS, root: String, dir: String, name: String) -> Result<String, S
 
 /// Move files and folders into `dest` (a logical folder). Returns new paths.
 #[tauri::command]
-fn fs_move(vs: VS, root: String, paths: Vec<String>, dest: String) -> Result<Vec<String>, String> {
+async fn fs_move(vs: VS<'_>, root: String, paths: Vec<String>, dest: String) -> Result<Vec<String>, String> {
     let root = PathBuf::from(root);
     let dest_dir = resolve(&root, &dest);
     with_ctx(&vs, &root, |ctx| {
@@ -728,7 +728,7 @@ fn fs_move(vs: VS, root: String, paths: Vec<String>, dest: String) -> Result<Vec
 }
 
 #[tauri::command]
-fn fs_rename(vs: VS, root: String, path: String, new_name: String) -> Result<String, String> {
+async fn fs_rename(vs: VS<'_>, root: String, path: String, new_name: String) -> Result<String, String> {
     let root = PathBuf::from(root);
     let p = PathBuf::from(&path);
     let new_name = new_name.trim();
@@ -752,7 +752,7 @@ fn fs_rename(vs: VS, root: String, path: String, new_name: String) -> Result<Str
 
 /// Delete files and folders for good (the Files tab's own trash is the app trash folder).
 #[tauri::command]
-fn fs_delete(vs: VS, root: String, paths: Vec<String>) -> Result<usize, String> {
+async fn fs_delete(vs: VS<'_>, root: String, paths: Vec<String>) -> Result<usize, String> {
     let root = PathBuf::from(root);
     with_ctx(&vs, &root, |ctx| {
         let mut n = 0;
@@ -773,7 +773,7 @@ fn fs_delete(vs: VS, root: String, paths: Vec<String>) -> Result<usize, String> 
 
 /// Bring outside files into the folder (drag and drop): copied, and encrypted when a vault is open.
 #[tauri::command]
-fn fs_import(vs: VS, root: String, sources: Vec<String>, dest: String, on_progress: tauri::ipc::Channel<VaultProgress>) -> Result<usize, String> {
+async fn fs_import(vs: VS<'_>, root: String, sources: Vec<String>, dest: String, on_progress: tauri::ipc::Channel<VaultProgress>) -> Result<usize, String> {
     let root = PathBuf::from(root);
     let dest_dir = resolve(&root, &dest);
     // Expand folders.

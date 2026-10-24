@@ -152,7 +152,7 @@ export function VaultDialog() {
       </span>
     </div>
   ) : null;
-  const quickName = v?.quickMethod === "touchid" ? "Touch ID" : v?.quickMethod === "hello" ? "Windows Hello" : "the system keyring";
+  const quickName = v?.quickMethod === "touchid" ? "Touch ID" : v?.quickMethod === "hello" ? "Windows Hello" : "this computer";
   const toggleQuick = async () => {
     if (!s.root || !v) return;
     setBusy(true);
@@ -272,8 +272,9 @@ export function VaultDialog() {
               </button>
             </div>
             <p className="dim small">
-              Stores the vault key in the {v.quickMethod === "keyring" ? "Secret Service keyring" : v.quickMethod === "hello" ? "Windows Credential Manager" : "macOS Keychain"}, released only after {quickName}
-              {v.quickMethod === "keyring" ? " is unlocked by your login session" : ""}. Only on this machine; the passphrase and recovery code keep working everywhere.
+              Stores the vault key in a file only your user account can read, inside the app's data folder
+              {v.quickMethod === "none" ? ". Linux has no standard biometric prompt, so your login session is the only gate" : `, handed out only after ${quickName}`}. Only on
+              this machine; the passphrase and recovery code keep working everywhere.
             </p>
           </section>
 

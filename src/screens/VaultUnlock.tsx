@@ -11,7 +11,7 @@ export function VaultUnlock() {
   const [busy, setBusy] = useState(false);
   const root = s.pendingRoot ?? "";
   const quick = s.vault?.quickRemembered ? s.vault.quickMethod : null;
-  const quickLabel = quick === "touchid" ? "Unlock with Touch ID" : quick === "hello" ? "Unlock with Windows Hello" : "Unlock from the keyring";
+  const quickLabel = quick === "touchid" ? "Unlock with Touch ID" : quick === "hello" ? "Unlock with Windows Hello" : "Unlock (remembered on this computer)";
 
   const go = async () => {
     setBusy(true);

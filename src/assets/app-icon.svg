@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- App icon template. {{bg}} {{ink}} {{dim}} {{dot}} are filled from the active theme. -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="{{bg}}"/>
+  <!-- two frames behind: the stack being culled -->
+  <rect x="300" y="196" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{dim}}" stroke-width="22"/>
+  <rect x="262" y="236" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{dim}}" stroke-width="22"/>
+  <!-- the frame in front -->
+  <rect x="224" y="276" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{ink}}" stroke-width="34"/>
+  <circle cx="330" cy="372" r="34" fill="{{dot}}"/>
+  <path d="M276 568 L384 428 L458 516 L540 392 L690 568 Z" fill="{{ink}}" stroke="{{ink}}" stroke-width="24" stroke-linejoin="round"/>
+  <!-- rating bar, 7 of 10 -->
+  <g>
+    <rect x="224" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
+    <rect x="281.3" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
+    <rect x="338.7" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
+    <rect x="396" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
+    <rect x="453.3" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
+    <rect x="510.7" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
+    <rect x="568" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
+    <rect x="625.3" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
+    <rect x="682.7" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
+    <rect x="740" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
+  </g>
+</svg>
