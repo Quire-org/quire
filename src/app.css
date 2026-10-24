@@ -1835,3 +1835,35 @@ section p {
   letter-spacing: 0.02em;
   font-size: 12px;
 }
+
+/* ---------- Option rows ---------- */
+.optrow {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  clip-path: var(--clip-panel);
+}
+.optrow-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 48px;
+}
+.optrow-title {
+  font-weight: 700;
+}
+.optrow-info {
+  color: var(--fg-dim);
+}
+.optrow-toggle {
+  font-size: 13px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.optrow-info-text {
+  padding: 0 12px 12px 12px;
+  line-height: 1.4;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
