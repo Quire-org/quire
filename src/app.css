@@ -1770,3 +1770,64 @@ section p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ---------- Stat tiles ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.stat {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  clip-path: var(--clip-btn);
+  min-width: 0;
+}
+.stat.wide {
+  grid-column: 1 / -1;
+}
+.stat.accent .stat-v {
+  color: var(--accent);
+}
+.stat.clickable {
+  cursor: pointer;
+}
+.stat.clickable:hover {
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+.stat-v {
+  font-size: 18px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat.wide .stat-v {
+  font-size: 24px;
+}
+.stat-k {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-theme="cozy"] .stat-k,
+[data-theme="sunset"] .stat-k,
+[data-theme="gallery"] .stat-k {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-size: 12px;
+}

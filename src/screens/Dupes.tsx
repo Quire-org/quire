@@ -8,6 +8,7 @@ import { fmtEta, useCountdown } from "../components/ScanPill";
 import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate } from "../lib/format";
 import { fmtTime, type DupeGroup, type DupeMember } from "../lib/dupes";
+import { Stat } from "../components/Stat";
 
 export function Dupes() {
   const s = useStore();
@@ -107,28 +108,14 @@ export function Dupes() {
           ))}
         </div>
 
-        <div className="estimate">
-          <div className="side-row">
-            <span className="label">Estimate</span>
-            <span className="big">{est.seconds == null ? (est.total ? "up to date" : "—") : `~${fmtEta(est.seconds)}`}</span>
-          </div>
-          <div className="kv mono small">
-            <span className="dim">In scope</span>
-            <span>{est.total} files</span>
-            <span className="dim">Fingerprinted</span>
-            <span>{est.cached}</span>
-            <span className="dim">New photos</span>
-            <span>{est.newStills}</span>
-            <span className="dim">New videos</span>
-            <span>{est.newVideos}</span>
-            <span className="dim">To read</span>
-            <span>{formatBytes(est.newBytes)}</span>
-            <span className="dim">{d.readMBps ? "Read speed" : "Assumed speed"}</span>
-            <span>{d.readMBps ? `${d.readMBps.toFixed(0)} MB/s` : "40 MB/s"}</span>
-          </div>
-          <button className="btn sm ghost" onClick={() => void d.benchmark()} disabled={d.running} title="Read about 128 MB from the folder to measure the drive">
-            Measure read speed
-          </button>
+        <div className="stats">
+          <Stat value={est.seconds == null ? (est.total ? "ready" : "—") : `~${fmtEta(est.seconds)}`} label="estimated time" accent wide />
+          <Stat value={est.total} label="in scope" />
+          <Stat value={est.cached} label="fingerprinted" />
+          <Stat value={est.newStills} label="new photos" />
+          <Stat value={est.newVideos} label="new videos" />
+          <Stat value={formatBytes(est.newBytes)} label="to read" />
+          <Stat value={d.readMBps ? `${d.readMBps.toFixed(0)} MB/s` : "40 MB/s"} label={d.readMBps ? "read speed" : "assumed speed"} onClick={() => void d.benchmark()} hint="Click to measure" />
         </div>
 
         {d.running ? (
