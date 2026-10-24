@@ -117,14 +117,14 @@ export function Dupes() {
             <span>{est.total} files</span>
             <span className="dim">Fingerprinted</span>
             <span>{est.cached}</span>
-            <span className="dim">New</span>
-            <span>
-              {est.newStills} photos · {est.newVideos} videos
-            </span>
+            <span className="dim">New photos</span>
+            <span>{est.newStills}</span>
+            <span className="dim">New videos</span>
+            <span>{est.newVideos}</span>
             <span className="dim">To read</span>
             <span>{formatBytes(est.newBytes)}</span>
-            <span className="dim">Read speed</span>
-            <span>{d.readMBps ? `${d.readMBps.toFixed(0)} MB/s` : "40 MB/s (assumed)"}</span>
+            <span className="dim">{d.readMBps ? "Read speed" : "Assumed speed"}</span>
+            <span>{d.readMBps ? `${d.readMBps.toFixed(0)} MB/s` : "40 MB/s"}</span>
           </div>
           <button className="btn sm ghost" onClick={() => void d.benchmark()} disabled={d.running} title="Read about 128 MB from the folder to measure the drive">
             Measure read speed
