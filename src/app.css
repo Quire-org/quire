@@ -1318,3 +1318,27 @@ section p {
   padding: 40px;
   text-align: center;
 }
+
+.strength {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.strength-bar {
+  height: 6px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+}
+.strength-fill {
+  height: 100%;
+  background: var(--danger);
+  transition: width 120ms linear;
+}
+.strength.fair .strength-fill {
+  background: var(--warn);
+}
+.strength.good .strength-fill,
+.strength.strong .strength-fill {
+  background: var(--ok);
+}

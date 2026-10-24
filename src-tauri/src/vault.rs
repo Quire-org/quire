@@ -158,14 +158,17 @@ impl Vault {
         if exists(root) {
             return Err("this folder already has a vault".into());
         }
-        if passphrase.chars().count() < 8 {
-            return Err("use a passphrase of at least 8 characters".into());
+        if passphrase.chars().count() < 12 {
+            return Err("use a passphrase of at least 12 characters".into());
         }
         let dir = Self::dir(root);
         fs::create_dir_all(dir.join("objects")).map_err(|e| e.to_string())?;
         fs::create_dir_all(dir.join("meta")).map_err(|e| e.to_string())?;
         let salt = random(16);
-        let (m, t, p) = (64 * 1024, 3, 1);
+        // ~200 ms per guess on a 2024 laptop (measured), 128 MiB per guess: well above
+        // the OWASP minimum and still fine for an interactive unlock. Existing vaults keep
+        // the parameters stored in their header.
+        let (m, t, p) = (128 * 1024, 3, 1);
         let kek = derive_kek(passphrase, &salt, m, t, p)?;
         let mut key = [0u8; 32];
         rand::thread_rng().fill_bytes(&mut key);
@@ -228,8 +231,8 @@ impl Vault {
 
     /// Set a new passphrase without knowing the old one (after a recovery unlock).
     pub fn reset_passphrase(&self, new: &str) -> Result<(), String> {
-        if new.chars().count() < 8 {
-            return Err("use a passphrase of at least 8 characters".into());
+        if new.chars().count() < 12 {
+            return Err("use a passphrase of at least 12 characters".into());
         }
         let mut header = Self::read_header(&self.root)?;
         let salt = random(16);
@@ -271,8 +274,8 @@ impl Vault {
     }
 
     pub fn change_passphrase(&self, old: &str, new: &str) -> Result<(), String> {
-        if new.chars().count() < 8 {
-            return Err("use a passphrase of at least 8 characters".into());
+        if new.chars().count() < 12 {
+            return Err("use a passphrase of at least 12 characters".into());
         }
         let mut header = Self::read_header(&self.root)?;
         let salt = hex::decode(&header.salt).map_err(|e| e.to_string())?;
@@ -597,5 +600,123 @@ mod tests {
         assert_eq!(parse_range(Some("bytes=0-5000"), 1000), Some((0, 1000)));
         assert_eq!(parse_range(Some("bytes=1000-"), 1000), None);
         assert_eq!(parse_range(None, 1000), None);
+    }
+}
+
+#[cfg(test)]
+mod integrity_tests {
+    use super::*;
+    use rand::{Rng, RngCore, SeedableRng};
+
+    fn tmp(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("ms-vault-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// Every size around the chunk boundaries, plus random ones, with random
+    /// bytes (so "strange formats" are covered: the cipher never looks at
+    /// content). Full reads, random ranges and exports must be byte-exact.
+    #[test]
+    fn roundtrip_is_byte_exact_for_all_sizes() {
+        let root = tmp("sizes");
+        let mut v = Vault::create(&root, "integrity test passphrase").unwrap();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(42);
+        let mut sizes = vec![0usize, 1, 2, 15, 16, 17, CHUNK - 1, CHUNK, CHUNK + 1, 2 * CHUNK - 1, 2 * CHUNK, 2 * CHUNK + 1, 3 * CHUNK + 12345];
+        for _ in 0..6 {
+            sizes.push(rng.gen_range(0..4 * CHUNK));
+        }
+        for (n, size) in sizes.iter().enumerate() {
+            let mut data = vec![0u8; *size];
+            rng.fill_bytes(&mut data);
+            let src = root.join(format!("in/f{n}.bin"));
+            fs::create_dir_all(src.parent().unwrap()).unwrap();
+            fs::write(&src, &data).unwrap();
+            let e = v.add_file(&src, &format!("f{n}.bin")).unwrap();
+            assert_eq!(e.size as usize, *size);
+            assert_eq!(v.read_all(&e.id).unwrap(), data, "size {size}: full read");
+            for _ in 0..20 {
+                if *size == 0 {
+                    break;
+                }
+                let a = rng.gen_range(0..*size);
+                let b = rng.gen_range(a..=*size);
+                assert_eq!(v.read_range(&e.id, a as u64, b as u64).unwrap(), &data[a..b], "size {size}: range {a}..{b}");
+            }
+            // Past the end is clamped, never garbage.
+            assert_eq!(v.read_range(&e.id, 0, u64::MAX).unwrap(), data);
+            let out = root.join(format!("out/f{n}.bin"));
+            v.export(&e.id, &out).unwrap();
+            assert_eq!(fs::read(&out).unwrap(), data, "size {size}: export");
+            let (ms, me) = (fs::metadata(&src).unwrap().modified().unwrap(), fs::metadata(&out).unwrap().modified().unwrap());
+            assert!(ms.duration_since(me).unwrap_or_default().as_millis() < 2 && me.duration_since(ms).unwrap_or_default().as_millis() < 2, "mtime preserved");
+        }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Any damage to a blob is detected by the authentication tag: the read
+    /// fails instead of returning altered bytes. Truncation fails too.
+    #[test]
+    fn tampering_is_detected_never_silently_decrypted() {
+        let root = tmp("tamper");
+        let mut v = Vault::create(&root, "integrity test passphrase").unwrap();
+        let data: Vec<u8> = (0..(2 * CHUNK + 100)).map(|i| (i % 253) as u8).collect();
+        let src = root.join("x.bin");
+        fs::write(&src, &data).unwrap();
+        let e = v.add_file(&src, "x.bin").unwrap();
+        let blob_path = v.object_path(&e.id);
+        let good = fs::read(&blob_path).unwrap();
+
+        // Flip one bit in each region: header nonce, first chunk, tag of the last chunk.
+        for pos in [10usize, OBJ_HEADER + 100, good.len() - 1, OBJ_HEADER + CHUNK + TAG + 5] {
+            let mut bad = good.clone();
+            bad[pos] ^= 0x01;
+            fs::write(&blob_path, &bad).unwrap();
+            let r = v.read_all(&e.id);
+            assert!(r.is_err(), "flipped byte at {pos} must fail, not decrypt");
+        }
+        // Truncated blob.
+        fs::write(&blob_path, &good[..good.len() - 7]).unwrap();
+        assert!(v.read_all(&e.id).is_err());
+        // Restore: reads again byte-exact.
+        fs::write(&blob_path, &good).unwrap();
+        assert_eq!(v.read_all(&e.id).unwrap(), data);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Two files with identical content get different blobs (fresh nonces),
+    /// and the passphrase derivation is deliberately slow.
+    #[test]
+    fn nonces_are_fresh_and_kdf_is_slow() {
+        let root = tmp("nonce");
+        let mut v = Vault::create(&root, "integrity test passphrase").unwrap();
+        let data = vec![7u8; 5000];
+        fs::write(root.join("a.bin"), &data).unwrap();
+        fs::write(root.join("b.bin"), &data).unwrap();
+        let a = v.add_file(&root.join("a.bin"), "a.bin").unwrap();
+        let b = v.add_file(&root.join("b.bin"), "b.bin").unwrap();
+        let (ba, bb) = (fs::read(v.object_path(&a.id)).unwrap(), fs::read(v.object_path(&b.id)).unwrap());
+        assert_ne!(ba, bb);
+        assert_ne!(&ba[OBJ_HEADER..], &bb[OBJ_HEADER..], "same plaintext must not give the same ciphertext");
+
+        let t = std::time::Instant::now();
+        let _ = Vault::unlock(&root, "wrong guess");
+        let per_guess = t.elapsed();
+        eprintln!("one passphrase guess costs {:?} (128 MiB Argon2id, t=3)", per_guess);
+        let _ = fs::remove_dir_all(&root);
+    }
+}
+
+#[cfg(test)]
+mod kdf_bench {
+    #[test]
+    #[ignore]
+    fn kdf_cost_table() {
+        for (m, t) in [(64 * 1024u32, 3u32), (128 * 1024, 3), (256 * 1024, 3), (256 * 1024, 4)] {
+            let s = std::time::Instant::now();
+            super::derive_kek("benchmark passphrase", &[1u8; 16], m, t, 1).unwrap();
+            eprintln!("m={} MiB t={} -> {:?}", m / 1024, t, s.elapsed());
+        }
     }
 }

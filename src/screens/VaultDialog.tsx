@@ -3,6 +3,7 @@ import { useStore } from "../store";
 import { api, pickFolder } from "../lib/api";
 import { Modal } from "../components/Modal";
 import { formatBytes } from "../lib/format";
+import { strength } from "../lib/strength";
 import type { VaultProgress } from "../lib/types";
 import { Copy, Fingerprint, Key, LockKey, LockKeyOpen, ShieldCheck, Warning } from "@phosphor-icons/react";
 
@@ -138,6 +139,19 @@ export function VaultDialog() {
   };
 
   const pct = progress && progress.totalBytes ? Math.round((progress.bytes / progress.totalBytes) * 100) : 0;
+  const st = strength(pass);
+  const okPass = pass.length >= 12 && st.label !== "weak" && pass === pass2;
+  const meter = pass ? (
+    <div className={`strength ${st.label}`}>
+      <div className="strength-bar">
+        <div className="strength-fill" style={{ width: `${Math.min(100, (st.bits / 90) * 100)}%` }} />
+      </div>
+      <span className="mono small">
+        {st.label} · ~{st.bits} bits · {st.hint}
+        {pass.length < 12 ? " · at least 12 characters" : ""}
+      </span>
+    </div>
+  ) : null;
   const quickName = v?.quickMethod === "touchid" ? "Touch ID" : v?.quickMethod === "hello" ? "Windows Hello" : "the system keyring";
   const toggleQuick = async () => {
     if (!s.root || !v) return;
@@ -198,12 +212,13 @@ export function VaultDialog() {
             </p>
           </div>
           <div className="row">
-            <input className="input grow" type="password" placeholder="Passphrase (8+ characters)" value={pass} onChange={(e) => setPass(e.target.value)} />
+            <input className="input grow" type="password" placeholder="Passphrase (12+ characters, or four random words)" value={pass} onChange={(e) => setPass(e.target.value)} />
             <input className="input grow" type="password" placeholder="Repeat" value={pass2} onChange={(e) => setPass2(e.target.value)} />
-            <button className="btn primary" disabled={busy || pass.length < 8 || pass !== pass2} onClick={() => void create()}>
+            <button className="btn primary" disabled={busy || !okPass} onClick={() => void create()}>
               Create vault
             </button>
           </div>
+          {meter}
         </section>
       ) : (
         <>
@@ -268,12 +283,13 @@ export function VaultDialog() {
             {s.needsNewPassphrase && <p className="dim small">You unlocked with the recovery code. Set a passphrase you will remember.</p>}
             <div className="row">
               {!s.needsNewPassphrase && <input className="input grow" type="password" placeholder="Current" value={oldPass} onChange={(e) => setOldPass(e.target.value)} />}
-              <input className="input grow" type="password" placeholder="New (8+ characters)" value={pass} onChange={(e) => setPass(e.target.value)} />
+              <input className="input grow" type="password" placeholder="New (12+ characters)" value={pass} onChange={(e) => setPass(e.target.value)} />
               <input className="input grow" type="password" placeholder="Repeat" value={pass2} onChange={(e) => setPass2(e.target.value)} />
-              <button className="btn" disabled={busy || pass.length < 8 || pass !== pass2 || (!s.needsNewPassphrase && !oldPass)} onClick={() => void changePass()}>
+              <button className="btn" disabled={busy || !okPass || (!s.needsNewPassphrase && !oldPass)} onClick={() => void changePass()}>
                 Change
               </button>
             </div>
+            {meter}
           </section>
 
           <hr className="rule" />
