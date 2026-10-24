@@ -4,6 +4,8 @@ import { MediaStage, SPEEDS } from "../components/MediaStage";
 import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, EyeSlash, GearSix, MonitorPlay, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
+import { EditStage } from "../components/EditStage";
+import { EditBar } from "../components/EditBar";
 import { TargetBar } from "../components/TargetBar";
 import { mediaUrl, pickFolder } from "../lib/api";
 import { isTypingTarget } from "../lib/hotkeys";
@@ -54,7 +56,7 @@ export function Viewer() {
 
   // Slideshow: images advance after the interval, videos when they end.
   const show = s.slideshow;
-  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editOpen;
+  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editMode;
   useEffect(() => {
     if (!show.playing || !current || modalOpen) return;
     if (current.kind === "video") return; // handled by onEnded
@@ -67,7 +69,21 @@ export function Viewer() {
     if (albumKey) s.setAlbumRatingByKey(albumKey, r);
     else s.setRating(current, r);
   };
-  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editOpen;
+  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen;
+  const [videoDuration, setVideoDuration] = useState(0);
+  useEffect(() => {
+    // Duration for the trim sliders: read it from the media element when a video is current.
+    setVideoDuration(0);
+    if (!current || current.kind !== "video") return;
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.src = mediaUrl(current);
+    v.onloadedmetadata = () => setVideoDuration(isFinite(v.duration) ? v.duration : 0);
+    return () => {
+      v.removeAttribute("src");
+      v.load();
+    };
+  }, [current?.key]);
 
   // Keep the stage clear of the HUD bars whatever their height (target buttons may wrap).
   useEffect(() => {
@@ -85,7 +101,7 @@ export function Viewer() {
     ro.observe(top);
     ro.observe(bottom);
     return () => ro.disconnect();
-  }, []);
+  }, [s.editMode]);
 
   const addTarget = useCallback(async () => {
     const dir = await pickFolder("Choose a target folder", s.lastTargetParent ?? s.root ?? undefined);
@@ -100,8 +116,10 @@ export function Viewer() {
       const cur = st.queue[st.index];
 
       if (key === "escape") {
-        if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen || st.vaultOpen || st.editOpen) {
-          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false, vaultOpen: false, editOpen: false });
+        if (st.editMode) {
+          st.leaveEdit();
+        } else if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen || st.vaultOpen) {
+          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false, vaultOpen: false });
         } else if (st.slideshow.playing) {
           st.toggleSlideshow();
         } else if (st.immersive) {
@@ -118,6 +136,11 @@ export function Viewer() {
         return;
       }
       if (anyModal) return;
+      if (st.editMode) {
+        // In edit mode only a few keys act: T leaves, arrows are ignored (the edit targets this item).
+        if (key === "t") st.leaveEdit();
+        return;
+      }
 
       if ((e.metaKey || e.ctrlKey) && key === "z") {
         e.preventDefault();
@@ -235,9 +258,11 @@ export function Viewer() {
   const upcoming = s.queue.slice(s.index + 1, s.index + 3).filter((i) => i.kind === "image");
 
   return (
-    <div ref={rootRef} className={`viewer ${s.hudHidden ? "hud-hidden" : ""} ${s.immersive ? "immersive" : ""} ${cursorHidden ? "cursor-hidden" : ""}`}>
+    <div ref={rootRef} className={`viewer ${s.hudHidden ? "hud-hidden" : ""} ${s.immersive ? "immersive" : ""} ${cursorHidden ? "cursor-hidden" : ""} ${s.editMode ? "editing" : ""}`}>
       <div className="stage">
-        {current ? (
+        {current && s.editMode ? (
+          <EditStage item={current} />
+        ) : current ? (
           <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} loop={!show.playing} onEnded={() => show.playing && s.next()} />
         ) : (
           <div className="fitbox">
@@ -369,6 +394,9 @@ export function Viewer() {
         </div>
       </div>
 
+      {s.editMode && current ? (
+        <EditBar item={current} items={s.editItems.length ? s.editItems : [current]} videoDuration={videoDuration} />
+      ) : (
       <div className="hud hud-bottom">
         <div className="hud-row">
           <RatingBar value={albumKey ? albumRating : rating} onChange={rate} label={albumKey ? `Album rating${album ? ` · ${album.name}` : ""}` : "Rating"} />
@@ -382,7 +410,7 @@ export function Viewer() {
             <button className="btn ghost" onClick={() => void s.undo()} disabled={s.undoStack.length === 0 || s.busy} title="Undo (⌘Z)">
               <ArrowCounterClockwise /> Undo <kbd className="kbd">⌘Z</kbd>
             </button>
-            <button className="btn ghost" onClick={() => current && s.openEdit([current])} disabled={!current || s.busy} title="Edit: rotate, upscale, convert (T)">
+            <button className="btn ghost" onClick={() => current && s.openEdit([current])} disabled={!current || s.busy} title="Edit: rotate, flip, crop, resize, trim, convert (T)">
               <PencilSimple /> Edit <kbd className="kbd">T</kbd>
             </button>
             <button className="btn danger" onClick={() => void s.trashCurrent()} disabled={!current || s.busy} title="Delete (⌫)">
@@ -394,6 +422,7 @@ export function Viewer() {
           <TargetBar targets={targets} onMove={(id) => void s.moveCurrent(id)} onAdd={() => void addTarget()} disabled={!current || s.busy} />
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <!-- App icon template. {{bg}} {{ink}} {{dim}} {{dot}} are filled from the active theme. -->
   <rect x="100" y="100" width="824" height="824" rx="184" fill="{{bg}}"/>
+  <g transform="translate(0 18)">
   <!-- two frames behind: the stack being culled -->
   <rect x="300" y="196" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{dim}}" stroke-width="22"/>
   <rect x="262" y="236" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{dim}}" stroke-width="22"/>
@@ -20,5 +21,6 @@
     <rect x="625.3" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
     <rect x="682.7" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
     <rect x="740" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
+  </g>
   </g>
 </svg>

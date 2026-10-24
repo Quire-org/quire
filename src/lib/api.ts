@@ -3,6 +3,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { Album, AlbumRename, BackupOutcome, BackupPlan, BackupProgress, Benchmark, DirEntryInfo, DriveInfo, EditOp, EditResult, EditTools, History, ImageHashResult, VaultProgress, VaultStatus, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult } from "./types";
 
 export const api = {
+  /** Replace the Dock / taskbar icon of the running app with this PNG. */
+  setAppIcon: (png: Uint8Array) => invoke<void>("set_app_icon", png),
   loadLibrary: (root: string) => invoke<Library>("load_library", { root }),
   saveLibrary: (root: string, library: Library) =>
     invoke<void>("save_library", { root, library }),
@@ -42,6 +44,7 @@ export const api = {
   // edits
   editTools: () => invoke<EditTools>("edit_tools"),
   editApply: (root: string, library: Library, item: MediaItem, op: EditOp, replace: boolean, onProgress: (p: number) => void) => {
+    // Rust expects the pipeline's crop/trim as arrays and nulls as absent options; both serialise as-is.
     const ch = new Channel<number>();
     ch.onmessage = onProgress;
     return invoke<EditResult>("edit_apply", { root, library, item, op, replace, onProgress: ch });

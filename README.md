@@ -78,14 +78,17 @@ so the same code builds for macOS, Linux and Windows.
   dialog that can hide behind the window.)
   What a vault cannot do: stop someone who has your passphrase, or who sits at your unlocked
   Mac, from reading the files. Blob sizes also remain visible.
-- **Edit** (`T`, or the Edit button in the viewer and the Browse selection bar): rotate 90°
-  left/right/180°, upscale 2× or 4× (Lanczos), and convert: JPEG/PNG/WebP/TIFF for photos,
-  MP4 H.264 or H.265, WebM VP9, GIF or MP3 for videos, with small/balanced/high quality.
-  Photos in common formats are processed in Rust; videos, HEIC and anything else use
-  **ffmpeg** when installed (`brew install ffmpeg`), with video rotation as a lossless
-  display flag. Results are saved next to the original with a suffix, or replace it (the
-  original goes to the trash and the rating carries over). Works on vault items too.
-  EXIF metadata is not carried over to edited photos.
+- **Edit mode** (`T`, or Edit in the viewer and the Browse selection bar): the stage splits
+  into original and live preview, and the bottom bar becomes the toolbox: rotate, flip,
+  crop (free or fixed aspect, drawn on the preview), resize to a width or upscale 2×/4×
+  (Lanczos), and for videos trim with in/out sliders, speed 0.25× to 4×, mute, and "Frame"
+  to save a still. Convert to JPEG/PNG/WebP/TIFF or MP4 H.264/H.265, WebM, GIF, MP3; the
+  quality choice only appears for lossy targets. *Save as copy* keeps the original and adds
+  a suffix, *Overwrite* trashes it and carries the rating over; a Browse selection applies
+  the same edits to every item. Photos in common formats are processed in Rust; videos,
+  HEIC and anything else use **ffmpeg** when installed (`brew install ffmpeg`). Rotation,
+  trim and mute on videos are lossless (no re-encode) when nothing else is changed. Works
+  on vault items too. EXIF metadata is not carried over to edited photos.
 - **Files** (`E`): a file manager over the opened folder, for every file and folder, not
   only media. Drag files from the desktop onto it to add them (encrypted on the way in when
   a vault is open), drag rows onto folders or breadcrumbs to move them, rename, delete,
@@ -139,7 +142,7 @@ so the same code builds for macOS, Linux and Windows.
 | `D` | Find duplicates (`Esc` back) |
 | `A` | Albums (`Esc` back) |
 | `E` | Files |
-| `T` | Edit: rotate, upscale, convert |
+| `T` | Edit mode (`Esc` cancels) |
 | `X` | Fit the whole image, or fill the screen (may crop) |
 | `⏎` | Slideshow: auto-advance on a timer (2 to 60 s, picked next to the button); videos play to the end. Hides the HUD like H by default (toggle next to the interval); Esc pauses |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
@@ -167,7 +170,12 @@ npm run tauri build                     # bundle (.app on macOS, deb/AppImage, N
 npm run tauri build -- --bundles dmg    # also produce a .dmg (needs Finder automation permission)
 cd src-tauri && cargo test              # backend unit tests
 npm test                                # frontend unit tests (vitest)
+npm run icon                            # regenerate src-tauri/icons from src/assets/app-icon.svg
 ```
+
+The bundled icon uses the neutral base palette, because Finder and Explorer cannot follow
+the in-app theme. While the app runs, the Dock (macOS) or window and taskbar icon (Windows,
+Linux) is re-tinted from the active theme's colours.
 
 The app also accepts a folder as its first command line argument.
 

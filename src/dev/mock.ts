@@ -103,6 +103,8 @@ function moveTo(item: MediaItem, destDir: string) {
 async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
   await new Promise((r) => setTimeout(r, 30));
   switch (cmd) {
+    case "set_app_icon":
+      return null;
     case "initial_root":
       return ROOT;
     case "load_library":
@@ -278,13 +280,15 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "edit_apply": {
       const ch = args.onProgress as { onmessage: (p: number) => void };
       const it = args.item as MediaItem;
-      const op = args.op as { kind: string; degrees?: number; factor?: number; format?: string };
+      const op = args.op as { rotate: number; flipH: boolean; crop: unknown; upscale: number | null; resizeWidth: number | null; format: string | null; extractFrame: number | null };
       for (let i = 1; i <= 5; i++) {
         await new Promise((r) => setTimeout(r, 60));
         ch.onmessage(i / 5);
       }
-      const ext = op.kind === "convert" ? (op.format!.startsWith("mp4") ? "mp4" : op.format!.startsWith("webm") ? "webm" : op.format!) : it.primary.split(".").pop()!;
-      const suffix = args.replace ? "" : op.kind === "rotate" ? ` rot${op.degrees}` : op.kind === "upscale" ? ` x${op.factor}` : "";
+      const fmt = op.format ?? (op.extractFrame != null ? "jpg" : null);
+      const ext = fmt ? (fmt.startsWith("mp4") ? "mp4" : fmt.startsWith("webm") ? "webm" : fmt) : it.primary.split(".").pop()!;
+      const parts = [op.rotate ? `rot${op.rotate}` : "", op.flipH ? "flip" : "", op.crop ? "crop" : "", op.upscale ? `x${op.upscale}` : op.resizeWidth ? `${op.resizeWidth}w` : ""].filter(Boolean);
+      const suffix = args.replace || !parts.length ? "" : " " + parts.join(" ");
       const base = it.primary.replace(/\.[^.]+$/, "");
       const target = `${base}${suffix}.${ext}`;
       const trashed: [string, string][] = [];
@@ -292,7 +296,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         for (const f of it.files) trashed.push([f, `${ROOT}/_deleted/${f.split("/").pop()}`]);
         items = items.filter((i) => i.key !== it.key);
       }
-      const ni = { ...toItem([target], target, it.kind), vaultId: it.vaultId ? "mock-" + target : undefined };
+      const ni = { ...toItem([target], target, op.extractFrame != null ? "image" : it.kind), vaultId: it.vaultId ? "mock-" + target : undefined };
       items.push(ni);
       origin.set(target, served(it.primary));
       return { item: ni, trashed };

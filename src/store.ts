@@ -5,7 +5,8 @@ import { suggestHotkey } from "./lib/hotkeys";
 import { identityOf, reconcile } from "./lib/reconcile";
 import { applyTheme, loadThemeId } from "./themes";
 import { basename, shuffled, uid } from "./lib/format";
-import type { Album, AlbumRename, EditOp, History, Library, MediaItem, Target, VaultStatus } from "./lib/types";
+import type { Album, AlbumRename, History, Library, MediaItem, Target, VaultStatus } from "./lib/types";
+import { useEdit, type Pipeline } from "./editStore";
 
 export type Screen = "welcome" | "viewer" | "browse" | "dupes" | "albums" | "files";
 
@@ -95,8 +96,9 @@ interface State {
   immersive: boolean;
   backupOpen: boolean;
   vaultOpen: boolean;
-  editOpen: boolean;
-  /** Items the Edit dialog works on (current item, or a Browse selection). */
+  /** Viewer edit mode: side-by-side preview and the edit bar. */
+  editMode: boolean;
+  /** Items the edit applies to (the current item, or a Browse selection). */
   editItems: MediaItem[];
   /** Vault state of the open folder, or of the folder waiting to be unlocked. */
   vault: VaultStatus | null;
@@ -180,9 +182,11 @@ interface Actions {
   unlockVaultQuick(): Promise<boolean>;
   lockVault(): Promise<void>;
   openFiles(): void;
+  /** Enter edit mode on these items (shows the first; a save applies to all). */
   openEdit(items: MediaItem[]): void;
+  leaveEdit(): void;
   /** Apply an edit to items in turn; updates queue, ratings and lists. */
-  applyEdit(items: MediaItem[], op: EditOp, replace: boolean, onProgress: (done: number, total: number, frac: number) => void): Promise<MediaItem[]>;
+  applyEdit(items: MediaItem[], op: Pipeline, replace: boolean, onProgress: (done: number, total: number, frac: number) => void): Promise<MediaItem[]>;
   undo(): Promise<void>;
   addTarget(absPath: string): void;
   updateTarget(id: string, patch: Partial<Target>): void;
@@ -264,7 +268,7 @@ export const useStore = create<Store>((set, get) => ({
   immersive: false,
   backupOpen: false,
   vaultOpen: false,
-  editOpen: false,
+  editMode: false,
   editItems: [],
   vault: null,
   pendingRoot: null,
@@ -523,10 +527,12 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openDupes() {
+    if (get().editMode) get().leaveEdit();
     set({ screen: "dupes", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
   openAlbums() {
+    if (get().editMode) get().leaveEdit();
     set({ screen: "albums", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
@@ -763,7 +769,21 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openEdit(items) {
-    if (items.length) set({ editOpen: true, editItems: items });
+    if (!items.length) return;
+    useEdit.getState().reset();
+    const st = get();
+    if (st.screen !== "viewer" || !st.queue.some((q) => q.key === items[0].key)) {
+      // From a list screen: view the selection, first item up front.
+      set({ screen: "viewer", queue: items, index: 0, source: { kind: "browse" }, shuffle: false });
+    } else {
+      set({ index: st.queue.findIndex((q) => q.key === items[0].key) });
+    }
+    set({ editMode: true, editItems: items, hudHidden: false, immersive: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
+  },
+
+  leaveEdit() {
+    useEdit.getState().reset();
+    set({ editMode: false, editItems: [] });
   },
 
   async applyEdit(items, op, replace, onProgress) {
@@ -813,6 +833,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openFiles() {
+    if (get().editMode) get().leaveEdit();
     set({ screen: "files", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
@@ -1008,6 +1029,7 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   openBrowse() {
+    if (get().editMode) get().leaveEdit();
     set({ screen: "browse", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 

@@ -47,7 +47,7 @@ export interface EditTools {
   encoders: string[];
 }
 
-export type EditOp = { kind: "rotate"; degrees: 90 | 180 | 270 } | { kind: "upscale"; factor: 2 | 4 } | { kind: "convert"; format: string; quality: "small" | "balanced" | "high" };
+export type { Pipeline as EditOp } from "../editStore";
 
 export interface EditResult {
   item: MediaItem;

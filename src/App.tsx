@@ -3,6 +3,7 @@ import { IconContext } from "@phosphor-icons/react";
 import { themes } from "./themes";
 import { useStore } from "./store";
 import { api } from "./lib/api";
+import { syncAppIcon } from "./lib/appIcon";
 
 let startupHandled = false;
 import { Welcome } from "./screens/Welcome";
@@ -15,7 +16,6 @@ import { Backup } from "./screens/Backup";
 import { VaultDialog } from "./screens/VaultDialog";
 import { VaultUnlock } from "./screens/VaultUnlock";
 import { Files } from "./screens/Files";
-import { EditDialog } from "./screens/EditDialog";
 import { ScanPill } from "./components/ScanPill";
 import { Settings } from "./screens/Settings";
 import { Trash } from "./screens/Trash";
@@ -31,11 +31,15 @@ export default function App() {
   const driveOpen = useStore((s) => s.driveOpen);
   const backupOpen = useStore((s) => s.backupOpen);
   const vaultOpen = useStore((s) => s.vaultOpen);
-  const editOpen = useStore((s) => s.editOpen);
   const pendingRoot = useStore((s) => s.pendingRoot);
   const theme = useStore((s) => s.theme);
   const iconWeight = themes.find((t) => t.id === theme)?.iconWeight ?? "regular";
   const openRoot = useStore((s) => s.openRoot);
+
+  // The Dock / taskbar icon follows the theme while the app runs.
+  useEffect(() => {
+    void syncAppIcon();
+  }, [theme]);
 
   // Key hints on buttons are hidden; holding ⌘ (or Ctrl) reveals them.
   useEffect(() => {
@@ -75,7 +79,6 @@ export default function App() {
       {driveOpen && <Drive />}
       {backupOpen && <Backup />}
       {vaultOpen && <VaultDialog />}
-      {editOpen && <EditDialog />}
       {pendingRoot && <VaultUnlock />}
       <ScanPill />
       {settingsOpen && <Settings />}

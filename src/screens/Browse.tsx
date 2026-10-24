@@ -215,7 +215,7 @@ export function Browse() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
-      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editOpen) return;
+      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen) return;
       const key = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && key === "a") {
         e.preventDefault();
@@ -384,7 +384,7 @@ export function Browse() {
                 </button>
               ))}
             </span>
-            <button className="btn sm" disabled={s.busy} onClick={() => s.openEdit(selectedItems)} title="Rotate, upscale or convert the selection (T)">
+            <button className="btn sm" disabled={s.busy} onClick={() => s.openEdit(selectedItems)} title="Edit the selection: rotate, flip, crop, resize, convert (T)">
               <PencilSimple /> Edit
             </button>
             <button className="btn sm danger" disabled={s.busy} onClick={() => void trashSelected()}>

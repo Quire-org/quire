@@ -69,7 +69,7 @@ export function Albums() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editOpen) return;
+      if (isTypingTarget(e.target) || s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen) return;
       const key = e.key.toLowerCase();
       if (key === "escape" || key === "a") s.openSortQueue();
       if (key === "b") s.openBrowse();

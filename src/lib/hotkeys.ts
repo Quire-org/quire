@@ -25,7 +25,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["D"], label: "Find duplicates" },
   { keys: ["A"], label: "Albums" },
   { keys: ["E"], label: "Files: every file and folder, drag and drop, encrypt on the way in" },
-  { keys: ["T"], label: "Edit: rotate, upscale, convert (current item, or the Browse selection)" },
+  { keys: ["T"], label: "Edit mode: rotate, flip, crop, resize, trim, speed, convert; Esc cancels" },
   { keys: ["X"], label: "Fit / fill the screen" },
   { keys: ["G"], label: "Open settings" },
   { keys: ["I"], label: "Show file info" },

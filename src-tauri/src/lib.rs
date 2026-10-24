@@ -836,7 +836,7 @@ struct EditResult {
 }
 
 #[tauri::command]
-async fn edit_apply(vs: VS<'_>, root: String, library: Library, item: MediaItem, op: edit::Op, replace: bool, on_progress: tauri::ipc::Channel<f32>) -> Result<EditResult, String> {
+async fn edit_apply(vs: VS<'_>, root: String, library: Library, item: MediaItem, op: edit::Pipeline, replace: bool, on_progress: tauri::ipc::Channel<f32>) -> Result<EditResult, String> {
     let root = PathBuf::from(root);
     let trash = library.trash_path(&root);
     let tools = edit::tools();
@@ -900,6 +900,44 @@ fn content_type(rel: &str) -> &'static str {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/* ---------------- app icon ---------------- */
+
+/// Replace the icon of the running app with a PNG rendered by the frontend in the
+/// theme's colours. macOS: the Dock icon (Finder keeps the bundled one). Elsewhere:
+/// every window's icon, which is what the taskbar shows.
+#[tauri::command]
+fn set_app_icon(app: tauri::AppHandle, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(png) = request.body() else {
+        return Err("expected raw PNG bytes".into());
+    };
+    let png = png.clone();
+    #[cfg(target_os = "macos")]
+    {
+        app.run_on_main_thread(move || {
+            use objc2::{AllocAnyThread, MainThreadMarker};
+            use objc2_app_kit::{NSApplication, NSImage};
+            use objc2_foundation::NSData;
+            let Some(mtm) = MainThreadMarker::new() else { return };
+            let data = NSData::with_bytes(&png);
+            if let Some(img) = NSImage::initWithData(NSImage::alloc(), &data) {
+                // SAFETY: called on the main thread with a valid NSImage.
+                unsafe { NSApplication::sharedApplication(mtm).setApplicationIconImage(Some(&img)) };
+            }
+        })
+        .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let rgba = image::load_from_memory(&png).map_err(|e| e.to_string())?.to_rgba8();
+        let (w, h) = rgba.dimensions();
+        let icon = tauri::image::Image::new(rgba.as_raw(), w, h);
+        for win in app.webview_windows().values() {
+            win.set_icon(icon.clone()).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -995,7 +1033,8 @@ pub fn run() {
             initial_root,
             path_exists,
             create_dir,
-            resolve_path
+            resolve_path,
+            set_app_icon
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
