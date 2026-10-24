@@ -1615,3 +1615,29 @@ section p {
   font-size: 12px;
   pointer-events: none;
 }
+
+/* ---------- Top bar menus ---------- */
+.btn-group {
+  display: inline-flex;
+  align-items: center;
+}
+.btn-group .btn:first-child {
+  padding-right: 6px;
+}
+.btn.caret {
+  padding-left: 2px;
+  padding-right: 4px;
+  min-width: 0;
+}
+.hud-top .pop {
+  bottom: auto;
+  top: calc(100% + 8px);
+  left: auto;
+  right: 0;
+}
+.pop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

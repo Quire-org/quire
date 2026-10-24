@@ -16,7 +16,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["M"], label: "Mute video" },
   { keys: [",", "."], label: "Scrub 5s, or step frames when paused" },
   { keys: ["[", "]", "\\"], label: "Playback speed down / up / reset" },
-  { keys: ["C"], label: "Immersive: hide the HUD, black background, hidden cursor" },
+  { keys: ["C"], label: "Immersive: hide the HUD, black background, hidden cursor (no button, key only)" },
   { keys: ["H"], label: "Hide or show the HUD (viewer), or the top bar and sidebar (list screens)" },
   { keys: ["R"], label: "Surprise me: a random item you haven't seen lately" },
   { keys: ["⏎"], label: "Slideshow: auto-advance on a timer (videos play to the end)" },
@@ -30,7 +30,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["Z", "click"], label: "Loupe: click zooms to 200% at the cursor, click again to fit; Z cycles fit / 100% / 200%; drag to pan" },
   { keys: ["G"], label: "Open settings" },
   { keys: ["I"], label: "Show file info" },
-  { keys: ["F"], label: "Toggle fullscreen" },
+  { keys: ["F"], label: "Toggle fullscreen (key only)" },
   { keys: ["Esc"], label: "Back / leave fullscreen" },
 ];
 

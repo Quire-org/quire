@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore, selectCurrent, selectRating } from "../store";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
-import { ArrowCounterClockwise, ArrowLeft, ArrowsIn, ArrowsOut, Books, CaretLeft, CaretRight, Copy, CornersOut, EyeSlash, GearSix, MonitorPlay, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowLeft, Books, CaretDown, CaretLeft, CaretRight, Copy, FolderOpen, GearSix, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
+import { Popover } from "../components/Popover";
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { EditStage } from "../components/EditStage";
@@ -19,6 +20,7 @@ export function Viewer() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [cursorHidden, setCursorHidden] = useState(false);
+  const [menu, setMenu] = useState<"show" | "goto" | null>(null);
   const targets = s.library?.targets ?? [];
   const album = current?.albumKey ? s.albums.find((a) => a.key === current.albumKey) : undefined;
   const albumKey = current?.albumKey;
@@ -347,47 +349,74 @@ export function Viewer() {
           <span className="mono counter" title="Position in the current queue">
             {s.queue.length ? s.index + 1 : 0} of {s.queue.length}
           </span>
-          <span className="slideshow-ctl">
+
+          {/* Slideshow: play/pause, with a menu for interval, HUD hiding, shuffle and surprise. */}
+          <span className="btn-group">
             <button className={`btn sm ghost ${show.playing ? "active" : ""}`} onClick={s.toggleSlideshow} title={show.playing ? "Pause slideshow (⏎)" : "Start slideshow (⏎)"}>
               {show.playing ? <Pause /> : <Play />} <kbd className="kbd">⏎</kbd>
             </button>
-            <Select compact title="Seconds per image" value={String(show.interval)} onChange={(v) => s.setSlideshowInterval(Number(v))} options={[2, 3, 5, 8, 10, 15, 20, 30, 60].map((n) => ({ value: String(n), label: `${n}s` }))} />
-            <button className={`btn sm ghost ${show.hideUi ? "active" : ""}`} onClick={() => s.setSlideshowHideUi(!show.hideUi)} title={show.hideUi ? "Slideshow hides the HUD, like H (click to keep it)" : "Slideshow keeps the HUD (click to hide it)"}>
-              <EyeSlash />
-            </button>
+            <Popover
+              open={menu === "show"}
+              onClose={() => setMenu(null)}
+              width={260}
+              trigger={
+                <button className="btn sm ghost caret" onClick={() => setMenu(menu === "show" ? null : "show")} title="Slideshow options">
+                  <CaretDown />
+                </button>
+              }
+            >
+              <div className="pop-title">Slideshow</div>
+              <div className="pop-row">
+                <span className="small">Seconds per image</span>
+                <Select compact value={String(show.interval)} onChange={(v) => s.setSlideshowInterval(Number(v))} options={[2, 3, 5, 8, 10, 15, 20, 30, 60].map((n) => ({ value: String(n), label: `${n}s` }))} />
+              </div>
+              <label className="check side-row">
+                <input type="checkbox" checked={show.hideUi} onChange={(e) => s.setSlideshowHideUi(e.target.checked)} /> Hide the HUD while playing
+              </label>
+              <div className="pop-list">
+                <button className={`btn sm ${s.shuffle ? "active" : "ghost"}`} onClick={s.toggleShuffle}>
+                  <Shuffle /> Shuffle <kbd className="kbd">S</kbd>
+                </button>
+                <button className="btn sm ghost" onClick={() => { setMenu(null); void s.surprise(); }}>
+                  <Sparkle /> Surprise me <kbd className="kbd">R</kbd>
+                </button>
+              </div>
+            </Popover>
           </span>
-          <button className="btn sm ghost" onClick={() => void s.surprise()} title="Surprise me (R)">
-            <Sparkle /> <kbd className="kbd">R</kbd>
-          </button>
-          <button className={`btn sm ghost ${s.fitMode === "fill" ? "active" : ""}`} onClick={s.toggleFit} title="Fit whole image / fill screen (X)">
-            {s.fitMode === "fit" ? <ArrowsIn /> : <ArrowsOut />} <kbd className="kbd">X</kbd>
-          </button>
-          <button className={`btn sm ghost ${s.shuffle ? "active" : ""}`} onClick={s.toggleShuffle} title="Shuffle (S)">
-            <Shuffle /> <kbd className="kbd">S</kbd>
-          </button>
-          <button className="btn sm ghost" onClick={s.openBrowse} title="Browse everything (B)">
-            <SquaresFour /> <kbd className="kbd">B</kbd>
-          </button>
-          <button className="btn sm ghost" onClick={s.openAlbums} title="Albums (A)">
-            <Books /> <kbd className="kbd">A</kbd>
-          </button>
-          <button className="btn sm ghost" onClick={s.openDupes} title="Find duplicates (D)">
-            <Copy /> <kbd className="kbd">D</kbd>
-          </button>
+
+          {/* Go to: the list screens. */}
+          <Popover
+            open={menu === "goto"}
+            onClose={() => setMenu(null)}
+            width={220}
+            trigger={
+              <button className="btn sm ghost" onClick={() => setMenu(menu === "goto" ? null : "goto")} title="Go to…">
+                <SquaresFour /> <CaretDown />
+              </button>
+            }
+          >
+            <div className="pop-title">Go to</div>
+            <div className="pop-list">
+              <button className="btn sm ghost" onClick={s.openBrowse}>
+                <SquaresFour /> Browse <kbd className="kbd">B</kbd>
+              </button>
+              <button className="btn sm ghost" onClick={s.openAlbums}>
+                <Books /> Albums <kbd className="kbd">A</kbd>
+              </button>
+              <button className="btn sm ghost" onClick={s.openDupes}>
+                <Copy /> Duplicates <kbd className="kbd">D</kbd>
+              </button>
+              <button className="btn sm ghost" onClick={s.openFiles}>
+                <FolderOpen /> Files <kbd className="kbd">E</kbd>
+              </button>
+            </div>
+          </Popover>
+
           <button className="btn sm ghost" onClick={() => s.set({ settingsOpen: true })} title="Settings (G)">
             <GearSix /> <kbd className="kbd">G</kbd>
           </button>
           <button className="btn sm ghost" onClick={() => s.set({ helpOpen: true })} title="Keys (?)">
             <Question />
-          </button>
-          <button className={`btn sm ghost ${s.hudHidden && !s.immersive ? "active" : ""}`} onClick={s.toggleHud} title="Hide the HUD (H)">
-            <EyeSlash /> <kbd className="kbd">H</kbd>
-          </button>
-          <button className={`btn sm ghost ${s.immersive ? "active" : ""}`} onClick={s.toggleImmersive} title="Immersive (C)">
-            <MonitorPlay /> <kbd className="kbd">C</kbd>
-          </button>
-          <button className="btn sm ghost" onClick={() => void s.toggleFullscreen()} title="Fullscreen (F)">
-            <CornersOut /> <kbd className="kbd">F</kbd>
           </button>
         </div>
       </div>

@@ -39,6 +39,10 @@ so the same code builds for macOS, Linux and Windows.
   trashes them all, and the usual keys act on the selection. View history is kept in
   `.mediasorter.history.json` next to the media. *Surprise me* (`R`) jumps to a random
   item, favouring ones you have not looked at lately.
+- **Top bar** in the viewer: position counter, a slideshow play button with a menu (interval,
+  hide HUD while playing, shuffle, surprise me), a *Go to* menu for Browse / Albums /
+  Duplicates / Files, Settings and help. Fit/fill, hide HUD, immersive and fullscreen are
+  keys only (`X`, `H`, `C`, `F`); fit/fill is also in Settings.
 - **Loupe**: click an image to zoom to 200% at the cursor (Lightroom style), click again to
   fit, drag to pan; `Z` cycles fit / 100% / 200%. In edit mode both panes zoom and pan
   together so the same spot can be compared.
