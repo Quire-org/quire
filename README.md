@@ -39,6 +39,9 @@ so the same code builds for macOS, Linux and Windows.
   trashes them all, and the usual keys act on the selection. View history is kept in
   `.mediasorter.history.json` next to the media. *Surprise me* (`R`) jumps to a random
   item, favouring ones you have not looked at lately.
+- **Loupe**: click an image to zoom to 200% at the cursor (Lightroom style), click again to
+  fit, drag to pan; `Z` cycles fit / 100% / 200%. In edit mode both panes zoom and pan
+  together so the same spot can be compared.
 - **Viewer extras**: playback speed (`[`, `]`, `\`, or the speed button), frame stepping
   with `,` and `.` while paused, a thumbnail of the frame under the cursor when hovering
   the progress bar, and immersive mode (`C`): black background, no HUD, cursor hidden.
@@ -144,6 +147,7 @@ so the same code builds for macOS, Linux and Windows.
 | `E` | Files |
 | `T` | Edit mode (`Esc` cancels) |
 | `X` | Fit the whole image, or fill the screen (may crop) |
+| `Z` / click | Loupe: 200% at the cursor, click again to fit; Z cycles fit / 100% / 200% |
 | `⏎` | Slideshow: auto-advance on a timer (2 to 60 s, picked next to the button); videos play to the end. Hides the HUD like H by default (toggle next to the interval); Esc pauses |
 | `C` | Immersive mode (hides the HUD, black background, hidden cursor) |
 | `H` | Hide / show the HUD in the viewer, or the top bar and sidebar on the list screens |

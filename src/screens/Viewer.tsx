@@ -207,6 +207,9 @@ export function Viewer() {
         case "x":
           st.toggleFit();
           return;
+        case "z":
+          st.cycleZoom();
+          return;
         case "g":
           st.set({ settingsOpen: true });
           return;
@@ -329,15 +332,15 @@ export function Viewer() {
         </div>
         <div className="hud-center">
           {current && (
-            <>
-              <span className="mono item-name">{basename(current.primary)}</span>
+            <div className="hud-center-inner">
+              <span className="mono item-name" title={basename(current.primary)}>{basename(current.primary)}</span>
               <span className="badge accent2">{ext(current.primary)}</span>
               {album && <span className="badge accent">ALBUM · {album.name}</span>}
               {!album && current.albumKey && <span className="badge accent">ALBUM</span>}
               {current.hasRaw && current.kind !== "raw" && <span className="badge">+RAW</span>}
               {current.hasVideo && current.kind !== "video" && <span className="badge">+VID</span>}
-              <span className="dim mono">{current.dir || "/"}</span>
-            </>
+              <span className="dim mono hud-dir ellipsis" title={current.dir || "/"}>{current.dir || "/"}</span>
+            </div>
           )}
         </div>
         <div className="hud-right">

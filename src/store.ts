@@ -96,6 +96,11 @@ interface State {
   immersive: boolean;
   backupOpen: boolean;
   vaultOpen: boolean;
+  /** Loupe zoom: level is image pixels per CSS pixel (0 = fit); pan in CSS px from centre. */
+  zoom: { level: number; preferredLevel: number; focal: { x: number; y: number }; pan: { px: number; py: number } };
+  setZoom(z: Partial<State["zoom"]>): void;
+  /** Z: cycle fit -> 100% -> 200% -> fit at the image centre. */
+  cycleZoom(): void;
   /** Viewer edit mode: side-by-side preview and the edit bar. */
   editMode: boolean;
   /** Items the edit applies to (the current item, or a Browse selection). */
@@ -268,6 +273,7 @@ export const useStore = create<Store>((set, get) => ({
   immersive: false,
   backupOpen: false,
   vaultOpen: false,
+  zoom: { level: 0, preferredLevel: 2, focal: { x: 0.5, y: 0.5 }, pan: { px: 0, py: 0 } },
   editMode: false,
   editItems: [],
   vault: null,
@@ -408,8 +414,10 @@ export const useStore = create<Store>((set, get) => ({
 
   setIndex(i) {
     const n = get().queue.length;
-    if (n === 0) return set({ index: 0 });
-    set({ index: ((i % n) + n) % n });
+    const z = get().zoom;
+    const zoom = z.level ? { ...z, level: 0, pan: { px: 0, py: 0 } } : z;
+    if (n === 0) return set({ index: 0, zoom });
+    set({ index: ((i % n) + n) % n, zoom });
   },
   next() {
     get().setIndex(get().index + 1);
@@ -766,6 +774,17 @@ export const useStore = create<Store>((set, get) => ({
     await api.vaultLock().catch(() => {});
     get().toast("Vault locked");
     get().closeRoot();
+  },
+
+  setZoom(z) {
+    set({ zoom: { ...get().zoom, ...z } });
+  },
+
+  cycleZoom() {
+    const z = get().zoom;
+    const next = z.level === 0 ? 1 : z.level === 1 ? 2 : 0;
+    set({ zoom: { ...z, level: next, preferredLevel: next || z.preferredLevel, pan: { px: 0, py: 0 }, focal: { x: 0.5, y: 0.5 } } });
+    get().toast(next === 0 ? "Fit" : `${next * 100}%`);
   },
 
   openEdit(items) {

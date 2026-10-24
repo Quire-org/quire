@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from "react";
+import { ZoomBox } from "./ZoomBox";
 
 export type FitMode = "fit" | "fill";
 export interface Natural {
@@ -32,25 +33,34 @@ export function useFitSize(el: HTMLElement | null, natural: Natural | null, mode
   return { width: Math.round(natural.w * scale), height: Math.round(natural.h * scale) };
 }
 
-/** An image fitted (or filling) its parent box, portrait or landscape. */
-export function FitImage({ src, mode = "fit", className = "", alt = "", onError, blurBackdrop }: { src: string; mode?: FitMode; className?: string; alt?: string; onError?: () => void; blurBackdrop?: boolean }) {
+/** An image fitted (or filling) its parent box, portrait or landscape. `zoomable` adds the click-to-loupe. */
+export function FitImage({ src, mode = "fit", className = "", alt = "", onError, blurBackdrop, zoomable }: { src: string; mode?: FitMode; className?: string; alt?: string; onError?: () => void; blurBackdrop?: boolean; zoomable?: boolean }) {
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [natural, setNatural] = useState<Natural | null>(null);
   useEffect(() => setNatural(null), [src]);
   const size = useFitSize(el, natural, mode);
+  const img = (
+    <img
+      key={src}
+      className={`stage-media ${size ? "sized" : ""}`}
+      src={src}
+      alt={alt}
+      draggable={false}
+      style={size ?? undefined}
+      onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+      onError={onError}
+    />
+  );
   return (
     <div ref={setEl} className={`fitbox ${className}`}>
       {blurBackdrop && <img className="fit-backdrop" src={src} alt="" aria-hidden draggable={false} />}
-      <img
-        key={src}
-        className={`stage-media ${size ? "sized" : ""}`}
-        src={src}
-        alt={alt}
-        draggable={false}
-        style={size ?? undefined}
-        onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-        onError={onError}
-      />
+      {zoomable ? (
+        <ZoomBox fitted={size} natural={natural}>
+          {img}
+        </ZoomBox>
+      ) : (
+        img
+      )}
     </div>
   );
 }

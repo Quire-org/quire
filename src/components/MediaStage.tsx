@@ -23,7 +23,7 @@ function ImageStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [item.primary]);
   if (failed) return <Unavailable item={item} reason="The webview cannot decode this image format." />;
-  return <FitImage src={mediaUrl(item)} mode={fit} alt={item.name} onError={() => setFailed(true)} />;
+  return <FitImage src={mediaUrl(item)} mode={fit} alt={item.name} onError={() => setFailed(true)} zoomable />;
 }
 
 function RawStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
@@ -47,7 +47,7 @@ function RawStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
         <div className="stage-loading mono">DECODING RAW PREVIEW…</div>
       </div>
     );
-  return <FitImage src={url} mode={fit} alt={item.name} />;
+  return <FitImage src={url} mode={fit} alt={item.name} zoomable />;
 }
 
 function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; fit: FitMode; loop: boolean; onEnded?: () => void }) {

@@ -3,6 +3,7 @@ import { mediaUrl, rawPreviewUrl } from "../lib/api";
 import type { MediaItem } from "../lib/types";
 import { useEdit } from "../editStore";
 import { useFitSize, type Natural } from "./FitImage";
+import { ZoomBox } from "./ZoomBox";
 
 type Rect = [number, number, number, number];
 type Handle = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -51,11 +52,13 @@ function Original({ item }: { item: MediaItem }) {
   if (!url) return <div className="fitbox" />;
   return (
     <div className="fitbox" ref={setBox}>
-      {item.kind === "video" ? (
-        <video className={`stage-media ${size ? "sized" : ""}`} style={size ?? undefined} src={url} muted loop autoPlay playsInline onLoadedMetadata={(e) => setNat({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight })} />
-      ) : (
-        <img className={`stage-media ${size ? "sized" : ""}`} style={size ?? undefined} src={url} alt="" draggable={false} onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
-      )}
+      <ZoomBox fitted={size} natural={nat}>
+        {item.kind === "video" ? (
+          <video className={`stage-media ${size ? "sized" : ""}`} style={size ?? undefined} src={url} muted loop autoPlay playsInline onLoadedMetadata={(e) => setNat({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight })} />
+        ) : (
+          <img className={`stage-media ${size ? "sized" : ""}`} style={size ?? undefined} src={url} alt="" draggable={false} onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
+        )}
+      </ZoomBox>
     </div>
   );
 }
@@ -259,6 +262,7 @@ function Preview({ item }: { item: MediaItem }) {
 
   return (
     <div className="fitbox" ref={setBox}>
+      <ZoomBox fitted={size} natural={frameNat} enabled={!cropping}>
       <div ref={frameRef} className={`edit-frame ${cropping ? "cropping" : ""}`} style={size ? { width: size.width, height: size.height } : undefined}>
         {isVideo ? (
           <video
@@ -293,6 +297,7 @@ function Preview({ item }: { item: MediaItem }) {
           </div>
         )}
       </div>
+      </ZoomBox>
     </div>
   );
 }

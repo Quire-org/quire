@@ -27,6 +27,7 @@ export const VIEWER_KEYS: { keys: string[]; label: string }[] = [
   { keys: ["E"], label: "Files: every file and folder, drag and drop, encrypt on the way in" },
   { keys: ["T"], label: "Edit mode: rotate, flip, crop, resize, trim, speed, convert; Esc cancels" },
   { keys: ["X"], label: "Fit / fill the screen" },
+  { keys: ["Z", "click"], label: "Loupe: click zooms to 200% at the cursor, click again to fit; Z cycles fit / 100% / 200%; drag to pan" },
   { keys: ["G"], label: "Open settings" },
   { keys: ["I"], label: "Show file info" },
   { keys: ["F"], label: "Toggle fullscreen" },
