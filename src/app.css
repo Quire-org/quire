@@ -1394,6 +1394,38 @@ section p {
   pointer-events: none;
   z-index: 2;
 }
+.crop-rect.live {
+  pointer-events: auto;
+  cursor: move;
+  border-width: 2px;
+}
+.crop-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
+  background-size: 33.333% 33.333%;
+  background-position: -1px -1px;
+}
+.crop-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border: 2px solid var(--accent-fg);
+  border-radius: var(--radius);
+  z-index: 3;
+}
+.crop-handle.n { top: -9px; left: 50%; transform: translateX(-50%); cursor: ns-resize; width: 36px; height: 10px; }
+.crop-handle.s { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; width: 36px; height: 10px; }
+.crop-handle.e { right: -5px; top: 50%; transform: translateY(-50%); cursor: ew-resize; width: 10px; height: 36px; }
+.crop-handle.w { left: -5px; top: 50%; transform: translateY(-50%); cursor: ew-resize; width: 10px; height: 36px; }
+.crop-handle.ne { top: -9px; right: -9px; cursor: nesw-resize; }
+.crop-handle.nw { top: -9px; left: -9px; cursor: nwse-resize; }
+.crop-handle.se { bottom: -9px; right: -9px; cursor: nwse-resize; }
+.crop-handle.sw { bottom: -9px; left: -9px; cursor: nesw-resize; }
 .crop-dim {
   position: absolute;
   inset: 0;
@@ -1428,4 +1460,57 @@ section p {
 }
 .edit-progress .progress-fill {
   display: block;
+}
+
+/* ---------- Custom select ---------- */
+.sel {
+  position: relative;
+  display: inline-block;
+}
+.sel-btn {
+  justify-content: space-between;
+  min-width: 110px;
+  gap: 6px;
+}
+.sel.compact .sel-btn {
+  min-width: 90px;
+}
+.sel.open .sel-btn {
+  border-color: var(--accent);
+}
+.sel-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  min-width: 100%;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 4px 0;
+  z-index: 60;
+  background: var(--bg-2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  clip-path: none;
+  white-space: nowrap;
+}
+.topnav .sel-pop,
+.browse-side .sel-pop,
+.modal .sel-pop,
+.hud-top .sel-pop {
+  bottom: auto;
+  top: calc(100% + 4px);
+}
+.sel-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sel-opt.hi {
+  background: var(--bg-3);
+}
+.sel-opt.on {
+  color: var(--accent);
 }

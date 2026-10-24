@@ -3,7 +3,8 @@ import { useStore } from "../store";
 import { api } from "../lib/api";
 import { describe, isIdentity, LOSSY, useEdit } from "../editStore";
 import type { EditTools, MediaItem } from "../lib/types";
-import { ArrowClockwise, ArrowCounterClockwise, ArrowsHorizontal, ArrowsVertical, Crop, FloppyDisk, Scissors, SpeakerSlash, Warning, X } from "@phosphor-icons/react";
+import { ArrowClockwise, ArrowCounterClockwise, ArrowsHorizontal, ArrowsVertical, Check, Crop, FloppyDisk, Scissors, SpeakerSlash, Warning, X } from "@phosphor-icons/react";
+import { Select } from "./Select";
 
 const IMAGE_TARGETS: [string, string][] = [["jpg", "JPEG"], ["png", "PNG"], ["webp", "WebP"], ["tiff", "TIFF"]];
 const VIDEO_TARGETS: [string, string][] = [["mp4-h264", "MP4 H.264"], ["mp4-h265", "MP4 H.265"], ["webm-vp9", "WebM"], ["gif", "GIF"], ["mp3", "MP3 audio"]];
@@ -63,8 +64,8 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
         </button>
 
         <span className="label">Crop</span>
-        <button className={chip(e.cropping)} disabled={dis} onClick={() => e.setState({ cropping: !e.cropping })} title="Drag a rectangle on the preview">
-          <Crop /> {e.cropping ? "Drawing…" : p.crop ? "Edit" : "Crop"}
+        <button className={chip(e.cropping)} disabled={dis} onClick={() => e.setState({ cropping: !e.cropping })} title="Crop: drag the window's edges, corners or middle on the preview">
+          {e.cropping ? <Check /> : <Crop />} {e.cropping ? "Done" : p.crop ? "Adjust" : "Crop"}
         </button>
         {e.cropping && (
           <span className="chips">
@@ -82,25 +83,25 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
         )}
 
         <span className="label">Size</span>
-        <select
-          className="input slide-interval"
-          value={p.upscale ? `x${p.upscale}` : p.resizeWidth ? String(p.resizeWidth) : ""}
+        <Select
+          compact
           disabled={dis}
-          onChange={(ev) => {
-            const v = ev.target.value;
+          value={p.upscale ? `x${p.upscale}` : p.resizeWidth ? String(p.resizeWidth) : ""}
+          onChange={(v) => {
             if (!v) e.set({ upscale: null, resizeWidth: null });
             else if (v.startsWith("x")) e.set({ upscale: Number(v.slice(1)) as 2 | 4, resizeWidth: null });
             else e.set({ resizeWidth: Number(v), upscale: null });
           }}
-        >
-          <option value="">Keep</option>
-          <option value="x2">Upscale 2×</option>
-          <option value="x4">Upscale 4×</option>
-          <option value="3840">3840 wide (4K)</option>
-          <option value="1920">1920 wide</option>
-          <option value="1280">1280 wide</option>
-          <option value="800">800 wide</option>
-        </select>
+          options={[
+            { value: "", label: "Keep size" },
+            { value: "x2", label: "Upscale 2×" },
+            { value: "x4", label: "Upscale 4×" },
+            { value: "3840", label: "3840 wide (4K)" },
+            { value: "1920", label: "1920 wide" },
+            { value: "1280", label: "1280 wide" },
+            { value: "800", label: "800 wide" },
+          ]}
+        />
 
         {isVideo && (
           <>
@@ -116,13 +117,20 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
                 {p.trim[1].toFixed(1)}s
               </span>
             )}
-            <select className="input slide-interval" value={p.speed ?? ""} disabled={dis} onChange={(ev) => e.set({ speed: ev.target.value ? Number(ev.target.value) : null })} title="Playback speed">
-              <option value="">1×</option>
-              <option value="0.25">0.25×</option>
-              <option value="0.5">0.5×</option>
-              <option value="2">2×</option>
-              <option value="4">4×</option>
-            </select>
+            <Select
+              compact
+              disabled={dis}
+              title="Playback speed"
+              value={p.speed ? String(p.speed) : ""}
+              onChange={(v) => e.set({ speed: v ? Number(v) : null })}
+              options={[
+                { value: "", label: "1× speed" },
+                { value: "0.25", label: "0.25×" },
+                { value: "0.5", label: "0.5×" },
+                { value: "2", label: "2×" },
+                { value: "4", label: "4×" },
+              ]}
+            />
             <button className={chip(p.mute)} disabled={dis} onClick={() => e.set({ mute: !p.mute })} title="Remove the audio track">
               <SpeakerSlash />
             </button>
@@ -139,14 +147,7 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
         )}
 
         <span className="label">Format</span>
-        <select className="input slide-interval" value={p.format ?? ""} disabled={dis} onChange={(ev) => e.set({ format: ev.target.value || null })}>
-          <option value="">Keep</option>
-          {(p.extractFrame != null ? IMAGE_TARGETS : targets).map(([v, l]) => (
-            <option key={v} value={v}>
-              {l}
-            </option>
-          ))}
-        </select>
+        <Select compact disabled={dis} value={p.format ?? ""} onChange={(v) => e.set({ format: v || null })} options={[{ value: "", label: "Keep format" }, ...(p.extractFrame != null ? IMAGE_TARGETS : targets).map(([value, label]) => ({ value, label }))]} />
         {p.format && LOSSY.has(p.format) && (
           <span className="chips">
             {(["small", "balanced", "high"] as const).map((q) => (

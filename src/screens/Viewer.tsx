@@ -6,6 +6,7 @@ import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { EditStage } from "../components/EditStage";
 import { EditBar } from "../components/EditBar";
+import { Select } from "../components/Select";
 import { TargetBar } from "../components/TargetBar";
 import { mediaUrl, pickFolder } from "../lib/api";
 import { isTypingTarget } from "../lib/hotkeys";
@@ -347,13 +348,7 @@ export function Viewer() {
             <button className={`btn sm ghost ${show.playing ? "active" : ""}`} onClick={s.toggleSlideshow} title={show.playing ? "Pause slideshow (⏎)" : "Start slideshow (⏎)"}>
               {show.playing ? <Pause /> : <Play />} <kbd className="kbd">⏎</kbd>
             </button>
-            <select className="input slide-interval" value={show.interval} onChange={(e) => s.setSlideshowInterval(Number(e.target.value))} title="Seconds per image">
-              {[2, 3, 5, 8, 10, 15, 20, 30, 60].map((n) => (
-                <option key={n} value={n}>
-                  {n}s
-                </option>
-              ))}
-            </select>
+            <Select compact title="Seconds per image" value={String(show.interval)} onChange={(v) => s.setSlideshowInterval(Number(v))} options={[2, 3, 5, 8, 10, 15, 20, 30, 60].map((n) => ({ value: String(n), label: `${n}s` }))} />
             <button className={`btn sm ghost ${show.hideUi ? "active" : ""}`} onClick={() => s.setSlideshowHideUi(!show.hideUi)} title={show.hideUi ? "Slideshow hides the HUD, like H (click to keep it)" : "Slideshow keeps the HUD (click to hide it)"}>
               <EyeSlash />
             </button>
