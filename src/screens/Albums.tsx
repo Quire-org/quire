@@ -171,17 +171,26 @@ export function Albums() {
         <button className="btn primary" disabled={!albums.length || s.busy} onClick={() => void s.openAlbums_Slideshow(albums)} title="Flip through everything in the visible albums">
           <Play /> Slideshow <kbd className="kbd">⏎</kbd>
         </button>
-        <p className="dim small">Open an album to rate it: the rating keys in the viewer rate the whole album.</p>
+        <p className="dim small">Open an album to rate it as a whole.</p>
 
         <Deco kind="sprout" className="deco-side" />
         <details className="advanced">
           <summary className="label">Advanced</summary>
-          <p className="dim small">Folder names like <span className="mono">My%20Trip</span> can be decoded to their real names.</p>
-          <label className="side-row check" title="Decode whenever albums are scanned">
+          <p className="dim small">
+            Decode URL-escaped names (<span className="mono">My%20Trip</span>).
+          </p>
+          <label className="check side-row" title="Decode whenever albums are scanned">
             <input type="checkbox" checked={!!s.library?.autoDecodeAlbumNames} onChange={(e) => s.setAutoDecodeAlbumNames(e.target.checked)} />
-            Auto-decode on scan
+            Automatically on scan
           </label>
-          <button className="btn sm" onClick={() => void checkNames()} disabled={checking || roots.length === 0}>
+          <button
+            className="btn sm"
+            onClick={() => {
+              if (roots.length === 0) s.toast("Add an album folder first", "warn");
+              else void checkNames();
+            }}
+            disabled={checking}
+          >
             {checking ? "Checking…" : "Check names now"}
           </button>
         </details>

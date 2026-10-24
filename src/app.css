@@ -413,7 +413,7 @@
 }
 .side-toggle {
   position: absolute;
-  left: 260px;
+  left: 288px;
   top: 50%;
   transform: translate(-50%, -50%);
   width: 18px;
@@ -447,7 +447,7 @@
 .browse {
   height: 100%;
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 288px 1fr;
 }
 .browse-side {
   display: flex;
@@ -737,6 +737,15 @@ section p {
 }
 .browse-side p {
   margin: 0;
+  line-height: 1.35;
+}
+.browse-side .small,
+.browse-side .check {
+  font-size: 13px;
+}
+.browse-side .check {
+  align-items: center;
+  line-height: 1.2;
 }
 .browse-side select.input {
   font-size: 13px;
@@ -1109,6 +1118,18 @@ section p {
   font-size: 20px;
   color: var(--accent);
   font-family: var(--font-mono);
+}
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  align-items: baseline;
+}
+.kv > span:nth-child(even) {
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- Album cover ---------- */

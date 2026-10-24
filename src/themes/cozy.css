@@ -29,6 +29,9 @@
 [data-theme="cozy"] body {
   font-weight: 600;
 }
+[data-theme="cozy"] .browse-side {
+  font-size: 14px;
+}
 [data-theme="cozy"] h1,
 [data-theme="cozy"] h2,
 [data-theme="cozy"] h3 {

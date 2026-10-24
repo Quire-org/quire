@@ -64,10 +64,7 @@ export function Dupes() {
     <div className="browse dupes">
       <aside className="browse-side panel">
         <h3>Duplicates</h3>
-        <p className="dim small">
-          Exact copies by content fingerprint, similar photos by perceptual hash, and videos whose footage matches or is
-          contained in a longer video.
-        </p>
+        <p className="dim small">Exact copies, similar photos, and video clips contained in longer videos.</p>
 
         <div className="label">Scope</div>
         <div className="side-list">
@@ -113,20 +110,25 @@ export function Dupes() {
         <div className="estimate">
           <div className="side-row">
             <span className="label">Estimate</span>
-            <span className="big">{est.seconds == null ? (est.total ? "nothing new" : "—") : `~${fmtEta(est.seconds)}`}</span>
+            <span className="big">{est.seconds == null ? (est.total ? "up to date" : "—") : `~${fmtEta(est.seconds)}`}</span>
           </div>
-          <div className="mono dim small">
-            {est.total} files in scope · {est.cached} already fingerprinted
+          <div className="kv mono small">
+            <span className="dim">In scope</span>
+            <span>{est.total} files</span>
+            <span className="dim">Fingerprinted</span>
+            <span>{est.cached}</span>
+            <span className="dim">New</span>
+            <span>
+              {est.newStills} photos · {est.newVideos} videos
+            </span>
+            <span className="dim">To read</span>
+            <span>{formatBytes(est.newBytes)}</span>
+            <span className="dim">Read speed</span>
+            <span>{d.readMBps ? `${d.readMBps.toFixed(0)} MB/s` : "40 MB/s (assumed)"}</span>
           </div>
-          <div className="mono dim small">
-            new: {est.newStills} photos, {est.newVideos} videos ({formatBytes(est.newBytes)} to read)
-          </div>
-          <div className="side-row">
-            <span className="mono faint small">read speed: {d.readMBps ? `${d.readMBps.toFixed(0)} MB/s` : "assumed 40 MB/s"}</span>
-            <button className="btn sm ghost" onClick={() => void d.benchmark()} disabled={d.running} title="Read ~128 MB from the folder to measure the drive">
-              Measure
-            </button>
-          </div>
+          <button className="btn sm ghost" onClick={() => void d.benchmark()} disabled={d.running} title="Read about 128 MB from the folder to measure the drive">
+            Measure read speed
+          </button>
         </div>
 
         {d.running ? (

@@ -25,6 +25,9 @@
   --scanlines: none;
   --letter: 0.01em;
 }
+[data-theme="sunset"] .browse-side {
+  font-size: 14px;
+}
 [data-theme="sunset"] body {
   font-weight: 600;
   background: linear-gradient(180deg, #fbeee4 0%, #f9e2d8 100%);
