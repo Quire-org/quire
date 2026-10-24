@@ -655,6 +655,8 @@ struct DirEntryInfo {
     size: u64,
     modified: u64,
     encrypted: bool,
+    /// Vault object id when encrypted (for thumbnails through the vault protocol).
+    vault_id: Option<String>,
     /// Number of files below a folder (recursive).
     count: usize,
 }
@@ -669,14 +671,17 @@ async fn list_dir(vs: VS<'_>, root: String, dir: String) -> Result<Vec<DirEntryI
             .into_iter()
             .map(|d| {
                 let files = ctx.list_files(&d, &[]);
-                DirEntryInfo { name: d.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: d.to_string_lossy().into_owned(), is_dir: true, size: files.iter().map(|f| f.size).sum(), modified: files.iter().map(|f| f.modified).max().unwrap_or(0), encrypted: false, count: files.len() }
+                DirEntryInfo { name: d.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: d.to_string_lossy().into_owned(), is_dir: true, size: files.iter().map(|f| f.size).sum(), modified: files.iter().map(|f| f.modified).max().unwrap_or(0), encrypted: false, vault_id: None, count: files.len() }
             })
             .collect();
         let mut files: Vec<DirEntryInfo> = ctx
             .list_files(&dir, &[])
             .into_iter()
             .filter(|f| f.path.parent() == Some(dir.as_path()))
-            .map(|f| DirEntryInfo { name: f.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: f.path.to_string_lossy().into_owned(), is_dir: false, size: f.size, modified: f.modified, encrypted: ctx.vault_id(&f.path).is_some(), count: 0 })
+            .map(|f| {
+                let vid = ctx.vault_id(&f.path);
+                DirEntryInfo { name: f.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: f.path.to_string_lossy().into_owned(), is_dir: false, size: f.size, modified: f.modified, encrypted: vid.is_some(), vault_id: vid, count: 0 }
+            })
             .collect();
         files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         out.extend(files);

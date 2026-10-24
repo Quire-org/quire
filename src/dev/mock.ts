@@ -310,7 +310,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
           if (!under(f, dir)) continue;
           const rest = f.slice(dir.length + 1);
           if (rest.includes("/")) names.add(rest.split("/")[0]);
-          else files.push({ name: rest, path: f, isDir: false, size: i.size, modified: i.modified, encrypted: !!i.vaultId, count: 0 } as { name: string });
+          else files.push({ name: rest, path: f, isDir: false, size: i.size, modified: i.modified, encrypted: !!i.vaultId, vaultId: i.vaultId ?? null, count: 0 } as { name: string });
         }
       }
       const dirs = [...names].sort().map((n) => ({ name: n, path: `${dir}/${n}`, isDir: true, size: 0, modified: 0, encrypted: false, count: items.filter((i) => under(i.primary, `${dir}/${n}`)).length }));
@@ -454,6 +454,9 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
   }
 }
 
+(window as unknown as { __TAURI_EVENT_PLUGIN_INTERNALS__: unknown }).__TAURI_EVENT_PLUGIN_INTERNALS__ = {
+  unregisterListener: () => {},
+};
 (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = {
   invoke,
   transformCallback: () => 0,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useStore } from "../store";
 import { api, pickFolder } from "../lib/api";
@@ -6,7 +6,10 @@ import { TopNav } from "../components/TopNav";
 import { isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate } from "../lib/format";
 import type { DirEntryInfo, VaultProgress } from "../lib/types";
-import { ArrowUp, CaretRight, DownloadSimple, File as FileIcon, Folder, FolderPlus, House, LockKey, PencilSimple, Trash } from "@phosphor-icons/react";
+import { ArrowUp, CaretRight, DownloadSimple, File as FileIcon, FileAudio, FileCode, FilePdf, FileText, FileZip, Folder, FolderPlus, House, List, LockKey, PencilSimple, SquaresFour, Trash } from "@phosphor-icons/react";
+import { mediaUrl, rawPreviewUrl } from "../lib/api";
+import { videoPoster } from "../lib/poster";
+import { classifyName } from "../lib/kinds";
 
 /**
  * A plain file manager over the opened folder: every file (not only media),
@@ -25,6 +28,22 @@ export function Files() {
   const [progress, setProgress] = useState<VaultProgress | null>(null);
   const [busy, setBusy] = useState(false);
   const [newFolder, setNewFolder] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "icons">(() => {
+    try {
+      return localStorage.getItem("mediasorter.filesView") === "list" ? "list" : "icons";
+    } catch {
+      return "icons";
+    }
+  });
+  const [iconSize, setIconSize] = useState(140);
+  const switchView = (v: "list" | "icons") => {
+    setView(v);
+    try {
+      localStorage.setItem("mediasorter.filesView", v);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const load = useCallback(async () => {
     if (!root) return;
@@ -121,6 +140,18 @@ export function Files() {
     }
   };
 
+  // Double-clicking a media file opens it in the viewer with its folder as the queue.
+  const openFile = async (x: DirEntryInfo) => {
+    if (!root || !classifyName(x.name)) return;
+    try {
+      const items = await api.scanDir(root, dir);
+      const idx = Math.max(0, items.findIndex((i) => i.primary === x.path || i.files.includes(x.path)));
+      s.openViewer(items, idx, { kind: "browse" });
+    } catch (e) {
+      s.toast(String(e), "error");
+    }
+  };
+
   const crumbs = useMemo(() => {
     const rel = dir.startsWith(root) ? dir.slice(root.length).split("/").filter(Boolean) : [];
     return rel.map((name, i) => ({ name, path: `${root}/${rel.slice(0, i + 1).join("/")}` }));
@@ -197,6 +228,15 @@ export function Files() {
           <button className="btn sm ghost" disabled={dir === root} onClick={() => setDir(dir.slice(0, dir.lastIndexOf("/")))} title="Up (↑)">
             <ArrowUp />
           </button>
+          <span className="chips">
+            <button className={`btn sm ${view === "icons" ? "active" : "ghost"}`} onClick={() => switchView("icons")} title="Icon view">
+              <SquaresFour />
+            </button>
+            <button className={`btn sm ${view === "list" ? "active" : "ghost"}`} onClick={() => switchView("list")} title="List view">
+              <List />
+            </button>
+          </span>
+          {view === "icons" && <input type="range" min={90} max={260} step={10} value={iconSize} onChange={(e) => setIconSize(Number(e.target.value))} title="Icon size" style={{ width: 90 }} />}
           <button className="btn sm" onClick={() => setNewFolder("")}>
             <FolderPlus /> New folder
           </button>
@@ -224,7 +264,7 @@ export function Files() {
           </div>
         )}
 
-        <div className="file-list">
+        <div className={view === "icons" ? "file-icons" : "file-list"} style={view === "icons" ? { gridTemplateColumns: `repeat(auto-fill, minmax(${iconSize}px, 1fr))` } : undefined}>
           {newFolder !== null && (
             <form
               className="file-row"
@@ -250,7 +290,58 @@ export function Files() {
               </button>
             </form>
           )}
-          {entries.map((x) => (
+          {entries.map((x) => view === "icons" ? (
+            <FileTile
+              key={x.path}
+              entry={x}
+              size={iconSize}
+              selected={selected.has(x.path)}
+              drop={dropTarget === x.path}
+              onDragStart={(e) => onDragStart(e, x.path)}
+              onDragOver={(e) => {
+                if (x.isDir) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDropTarget(x.path);
+                }
+              }}
+              onDragLeave={() => dropTarget === x.path && setDropTarget(null)}
+              onDrop={(e) => {
+                if (x.isDir) {
+                  e.stopPropagation();
+                  onDropInto(e, x.path);
+                }
+              }}
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey) {
+                  const n = new Set(selected);
+                  if (n.has(x.path)) n.delete(x.path);
+                  else n.add(x.path);
+                  setSelected(n);
+                } else setSelected(new Set([x.path]));
+              }}
+              onDoubleClick={() => (x.isDir ? setDir(x.path) : openFile(x))}
+              onRename={() => {
+                setRenaming(x.path);
+                setRenameTo(x.name);
+              }}
+              renaming={renaming === x.path}
+              renameTo={renameTo}
+              setRenameTo={setRenameTo}
+              commitRename={async () => {
+                if (!root) return;
+                try {
+                  await api.fsRename(root, x.path, renameTo);
+                  setRenaming(null);
+                  s.set({ allStale: true, albumsLoaded: false });
+                  await load();
+                } catch (err) {
+                  s.toast(String(err), "error");
+                }
+              }}
+              cancelRename={() => setRenaming(null)}
+            />
+          ) : (
             <div
               key={x.path}
               className={`file-row ${selected.has(x.path) ? "selected" : ""} ${dropTarget === x.path ? "drop" : ""}`}
@@ -278,7 +369,7 @@ export function Files() {
                   setSelected(n);
                 } else setSelected(new Set([x.path]));
               }}
-              onDoubleClick={() => x.isDir && setDir(x.path)}
+              onDoubleClick={() => (x.isDir ? setDir(x.path) : openFile(x))}
             >
               {x.isDir ? <Folder className="file-icon" /> : <FileIcon className="file-icon" />}
               {renaming === x.path ? (
@@ -342,6 +433,94 @@ export function Files() {
           {entries.length === 0 && newFolder === null && <div className="dim file-empty">Empty folder. Drop files here to add them{s.vault?.unlocked ? " (they are encrypted on the way in)" : ""}.</div>}
         </div>
       </div>
+    </div>
+  );
+}
+
+
+/** Icon-view tile: thumbnail for media, a typed glyph for everything else. */
+function FileTile(props: {
+  entry: DirEntryInfo;
+  size: number;
+  selected: boolean;
+  drop: boolean;
+  renaming: boolean;
+  renameTo: string;
+  setRenameTo: (v: string) => void;
+  commitRename: () => void;
+  cancelRename: () => void;
+  onRename: () => void;
+  onDragStart: (e: DragEvent) => void;
+  onDragOver: (e: DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: DragEvent) => void;
+  onClick: (e: React.MouseEvent) => void;
+  onDoubleClick: () => void;
+}) {
+  const { entry: x, size } = props;
+  const kind = x.isDir ? null : classifyName(x.name);
+  const [thumb, setThumb] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && setVisible(true)), { rootMargin: "300px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!visible || !kind) return;
+    let alive = true;
+    const item = { primary: x.path, vaultId: x.vaultId ?? undefined };
+    const url = kind === "raw" ? rawPreviewUrl(x.path) : kind === "video" ? videoPoster(mediaUrl(item)) : Promise.resolve(mediaUrl(item));
+    url.then((u) => alive && setThumb(u)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [visible, kind, x.path, x.encrypted]);
+
+  const Glyph = x.isDir ? Folder : /\.(mp3|wav|flac|m4a|aac|ogg)$/i.test(x.name) ? FileAudio : /\.(pdf)$/i.test(x.name) ? FilePdf : /\.(zip|rar|7z|gz|tar|dmg)$/i.test(x.name) ? FileZip : /\.(json|xml|js|ts|py|rs|html|css|sh|yml|yaml|toml)$/i.test(x.name) ? FileCode : /\.(txt|md|rtf|csv|log)$/i.test(x.name) ? FileText : FileIcon;
+
+  return (
+    <div
+      ref={ref}
+      className={`file-tile ${props.selected ? "selected" : ""} ${props.drop ? "drop" : ""}`}
+      draggable
+      onDragStart={props.onDragStart}
+      onDragOver={props.onDragOver}
+      onDragLeave={props.onDragLeave}
+      onDrop={props.onDrop}
+      onClick={props.onClick}
+      onDoubleClick={props.onDoubleClick}
+      title={x.path}
+    >
+      <div className="file-tile-art" style={{ height: size * 0.75 }}>
+        {thumb ? <img src={thumb} alt="" draggable={false} /> : <Glyph size={Math.round(size * 0.42)} weight={x.isDir ? "fill" : undefined} className="file-glyph" />}
+        {x.isDir && <span className="badge accent2 tile-count">{x.count}</span>}
+        {x.encrypted && (
+          <span className="tile-lock" title="Encrypted">
+            <LockKey />
+          </span>
+        )}
+        {!x.isDir && !kind && <span className="badge tile-ext">{x.name.split(".").pop()?.toUpperCase().slice(0, 5)}</span>}
+      </div>
+      {props.renaming ? (
+        <form
+          className="row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            props.commitRename();
+          }}
+        >
+          <input className="input grow" autoFocus value={props.renameTo} onChange={(e) => props.setRenameTo(e.target.value)} onKeyDown={(e) => e.key === "Escape" && props.cancelRename()} onBlur={props.cancelRename} />
+        </form>
+      ) : (
+        <div className="file-tile-name" onDoubleClick={(e) => { e.stopPropagation(); props.onRename(); }} title="Double-click to rename">
+          {x.name}
+        </div>
+      )}
+      <div className="mono faint small">{x.isDir ? `${x.count} files` : formatBytes(x.size)}</div>
     </div>
   );
 }

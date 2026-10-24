@@ -61,6 +61,7 @@ export interface DirEntryInfo {
   size: number;
   modified: number;
   encrypted: boolean;
+  vaultId?: string | null;
   count: number;
 }
 

@@ -97,7 +97,8 @@ so the same code builds for macOS, Linux and Windows.
   trim and mute on videos are lossless (no re-encode) when nothing else is changed. Works
   on vault items too. EXIF metadata is not carried over to edited photos.
 - **Files** (`E`): a file manager over the opened folder, for every file and folder, not
-  only media. Drag files from the desktop onto it to add them (encrypted on the way in when
+  only media. Icon view (thumbnails for media, typed glyphs for the rest, size slider) or
+  list view; double-click a media file to open it in the viewer with its folder as the queue. Drag files from the desktop onto it to add them (encrypted on the way in when
   a vault is open), drag rows onto folders or breadcrumbs to move them, rename, delete,
   export, new folder.
 - **Backup** (top bar or Settings → Backup…) mirrors the opened folder into a folder on
