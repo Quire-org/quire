@@ -174,6 +174,7 @@ interface Actions {
   setAlbumFilters(patch: Partial<AlbumFilters>): void;
   refreshVault(): Promise<void>;
   unlockVault(secret: string, recovery: boolean): Promise<boolean>;
+  unlockVaultQuick(): Promise<boolean>;
   lockVault(): Promise<void>;
   openFiles(): void;
   undo(): Promise<void>;
@@ -730,6 +731,20 @@ export const useStore = create<Store>((set, get) => ({
     set({ pendingRoot: null, needsNewPassphrase: recovery });
     await get().openRoot(root);
     if (recovery) set({ vaultOpen: true });
+    return true;
+  },
+
+  async unlockVaultQuick() {
+    const root = get().pendingRoot ?? get().root;
+    if (!root) return false;
+    try {
+      await api.vaultUnlockQuick(root);
+    } catch (e) {
+      get().toast(String(e), "error");
+      return false;
+    }
+    set({ pendingRoot: null, needsNewPassphrase: false });
+    await get().openRoot(root);
     return true;
   },
 

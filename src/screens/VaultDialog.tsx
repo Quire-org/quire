@@ -4,7 +4,7 @@ import { api, pickFolder } from "../lib/api";
 import { Modal } from "../components/Modal";
 import { formatBytes } from "../lib/format";
 import type { VaultProgress } from "../lib/types";
-import { Copy, Key, LockKey, LockKeyOpen, ShieldCheck, Warning } from "@phosphor-icons/react";
+import { Copy, Fingerprint, Key, LockKey, LockKeyOpen, ShieldCheck, Warning } from "@phosphor-icons/react";
 
 /**
  * Vault management: create (shows the recovery code once), encrypt plain
@@ -138,6 +138,25 @@ export function VaultDialog() {
   };
 
   const pct = progress && progress.totalBytes ? Math.round((progress.bytes / progress.totalBytes) * 100) : 0;
+  const quickName = v?.quickMethod === "touchid" ? "Touch ID" : v?.quickMethod === "hello" ? "Windows Hello" : "the system keyring";
+  const toggleQuick = async () => {
+    if (!s.root || !v) return;
+    setBusy(true);
+    try {
+      if (v.quickRemembered) {
+        await api.vaultForget(s.root);
+        s.toast("This computer no longer remembers the vault", "ok");
+      } else {
+        await api.vaultRemember();
+        s.toast(`Remembered. Next time: ${quickName}`, "ok");
+      }
+      await s.refreshVault();
+    } catch (e) {
+      s.toast(String(e), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Modal title="Vault" onClose={close} wide>
@@ -225,6 +244,22 @@ export function VaultDialog() {
                 </div>
               </div>
             )}
+          </section>
+
+          <hr className="rule" />
+          <section>
+            <div className="sec-head">
+              <h3>
+                <Fingerprint /> Quick unlock on this computer
+              </h3>
+              <button className={`btn sm ${v.quickRemembered ? "active" : "primary"}`} disabled={busy} onClick={() => void toggleQuick()}>
+                {v.quickRemembered ? "Forget this computer" : `Remember with ${quickName}`}
+              </button>
+            </div>
+            <p className="dim small">
+              Stores the vault key in the {v.quickMethod === "keyring" ? "Secret Service keyring" : v.quickMethod === "hello" ? "Windows Credential Manager" : "macOS Keychain"}, released only after {quickName}
+              {v.quickMethod === "keyring" ? " is unlocked by your login session" : ""}. Only on this machine; the passphrase and recovery code keep working everywhere.
+            </p>
           </section>
 
           <hr className="rule" />

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "../store";
 import { Modal } from "../components/Modal";
-import { Key, LockKey } from "@phosphor-icons/react";
+import { Fingerprint, Key, LockKey } from "@phosphor-icons/react";
 
 /** Passphrase (or recovery code) prompt for a folder with a locked vault. */
 export function VaultUnlock() {
@@ -10,6 +10,8 @@ export function VaultUnlock() {
   const [recovery, setRecovery] = useState(false);
   const [busy, setBusy] = useState(false);
   const root = s.pendingRoot ?? "";
+  const quick = s.vault?.quickRemembered ? s.vault.quickMethod : null;
+  const quickLabel = quick === "touchid" ? "Unlock with Touch ID" : quick === "hello" ? "Unlock with Windows Hello" : "Unlock from the keyring";
 
   const go = async () => {
     setBusy(true);
@@ -23,6 +25,19 @@ export function VaultUnlock() {
       <p className="dim small">
         <LockKey /> <span className="mono">{root.split("/").filter(Boolean).slice(-2).join("/")}</span> is encrypted.
       </p>
+      {quick && (
+        <button
+          className="btn primary"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await s.unlockVaultQuick();
+            setBusy(false);
+          }}
+        >
+          <Fingerprint /> {quickLabel}
+        </button>
+      )}
       <form
         className="row"
         onSubmit={(e) => {

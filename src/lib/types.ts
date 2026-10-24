@@ -27,6 +27,9 @@ export interface VaultStatus {
   plaintextFiles: number;
   plaintextBytes: number;
   encryptedFiles: number;
+  /** "touchid" | "hello" | "keyring" */
+  quickMethod: string;
+  quickRemembered: boolean;
 }
 
 export interface VaultProgress {

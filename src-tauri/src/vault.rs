@@ -257,6 +257,19 @@ impl Vault {
         Ok(v)
     }
 
+    /// The raw data key, for the quick-unlock store on this machine.
+    pub fn data_key(&self) -> [u8; 32] {
+        self.key.0
+    }
+
+    /// Open with the data key itself (quick unlock). The header still has to exist.
+    pub fn unlock_with_key(root: &Path, key: [u8; 32]) -> Result<Vault, String> {
+        Self::read_header(root)?;
+        let mut v = Vault { root: root.to_path_buf(), key: DataKey(key), index: Index::default(), by_rel: BTreeMap::new(), by_id: BTreeMap::new() };
+        v.load_index().map_err(|_| "stored key does not open this vault".to_string())?;
+        Ok(v)
+    }
+
     pub fn change_passphrase(&self, old: &str, new: &str) -> Result<(), String> {
         if new.chars().count() < 8 {
             return Err("use a passphrase of at least 8 characters".into());

@@ -69,6 +69,11 @@ so the same code builds for macOS, Linux and Windows.
   you press *Encrypt new files*; they still show and sort in the meantime. *Export* writes
   readable copies elsewhere, *Remove vault* decrypts everything back in place. Forgetting
   both passphrase and code means the files are gone: there is no other way in, by design.
+  **Quick unlock**: the Vault dialog can remember the vault on the current computer. The data
+  key goes into the OS credential store and is released only after a local prompt: Touch ID
+  (or the login password) on macOS, Windows Hello on Windows, and the Secret Service keyring
+  on Linux, which the desktop session unlocks (install `libdbus-1` / a keyring daemon such as
+  GNOME Keyring or KWallet). Only on that machine; passphrase and recovery code keep working.
   What a vault cannot do: stop someone who has your passphrase, or who sits at your unlocked
   Mac, from reading the files. Blob sizes also remain visible.
 - **Files** (`E`): a file manager over the opened folder, for every file and folder, not

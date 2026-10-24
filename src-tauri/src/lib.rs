@@ -7,6 +7,7 @@ mod library;
 mod media;
 mod ops;
 mod preview;
+mod quick;
 mod vault;
 
 use fsx::Ctx;
@@ -406,6 +407,9 @@ struct VaultStatus {
     plaintext_files: usize,
     plaintext_bytes: u64,
     encrypted_files: usize,
+    /// Quick unlock: "touchid", "hello" or "keyring", and whether this folder is remembered here.
+    quick_method: String,
+    quick_remembered: bool,
 }
 
 #[tauri::command]
@@ -416,7 +420,16 @@ fn vault_status(vs: VS, root: String) -> VaultStatus {
     let unlocked = guard.as_ref().map(|v| v.root == root).unwrap_or(false);
     let encrypted_files = guard.as_ref().filter(|v| v.root == root).map(|v| v.entries().len()).unwrap_or(0);
     let plain = if exists { fsx::plaintext_files(&root) } else { vec![] };
-    VaultStatus { exists, unlocked, has_recovery: exists && Vault::has_recovery(&root), plaintext_files: plain.len(), plaintext_bytes: plain.iter().map(|f| f.size).sum(), encrypted_files }
+    VaultStatus {
+        exists,
+        unlocked,
+        has_recovery: exists && Vault::has_recovery(&root),
+        plaintext_files: plain.len(),
+        plaintext_bytes: plain.iter().map(|f| f.size).sum(),
+        encrypted_files,
+        quick_method: quick::method().to_string(),
+        quick_remembered: exists && quick::is_remembered(&root),
+    }
 }
 
 /// Migrate plaintext metadata files into the vault (or back out).
@@ -461,6 +474,30 @@ fn vault_unlock(vs: VS, root: String, passphrase: String) -> Result<(), String> 
 #[tauri::command]
 fn vault_unlock_recovery(vs: VS, root: String, code: String) -> Result<(), String> {
     let v = Vault::unlock_with_recovery(Path::new(&root), &code)?;
+    *vs.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(v);
+    Ok(())
+}
+
+/// Remember the open vault on this computer (behind Touch ID / Windows Hello / the keyring).
+#[tauri::command]
+fn vault_remember(vs: VS) -> Result<(), String> {
+    let guard = vs.0.lock().unwrap_or_else(|p| p.into_inner());
+    let v = guard.as_ref().ok_or("vault is locked")?;
+    quick::authenticate_for_setup()?;
+    quick::remember(&v.root, &v.data_key())
+}
+
+#[tauri::command]
+fn vault_forget(root: String) -> Result<(), String> {
+    quick::forget(Path::new(&root))
+}
+
+/// Unlock with the key remembered on this computer, after the OS prompt.
+#[tauri::command]
+async fn vault_unlock_quick(vs: VS<'_>, root: String) -> Result<(), String> {
+    let r = PathBuf::from(&root);
+    let key = tauri::async_runtime::spawn_blocking(move || quick::unlock(&r, "unlock the media vault")).await.map_err(|e| e.to_string())??;
+    let v = Vault::unlock_with_key(Path::new(&root), key)?;
     *vs.0.lock().unwrap_or_else(|p| p.into_inner()) = Some(v);
     Ok(())
 }
@@ -601,6 +638,7 @@ fn vault_remove(vs: VS, root: String, on_progress: tauri::ipc::Channel<VaultProg
     }
     migrate_meta_out(v, &root)?;
     std::fs::remove_dir_all(root.join(vault::VAULT_DIR)).map_err(|e| e.to_string())?;
+    let _ = quick::forget(&root);
     *guard = None;
     Ok(entries.len())
 }
@@ -898,6 +936,9 @@ pub fn run() {
             vault_create,
             vault_unlock,
             vault_unlock_recovery,
+            vault_unlock_quick,
+            vault_remember,
+            vault_forget,
             vault_lock,
             vault_change_passphrase,
             vault_reset_passphrase,

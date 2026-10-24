@@ -44,7 +44,7 @@ const seed: Entry[] = [
 let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false, backupDest: null, lastBackup: null, ids: {} };
 let items: MediaItem[] = seed.map((e) => toItem(e.files.map((f) => `${ROOT}/${f}`), `${ROOT}/${e.rel}`, e.kind));
 let pickCount = 0;
-let mockVault = { exists: false, unlocked: false };
+let mockVault = { exists: false, unlocked: false, remembered: false };
 let history: { version: number; viewed: Record<string, number> } | null = null;
 
 function fakeHash(text: string): bigint {
@@ -230,16 +230,23 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "cancel_backup":
       return null;
     case "vault_status":
-      return { exists: mockVault.exists, unlocked: mockVault.unlocked, hasRecovery: mockVault.exists, plaintextFiles: mockVault.exists ? items.filter((i) => !i.vaultId).length : 0, plaintextBytes: 0, encryptedFiles: items.filter((i) => i.vaultId).length };
+      return { exists: mockVault.exists, unlocked: mockVault.unlocked, hasRecovery: mockVault.exists, plaintextFiles: mockVault.exists ? items.filter((i) => !i.vaultId).length : 0, plaintextBytes: 0, encryptedFiles: items.filter((i) => i.vaultId).length, quickMethod: "touchid", quickRemembered: mockVault.remembered };
     case "vault_create":
-      mockVault = { exists: true, unlocked: true };
+      mockVault = { exists: true, unlocked: true, remembered: false };
       return "ABCD-EFGH-JKMN-PQRS-TVWX-YZ01-2345-6789";
     case "vault_unlock":
       if (args.passphrase !== "mock") throw new Error("wrong passphrase");
       mockVault.unlocked = true;
       return null;
     case "vault_unlock_recovery":
+    case "vault_unlock_quick":
       mockVault.unlocked = true;
+      return null;
+    case "vault_remember":
+      mockVault.remembered = true;
+      return null;
+    case "vault_forget":
+      mockVault.remembered = false;
       return null;
     case "vault_lock":
       mockVault.unlocked = false;
@@ -263,7 +270,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return (args.paths as string[]).length;
     case "vault_remove": {
       items = items.map(({ vaultId: _v, ...rest }) => rest);
-      mockVault = { exists: false, unlocked: false };
+      mockVault = { exists: false, unlocked: false, remembered: false };
       return items.length;
     }
     case "list_dir": {
