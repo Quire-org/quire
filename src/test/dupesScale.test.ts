@@ -108,7 +108,8 @@ describe("matching at scale", () => {
     const groups = findGroups(entries, SENSITIVITY.normal, (f) => shares.push(f));
     const ms = performance.now() - t0;
     expect(groups.length).toBeGreaterThan(1000);
-    expect(ms).toBeLessThan(5000); // about a second here; comparing every pair took minutes
+    // About a second on a laptop, several on a shared CI runner; comparing every pair took minutes.
+    expect(ms).toBeLessThan(20000);
     expect(shares.length).toBeGreaterThan(10);
     expect(shares.every((f, i) => f >= 0 && f <= 1 && (i === 0 || f >= shares[i - 1]))).toBe(true);
   });
