@@ -2,8 +2,9 @@
 //! trash or rename, used to walk the whole tree again with a read of every file's
 //! size and time. Now each folder's listing is kept, and a scan only checks each
 //! folder's own modified time: adding, removing or renaming anything in a folder
-//! changes it, so an unchanged folder's listing is used as is. A file changed in
-//! place leaves its folder's time alone; the file watcher catches those.
+//! changes it, so an unchanged folder's listing is used as is (once its time is a
+//! few seconds old: a change within the same tick of the clock leaves it as it was).
+//! A file changed in place leaves its folder's time alone; the file watcher catches those.
 //! Folders not known yet are read on several threads at once.
 
 use crate::media::FileRef;
@@ -12,11 +13,14 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 struct Listing {
     /// The folder's modified time when it was read.
     stamp: SystemTime,
+    /// Whether that time was already past by more than a tick of the drive's clock when it was read:
+    /// only then does a later change move it. A newer folder is read again each time.
+    settled: bool,
     files: Vec<FileRef>,
     dirs: Vec<PathBuf>,
 }
@@ -30,6 +34,10 @@ fn hidden(name: &std::ffi::OsStr) -> bool {
     name.to_string_lossy().starts_with('.')
 }
 
+/// Longer than a folder's time can stay the same through a change: a tick of the clock it is kept in
+/// (2 seconds on FAT drives, a few milliseconds elsewhere).
+const SETTLE: Duration = Duration::from_secs(3);
+
 fn ms(t: SystemTime) -> u64 {
     t.duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
@@ -41,6 +49,7 @@ fn listing(dir: &Path) -> Option<Arc<Listing>> {
     // next scan reads the folder again.
     let stamp = fs::symlink_metadata(dir).ok()?.modified().ok()?;
     if let Some(l) = known().lock().unwrap_or_else(|p| p.into_inner()).get(dir)
+        && l.settled
         && l.stamp == stamp
     {
         return Some(l.clone());
@@ -60,7 +69,8 @@ fn listing(dir: &Path) -> Option<Arc<Listing>> {
             files.push(FileRef { path: e.path(), size: m.len(), modified: m.modified().map(ms).unwrap_or(0) });
         }
     }
-    let l = Arc::new(Listing { stamp, files, dirs });
+    let settled = SystemTime::now().duration_since(stamp).is_ok_and(|age| age > SETTLE);
+    let l = Arc::new(Listing { stamp, settled, files, dirs });
     known().lock().unwrap_or_else(|p| p.into_inner()).insert(dir.to_path_buf(), l.clone());
     Some(l)
 }
