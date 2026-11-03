@@ -1,7 +1,9 @@
 /**
- * First-frame posters for video tiles. WebKit does not paint a frame for a
- * <video preload="metadata"> until it plays, so we grab one ourselves. Kept in
- * memory only, a couple at a time so the grid does not spawn dozens of decoders.
+ * First-frame posters for video tiles outside a vault (a vault's videos have
+ * theirs made by the backend and kept in the vault, see canThumb). WebKit does
+ * not paint a frame for a <video preload="metadata"> until it plays, so we grab
+ * one ourselves. Kept in memory only, a couple at a time so the grid does not
+ * spawn dozens of decoders.
  */
 const cache = new Map<string, Promise<string>>();
 let active = 0;

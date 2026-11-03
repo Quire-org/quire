@@ -1,30 +1,21 @@
-//! Quick unlock: the vault's data key is kept in a file only this user can
-//! read, inside the app's data folder, and handed out only after a local
-//! authentication prompt. macOS: Touch ID or the login password through
-//! LocalAuthentication. Windows: Windows Hello (UserConsentVerifier). Linux
-//! has no standard prompt, so there it is "unlock without passphrase on this
-//! computer", gated by the login session alone.
+//! Quick unlock: the vault's data key is kept on this computer and handed out
+//! only after a local authentication prompt. macOS: the key is a generic
+//! password in the user's Keychain, and the prompt is Touch ID or the login
+//! password through LocalAuthentication. Windows: a file only this user can
+//! read in the app's data folder, behind Windows Hello (UserConsentVerifier).
+//! Linux has no standard prompt, so there it is "unlock without passphrase on
+//! this computer", gated by the login session alone.
 //!
 //! The passphrase and recovery code stay valid; this is a convenience slot
 //! that lives only on this computer.
 
 use std::path::{Path, PathBuf};
 
-/// Where remembered keys live: the app's own data folder, mode 0600. The
-/// Keychain was tried first, but its trust is bound to the exact binary and
-/// unsigned builds trigger an "allow access" dialog that can hide behind the
-/// window and look like a hang. A signed release build could move this to a
-/// Secure Enclave-bound Keychain item later.
+/// Where remembered keys live on Windows and Linux: the app's own data folder (`quick-unlock`), mode
+/// 0600. On macOS this is only where earlier versions kept them: a key found here is moved into the
+/// Keychain the next time it is used, and the file deleted.
 fn store_dir() -> Result<PathBuf, String> {
-    let base = if cfg!(target_os = "macos") {
-        std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Library/Application Support"))
-    } else if cfg!(target_os = "windows") {
-        std::env::var_os("APPDATA").map(PathBuf::from)
-    } else {
-        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
-    }
-    .ok_or("no home directory")?;
-    let dir = base.join("app.media-sorter").join("quick-unlock");
+    let dir = crate::data_dir().ok_or("the app's data folder isn't known yet")?.join("quick-unlock");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     #[cfg(unix)]
     {
@@ -34,11 +25,56 @@ fn store_dir() -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-fn key_file(root: &Path) -> Result<PathBuf, String> {
+/// A library's name in the store: a hash of its path, so the path itself shows nowhere (not in a file
+/// name, not in Keychain Access).
+fn root_name(root: &Path) -> String {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     root.to_string_lossy().hash(&mut h);
-    Ok(store_dir()?.join(format!("vault-{:016x}.key", h.finish())))
+    format!("vault-{:016x}", h.finish())
+}
+
+fn key_file(root: &Path) -> Result<PathBuf, String> {
+    Ok(store_dir()?.join(format!("{}.key", root_name(root))))
+}
+
+/// The key a file holds, hex-encoded as `remember_in_file` wrote it.
+fn read_key_file(p: &Path) -> Result<[u8; 32], String> {
+    let hex_key = std::fs::read_to_string(p).map_err(|e| e.to_string())?;
+    decode_key(hex_key.trim().as_bytes())
+}
+
+fn decode_key(hex_key: &[u8]) -> Result<[u8; 32], String> {
+    let bytes = hex::decode(hex_key).map_err(|_| "stored key is corrupted".to_string())?;
+    if bytes.len() != 32 {
+        return Err("stored key is corrupted".into());
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&bytes);
+    Ok(key)
+}
+
+/// The key into a file only this user can read.
+#[cfg(not(target_os = "macos"))]
+fn remember_in_file(root: &Path, key: &[u8; 32]) -> Result<(), String> {
+    let p = key_file(root)?;
+    std::fs::write(&p, hex::encode(key)).map_err(|e| format!("could not store the key: {e}"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
+}
+
+/// The key file gone, if there was one.
+fn forget_file(root: &Path) -> Result<(), String> {
+    let p = key_file(root)?;
+    match std::fs::remove_file(&p) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// What the current platform can offer, for the UI.
@@ -52,45 +88,118 @@ pub fn method() -> &'static str {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 pub fn is_remembered(root: &Path) -> bool {
     key_file(root).map(|p| p.is_file()).unwrap_or(false)
 }
 
+#[cfg(not(target_os = "macos"))]
 pub fn remember(root: &Path, key: &[u8; 32]) -> Result<(), String> {
-    let p = key_file(root)?;
-    std::fs::write(&p, hex::encode(key)).map_err(|e| format!("could not store the key: {e}"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600));
-    }
-    Ok(())
+    remember_in_file(root, key)
 }
 
+#[cfg(not(target_os = "macos"))]
 pub fn forget(root: &Path) -> Result<(), String> {
-    let p = key_file(root)?;
-    match std::fs::remove_file(&p) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    forget_file(root)
 }
 
 /// Prompt the user, then return the stored key.
+#[cfg(not(target_os = "macos"))]
 pub fn unlock(root: &Path, reason: &str) -> Result<[u8; 32], String> {
     let p = key_file(root)?;
     if !p.is_file() {
         return Err("this folder is not remembered on this computer".into());
     }
     authenticate(reason)?;
-    let hex_key = std::fs::read_to_string(&p).map_err(|e| e.to_string())?;
-    let bytes = hex::decode(hex_key.trim()).map_err(|_| "stored key is corrupted".to_string())?;
-    if bytes.len() != 32 {
-        return Err("stored key is corrupted".into());
+    read_key_file(&p)
+}
+
+/// The Keychain item a library's key is kept under: one service for the app, the account naming the
+/// library as the key file did. The item is only read after the authentication prompt; whether it is
+/// there is asked without reading it, which the Keychain allows without asking anything.
+#[cfg(target_os = "macos")]
+const KEYCHAIN_SERVICE: &str = "Quire quick unlock";
+
+/// The Keychain's "no such item" status.
+#[cfg(target_os = "macos")]
+const ITEM_NOT_FOUND: i32 = -25300;
+
+#[cfg(target_os = "macos")]
+fn in_service(service: &str, root: &Path) -> bool {
+    use security_framework::item::{ItemClass, ItemSearchOptions, Limit};
+    // Attributes only: the secret itself is read in `unlock`, after the prompt.
+    ItemSearchOptions::new().class(ItemClass::generic_password()).service(service).account(&root_name(root)).load_attributes(true).limit(Limit::Max(1)).search().is_ok_and(|found| !found.is_empty())
+}
+
+/// Under Quire's service, or Media Sorter's from before the rename (moved on the next unlock).
+#[cfg(target_os = "macos")]
+fn in_keychain(root: &Path) -> bool {
+    in_service(KEYCHAIN_SERVICE, root) || in_service(crate::formerly::KEYCHAIN_SERVICE, root)
+}
+
+/// Remove a library's item from a service; one that isn't there is fine.
+#[cfg(target_os = "macos")]
+fn delete_item(service: &str, root: &Path) -> Result<(), String> {
+    match security_framework::passwords::delete_generic_password(service, &root_name(root)) {
+        Ok(()) => Ok(()),
+        Err(e) if e.code() == ITEM_NOT_FOUND => Ok(()),
+        Err(e) => Err(format!("could not remove the key from the Keychain: {e}")),
     }
-    let mut key = [0u8; 32];
-    key.copy_from_slice(&bytes);
-    Ok(key)
+}
+
+#[cfg(target_os = "macos")]
+pub fn is_remembered(root: &Path) -> bool {
+    in_keychain(root) || key_file(root).map(|p| p.is_file()).unwrap_or(false)
+}
+
+#[cfg(target_os = "macos")]
+pub fn remember(root: &Path, key: &[u8; 32]) -> Result<(), String> {
+    // Hex, as the file held it: what Keychain Access shows is a plain string.
+    security_framework::passwords::set_generic_password(KEYCHAIN_SERVICE, &root_name(root), hex::encode(key).as_bytes()).map_err(|e| format!("could not store the key in the Keychain: {e}"))?;
+    // Any key from before (a file, or Media Sorter's Keychain item): Quire's item holds it now.
+    if let Err(e) = delete_item(crate::formerly::KEYCHAIN_SERVICE, root) {
+        eprintln!("[quick unlock] {e}");
+    }
+    forget_file(root)
+}
+
+#[cfg(target_os = "macos")]
+pub fn forget(root: &Path) -> Result<(), String> {
+    delete_item(KEYCHAIN_SERVICE, root)?;
+    delete_item(crate::formerly::KEYCHAIN_SERVICE, root)?;
+    forget_file(root)
+}
+
+/// Prompt the user, then return the stored key. A key an earlier version kept in a file, or under
+/// Media Sorter's Keychain service, goes into Quire's Keychain item here and the old one is deleted,
+/// so a library remembered before stays remembered.
+#[cfg(target_os = "macos")]
+pub fn unlock(root: &Path, reason: &str) -> Result<[u8; 32], String> {
+    let old_file = key_file(root)?;
+    if !in_keychain(root) && !old_file.is_file() {
+        return Err("this folder is not remembered on this computer".into());
+    }
+    authenticate(reason)?;
+    if old_file.is_file() {
+        let key = read_key_file(&old_file)?;
+        // The move into the Keychain failing is no reason to keep the user out: the file stays, and
+        // the move is tried again next time.
+        if let Err(e) = remember(root, &key) {
+            eprintln!("[quick unlock] {e}");
+        }
+        return Ok(key);
+    }
+    if !in_service(KEYCHAIN_SERVICE, root) {
+        let stored = security_framework::passwords::get_generic_password(crate::formerly::KEYCHAIN_SERVICE, &root_name(root)).map_err(|e| format!("could not read the key from the Keychain: {e}"))?;
+        let key = decode_key(&stored)?;
+        // As with the file: a move that fails is tried again next time.
+        if let Err(e) = remember(root, &key) {
+            eprintln!("[quick unlock] {e}");
+        }
+        return Ok(key);
+    }
+    let stored = security_framework::passwords::get_generic_password(KEYCHAIN_SERVICE, &root_name(root)).map_err(|e| format!("could not read the key from the Keychain: {e}"))?;
+    decode_key(&stored)
 }
 
 /// Confirm the user before storing a key (same prompt as unlocking).
@@ -134,11 +243,11 @@ fn authenticate(reason: &str) -> Result<(), String> {
 fn authenticate(reason: &str) -> Result<(), String> {
     use windows::core::HSTRING;
     use windows::Security::Credentials::UI::{UserConsentVerificationResult, UserConsentVerifier, UserConsentVerifierAvailability};
-    let avail = UserConsentVerifier::CheckAvailabilityAsync().map_err(|e| e.to_string())?.get().map_err(|e| e.to_string())?;
+    let avail = UserConsentVerifier::CheckAvailabilityAsync().map_err(|e| e.to_string())?.join().map_err(|e| e.to_string())?;
     if avail != UserConsentVerifierAvailability::Available {
         return Err("Windows Hello is not set up on this computer".into());
     }
-    let res = UserConsentVerifier::RequestVerificationAsync(&HSTRING::from(reason)).map_err(|e| e.to_string())?.get().map_err(|e| e.to_string())?;
+    let res = UserConsentVerifier::RequestVerificationAsync(&HSTRING::from(reason)).map_err(|e| e.to_string())?.join().map_err(|e| e.to_string())?;
     if res == UserConsentVerificationResult::Verified {
         Ok(())
     } else {

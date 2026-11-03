@@ -211,6 +211,7 @@ export function VaultDialog() {
               <Warning /> Without the passphrase or the recovery code the files are gone for good. There is no other way in, by design.
             </p>
           </div>
+          {v?.format === "msdos" && <Fat32Note />}
           <div className="row">
             <input className="input grow" type="password" placeholder="Passphrase (12+ characters, or four random words)" value={pass} onChange={(e) => setPass(e.target.value)} />
             <input className="input grow" type="password" placeholder="Repeat" value={pass2} onChange={(e) => setPass2(e.target.value)} />
@@ -240,7 +241,14 @@ export function VaultDialog() {
               </span>
               <span className="label">Recovery code</span>
               <span>{v.hasRecovery ? "set" : "none"}</span>
+              {v.format && (
+                <>
+                  <span className="label">Drive format</span>
+                  <span>{FORMATS[v.format] ?? v.format}</span>
+                </>
+              )}
             </div>
+            {v.format === "msdos" && <Fat32Note />}
             {v.plaintextFiles > 0 && (
               <div className="row" style={{ marginTop: 8 }}>
                 <button className="btn primary" disabled={busy} onClick={() => void encryptAll()}>
@@ -339,5 +347,21 @@ export function VaultDialog() {
         </>
       )}
     </Modal>
+  );
+}
+
+/** The drive formats as people know them. */
+const FORMATS: Record<string, string> = { msdos: "FAT32", exfat: "exFAT", apfs: "APFS", hfs: "Mac OS Extended" };
+
+/** What a FAT32 drive means for a vault. */
+function Fat32Note() {
+  return (
+    <div className="verdict unknown">
+      <p className="small">
+        <Warning /> This drive is FAT32. It stores no file of 4 GB or more, and an encrypted video close to that won't fit. It also looks
+        for a file in a folder one entry at a time, so a big library is slow on it. A drive formatted exFAT, or APFS if it stays with
+        Macs, suits a vault better. Formatting erases the drive: copy the library elsewhere first (Backup).
+      </p>
+    </div>
   );
 }

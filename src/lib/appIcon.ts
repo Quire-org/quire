@@ -11,8 +11,6 @@ import { api } from "./api";
 export const ICON_SLOTS = {
   bg: "--bg-2",
   ink: "--accent",
-  dim: "--fg-faint",
-  dot: "--accent-2",
 } as const;
 
 export type IconColors = Record<keyof typeof ICON_SLOTS, string>;

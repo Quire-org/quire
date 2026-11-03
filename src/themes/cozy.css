@@ -1,5 +1,7 @@
 /* Cozy: warm cream, dusty rose and sage. Soft corners, no decorations. */
 [data-theme="cozy"] {
+  /* The dusty rose as text and icons: deeper than the accent itself, to be read on the light page (4.5:1 or more). */
+  --accent-text: #8a504a;
   --bg: #f3ece3;
   --bg-2: #fbf7f1;
   --bg-3: #ebe2d6;
@@ -56,7 +58,7 @@
 }
 [data-theme="cozy"] .brand {
   color: var(--accent-2);
-  letter-spacing: 0.08em;
+  --brand-tracking: 0.08em;
 }
 [data-theme="cozy"] .panel,
 [data-theme="cozy"] .modal {
@@ -93,4 +95,115 @@
 }
 [data-theme="cozy"] .kbd {
   border-radius: 5px;
+}
+
+/* Cozy by night: the same room with the lamps on. Warm browns, the rose and the sage a shade lighter. */
+[data-theme="cozy"][data-mode="dark"] {
+  --accent-text: var(--accent);
+  --bg: #241f1b;
+  --bg-2: #2e2824;
+  --bg-3: #3a322c;
+  --fg: #f1e9df;
+  --fg-dim: #b8aa9a;
+  --fg-faint: #7a6e62;
+  --accent: #e0a69f;
+  --accent-fg: #3b2a28;
+  --accent-2: #8fb8a6;
+  --danger: #e08a78;
+  --ok: #9cc49e;
+  --warn: #e4b878;
+  --border: rgba(241, 233, 223, 0.1);
+  --border-strong: rgba(241, 233, 223, 0.26);
+  --hud-bg: rgba(36, 31, 27, 0.9);
+  --glow: 0 2px 10px rgba(224, 166, 159, 0.3);
+  --glow-strong: 0 4px 18px rgba(224, 166, 159, 0.45);
+}
+[data-theme="cozy"][data-mode="dark"] .btn {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+[data-theme="cozy"][data-mode="dark"] .panel,
+[data-theme="cozy"][data-mode="dark"] .modal {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+[data-theme="cozy"][data-mode="dark"] .stage,
+[data-theme="cozy"][data-mode="dark"] .viewer {
+  background: #1c1815;
+}
+[data-theme="cozy"][data-mode="dark"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Cozy's page: a dotted journal page under lamplight, a sprig of sage drawn in one corner and one of
+ * rose in the other. Quiet enough that the pictures, and the little plant and mug, stay first.
+ */
+[data-theme="cozy"] body {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 260'%3E%3Cg fill='none' stroke='%236f9a8a' stroke-opacity='0.35' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M30 250 L52.7 222.5 L74.7 195 L95.4 167.5 L114.2 140 L130.9 112.5 L145.3 85 L157.4 57.5 L167.6 30'/%3E%3Cellipse cx='49.9' cy='209.8' rx='13' ry='6' transform='rotate(-102.5 49.9 209.8)'/%3E%3Cellipse cx='67.1' cy='222.9' rx='14.4' ry='6' transform='rotate(1.5 67.1 222.9)'/%3E%3Cellipse cx='71.7' cy='182.3' rx='13' ry='5.4' transform='rotate(-103.3 71.7 182.3)'/%3E%3Cellipse cx='86.7' cy='195.1' rx='12' ry='5.4' transform='rotate(0.7 86.7 195.1)'/%3E%3Cellipse cx='92.4' cy='156.6' rx='11.2' ry='4.9' transform='rotate(-105 92.4 156.6)'/%3E%3Cellipse cx='106.5' cy='167.3' rx='11.1' ry='4.9' transform='rotate(-1 106.5 167.3)'/%3E%3Cellipse cx='111.1' cy='130.2' rx='10.3' ry='4.3' transform='rotate(-107.5 111.1 130.2)'/%3E%3Cellipse cx='124.8' cy='139.3' rx='10.6' ry='4.3' transform='rotate(-3.5 124.8 139.3)'/%3E%3Cellipse cx='128.1' cy='105.1' rx='7.9' ry='3.8' transform='rotate(-110.7 128.1 105.1)'/%3E%3Cellipse cx='138.7' cy='111.6' rx='7.8' ry='3.8' transform='rotate(-6.7 138.7 111.6)'/%3E%3Cellipse cx='141.9' cy='77.6' rx='8.2' ry='3.2' transform='rotate(-114.4 141.9 77.6)'/%3E%3Cellipse cx='152.6' cy='83.7' rx='7.4' ry='3.2' transform='rotate(-10.4 152.6 83.7)'/%3E%3Cellipse cx='154.2' cy='51.5' rx='6.8' ry='2.7' transform='rotate(-118.2 154.2 51.5)'/%3E%3Cellipse cx='162.5' cy='56.2' rx='5.3' ry='2.7' transform='rotate(-14.2 162.5 56.2)'/%3E%3Cellipse cx='165' cy='25.8' rx='4.9' ry='2.2' transform='rotate(-121.8 165 25.8)'/%3E%3Cellipse cx='172.7' cy='28.3' rx='5.4' ry='2.2' transform='rotate(-17.8 172.7 28.3)'/%3E%3C/g%3E%3C/svg%3E") left -24px bottom -36px / 250px auto no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 260'%3E%3Cg transform='translate(220 0) scale(-1 1)' fill='none' stroke='%23c08a84' stroke-opacity='0.3' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M30 250 L52.7 222.5 L74.7 195 L95.4 167.5 L114.2 140 L130.9 112.5 L145.3 85 L157.4 57.5 L167.6 30'/%3E%3Cellipse cx='49.5' cy='208.2' rx='14.7' ry='6' transform='rotate(-102.5 49.5 208.2)'/%3E%3Cellipse cx='67.3' cy='222.9' rx='14.6' ry='6' transform='rotate(1.5 67.3 222.9)'/%3E%3Cellipse cx='72' cy='183.7' rx='11.6' ry='5.4' transform='rotate(-103.3 72 183.7)'/%3E%3Cellipse cx='86.3' cy='195.1' rx='11.7' ry='5.4' transform='rotate(0.7 86.3 195.1)'/%3E%3Cellipse cx='92.3' cy='156' rx='11.9' ry='4.9' transform='rotate(-105 92.3 156)'/%3E%3Cellipse cx='107.1' cy='167.3' rx='11.7' ry='4.9' transform='rotate(-1 107.1 167.3)'/%3E%3Cellipse cx='111.1' cy='130.1' rx='10.3' ry='4.3' transform='rotate(-107.5 111.1 130.1)'/%3E%3Cellipse cx='123.8' cy='139.4' rx='9.6' ry='4.3' transform='rotate(-3.5 123.8 139.4)'/%3E%3Cellipse cx='127.8' cy='104.1' rx='9' ry='3.8' transform='rotate(-110.7 127.8 104.1)'/%3E%3Cellipse cx='139.8' cy='111.4' rx='9' ry='3.8' transform='rotate(-6.7 139.8 111.4)'/%3E%3Cellipse cx='142.2' cy='78' rx='7.7' ry='3.2' transform='rotate(-114.4 142.2 78)'/%3E%3Cellipse cx='152' cy='83.8' rx='6.8' ry='3.2' transform='rotate(-10.4 152 83.8)'/%3E%3Cellipse cx='154.6' cy='52.1' rx='6.1' ry='2.7' transform='rotate(-118.2 154.6 52.1)'/%3E%3Cellipse cx='163.3' cy='56' rx='6' ry='2.7' transform='rotate(-14.2 163.3 56)'/%3E%3Cellipse cx='164.7' cy='25.4' rx='5.4' ry='2.2' transform='rotate(-121.8 164.7 25.4)'/%3E%3Cellipse cx='173.3' cy='28.2' rx='6' ry='2.2' transform='rotate(-17.8 173.3 28.2)'/%3E%3C/g%3E%3C/svg%3E") right -18px top 64px / 190px auto no-repeat,
+    radial-gradient(ellipse 55% 45% at 6% 0%, rgba(255, 250, 241, 0.95), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 100% 100%, rgba(216, 154, 147, 0.14), transparent 70%),
+    radial-gradient(circle, rgba(74, 64, 55, 0.085) 1px, transparent 1.6px) 0 0 / 22px 22px,
+    var(--bg);
+}
+/* Cozy in the evening: the lamp warmer and lower, the page dim, and a few fireflies blinking out of step. */
+[data-theme="cozy"][data-mode="dark"] body {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 260'%3E%3Cg fill='none' stroke='%238fb8a6' stroke-opacity='0.22' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M30 250 L52.7 222.5 L74.7 195 L95.4 167.5 L114.2 140 L130.9 112.5 L145.3 85 L157.4 57.5 L167.6 30'/%3E%3Cellipse cx='49.9' cy='209.8' rx='13' ry='6' transform='rotate(-102.5 49.9 209.8)'/%3E%3Cellipse cx='67.1' cy='222.9' rx='14.4' ry='6' transform='rotate(1.5 67.1 222.9)'/%3E%3Cellipse cx='71.7' cy='182.3' rx='13' ry='5.4' transform='rotate(-103.3 71.7 182.3)'/%3E%3Cellipse cx='86.7' cy='195.1' rx='12' ry='5.4' transform='rotate(0.7 86.7 195.1)'/%3E%3Cellipse cx='92.4' cy='156.6' rx='11.2' ry='4.9' transform='rotate(-105 92.4 156.6)'/%3E%3Cellipse cx='106.5' cy='167.3' rx='11.1' ry='4.9' transform='rotate(-1 106.5 167.3)'/%3E%3Cellipse cx='111.1' cy='130.2' rx='10.3' ry='4.3' transform='rotate(-107.5 111.1 130.2)'/%3E%3Cellipse cx='124.8' cy='139.3' rx='10.6' ry='4.3' transform='rotate(-3.5 124.8 139.3)'/%3E%3Cellipse cx='128.1' cy='105.1' rx='7.9' ry='3.8' transform='rotate(-110.7 128.1 105.1)'/%3E%3Cellipse cx='138.7' cy='111.6' rx='7.8' ry='3.8' transform='rotate(-6.7 138.7 111.6)'/%3E%3Cellipse cx='141.9' cy='77.6' rx='8.2' ry='3.2' transform='rotate(-114.4 141.9 77.6)'/%3E%3Cellipse cx='152.6' cy='83.7' rx='7.4' ry='3.2' transform='rotate(-10.4 152.6 83.7)'/%3E%3Cellipse cx='154.2' cy='51.5' rx='6.8' ry='2.7' transform='rotate(-118.2 154.2 51.5)'/%3E%3Cellipse cx='162.5' cy='56.2' rx='5.3' ry='2.7' transform='rotate(-14.2 162.5 56.2)'/%3E%3Cellipse cx='165' cy='25.8' rx='4.9' ry='2.2' transform='rotate(-121.8 165 25.8)'/%3E%3Cellipse cx='172.7' cy='28.3' rx='5.4' ry='2.2' transform='rotate(-17.8 172.7 28.3)'/%3E%3C/g%3E%3C/svg%3E") left -24px bottom -36px / 250px auto no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 260'%3E%3Cg transform='translate(220 0) scale(-1 1)' fill='none' stroke='%23e0a69f' stroke-opacity='0.18' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M30 250 L52.7 222.5 L74.7 195 L95.4 167.5 L114.2 140 L130.9 112.5 L145.3 85 L157.4 57.5 L167.6 30'/%3E%3Cellipse cx='49.5' cy='208.2' rx='14.7' ry='6' transform='rotate(-102.5 49.5 208.2)'/%3E%3Cellipse cx='67.3' cy='222.9' rx='14.6' ry='6' transform='rotate(1.5 67.3 222.9)'/%3E%3Cellipse cx='72' cy='183.7' rx='11.6' ry='5.4' transform='rotate(-103.3 72 183.7)'/%3E%3Cellipse cx='86.3' cy='195.1' rx='11.7' ry='5.4' transform='rotate(0.7 86.3 195.1)'/%3E%3Cellipse cx='92.3' cy='156' rx='11.9' ry='4.9' transform='rotate(-105 92.3 156)'/%3E%3Cellipse cx='107.1' cy='167.3' rx='11.7' ry='4.9' transform='rotate(-1 107.1 167.3)'/%3E%3Cellipse cx='111.1' cy='130.1' rx='10.3' ry='4.3' transform='rotate(-107.5 111.1 130.1)'/%3E%3Cellipse cx='123.8' cy='139.4' rx='9.6' ry='4.3' transform='rotate(-3.5 123.8 139.4)'/%3E%3Cellipse cx='127.8' cy='104.1' rx='9' ry='3.8' transform='rotate(-110.7 127.8 104.1)'/%3E%3Cellipse cx='139.8' cy='111.4' rx='9' ry='3.8' transform='rotate(-6.7 139.8 111.4)'/%3E%3Cellipse cx='142.2' cy='78' rx='7.7' ry='3.2' transform='rotate(-114.4 142.2 78)'/%3E%3Cellipse cx='152' cy='83.8' rx='6.8' ry='3.2' transform='rotate(-10.4 152 83.8)'/%3E%3Cellipse cx='154.6' cy='52.1' rx='6.1' ry='2.7' transform='rotate(-118.2 154.6 52.1)'/%3E%3Cellipse cx='163.3' cy='56' rx='6' ry='2.7' transform='rotate(-14.2 163.3 56)'/%3E%3Cellipse cx='164.7' cy='25.4' rx='5.4' ry='2.2' transform='rotate(-121.8 164.7 25.4)'/%3E%3Cellipse cx='173.3' cy='28.2' rx='6' ry='2.2' transform='rotate(-17.8 173.3 28.2)'/%3E%3C/g%3E%3C/svg%3E") right -18px top 64px / 190px auto no-repeat,
+    radial-gradient(ellipse 50% 45% at 6% 0%, rgba(255, 190, 120, 0.11), transparent 70%),
+    radial-gradient(ellipse 45% 40% at 100% 100%, rgba(224, 166, 159, 0.06), transparent 70%),
+    radial-gradient(circle, rgba(241, 233, 223, 0.05) 1px, transparent 1.6px) 0 0 / 22px 22px,
+    var(--bg);
+}
+[data-theme="cozy"][data-mode="dark"] #root::before,
+[data-theme="cozy"][data-mode="dark"] #root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  animation: cozy-firefly 11s ease-in-out infinite;
+}
+[data-theme="cozy"][data-mode="dark"] #root::before {
+  background:
+    radial-gradient(2.4px 2.4px at 14% 72%, #ffe2a8, transparent),
+    radial-gradient(14px 14px at 14% 72%, rgba(255, 200, 120, 0.22), transparent),
+    radial-gradient(2px 2px at 81% 38%, #ffe2a8, transparent),
+    radial-gradient(12px 12px at 81% 38%, rgba(255, 200, 120, 0.2), transparent),
+    radial-gradient(2.2px 2.2px at 58% 86%, #ffe2a8, transparent),
+    radial-gradient(13px 13px at 58% 86%, rgba(255, 200, 120, 0.2), transparent);
+}
+[data-theme="cozy"][data-mode="dark"] #root::after {
+  animation-duration: 17s;
+  animation-delay: -7s;
+  background:
+    radial-gradient(2.2px 2.2px at 33% 22%, #ffe2a8, transparent),
+    radial-gradient(13px 13px at 33% 22%, rgba(255, 200, 120, 0.2), transparent),
+    radial-gradient(2.4px 2.4px at 92% 78%, #ffe2a8, transparent),
+    radial-gradient(14px 14px at 92% 78%, rgba(255, 200, 120, 0.22), transparent),
+    radial-gradient(2px 2px at 6% 30%, #ffe2a8, transparent),
+    radial-gradient(12px 12px at 6% 30%, rgba(255, 200, 120, 0.18), transparent);
+}
+@keyframes cozy-firefly {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.9;
+  }
+  55% {
+    opacity: 0.6;
+  }
+  70% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="cozy"][data-mode="dark"] #root::before,
+  [data-theme="cozy"][data-mode="dark"] #root::after {
+    animation: none;
+    opacity: 0.5;
+  }
 }

@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<title>Quire</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #ddd; overflow: hidden; }
+  body {
+    font: 15px -apple-system, system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; touch-action: none;
+  }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  video { position: fixed; inset: 0; width: 100vw; height: 100vh; object-fit: contain; background: #000; display: none; }
+  body.vid video { display: block; }
+  #note {
+    position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 24px; text-align: center; color: #aaa;
+  }
+  #note b { color: #eee; font-size: 17px; font-weight: 600; }
+
+  /* Controls, shown on a tap (and while a video is paused): only then do they take touches. */
+  #ctl, #bar { opacity: 0; transition: opacity .2s; pointer-events: none; }
+  body.on #ctl, body.on #bar { opacity: 1; }
+  body.on #ctl button, body.on #track { pointer-events: auto; }
+  #ctl { position: fixed; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: none; justify-content: center; align-items: center; gap: 44px; }
+  body.vid #ctl { display: flex; }
+  #ctl button {
+    width: 58px; height: 58px; border-radius: 50%; border: 2px solid rgba(255,255,255,.85); background: rgba(0,0,0,.5);
+    color: #fff; font: 600 15px -apple-system, system-ui, sans-serif; padding: 0; position: relative; -webkit-tap-highlight-color: transparent;
+  }
+  #ctl button:active { background: rgba(255,255,255,.25); }
+  #pp { width: 78px !important; height: 78px !important; }
+  #pp::before, #pp::after { content: ""; position: absolute; top: 50%; left: 50%; }
+  #pp:not(.playing)::before {
+    margin: -16px 0 0 -9px; border-style: solid; border-width: 16px 0 16px 27px; border-color: transparent transparent transparent #fff;
+  }
+  #pp.playing::before, #pp.playing::after { width: 7px; height: 28px; margin-top: -14px; background: #fff; border-radius: 2px; }
+  #pp.playing::before { margin-left: -12px; }
+  #pp.playing::after { margin-left: 5px; }
+
+  #bar {
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    display: flex; gap: 12px; align-items: center; background: linear-gradient(transparent, rgba(0,0,0,.75));
+    color: #eee; font-size: 13px;
+  }
+  #name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.vid #name { flex: 0 1 30%; }
+  /* The timeline: a tall strip to hit with a thumb, a thin rail to see. */
+  #track { flex: 1; height: 44px; display: none; align-items: center; touch-action: none; }
+  body.vid #track { display: flex; }
+  #rail { width: 100%; height: 4px; border-radius: 2px; background: rgba(255,255,255,.3); position: relative; }
+  #fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 2px; background: #fff; }
+  #knob { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; left: 0; }
+  #time { font-variant-numeric: tabular-nums; display: none; }
+  body.vid #time { display: inline; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<video id="v" playsinline webkit-playsinline preload="metadata" disablepictureinpicture disableremoteplayback x-webkit-airplay="deny" controlslist="nodownload noremoteplayback noplaybackrate"></video>
+<div id="note"><b>Connecting…</b></div>
+<div id="ctl">
+  <button id="back" aria-label="Back 15 seconds">−15</button>
+  <button id="pp" aria-label="Play or pause"></button>
+  <button id="fwd" aria-label="On 15 seconds">+15</button>
+</div>
+<div id="bar"><span id="name"></span><span id="track"><span id="rail"><span id="fill"></span><span id="knob"></span></span></span><span id="time"></span><span id="pos"></span></div>
+<script>
+(() => {
+  // Shown, never kept: pictures are drawn, not offered as images; a video only streams while it is the one
+  // shown (told not to be stored), its player emptied when it changes or the page goes; once it ends, wiped.
+  const base = location.pathname.replace(/\/+$/, "");
+  const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  const ua = navigator.userAgent;
+  const name = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? "iPad" : /iPhone/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android device" : "A browser";
+  const $ = (x) => document.getElementById(x);
+  const c = $("c");
+  const ctx = c.getContext("2d");
+  const note = $("note");
+  const video = $("v");
+  const pp = $("pp");
+  const track = $("track");
+  const fill = $("fill");
+  const knob = $("knob");
+  const time = $("time");
+  const body = document.body;
+  let shown = null; // the picture drawn now (kept only to draw again on turning the device)
+  let seq = null;
+  let state = "";
+  let remote = false;
+  let done = false;
+
+  const say = (title, line) => {
+    note.innerHTML = "";
+    const b = document.createElement("b");
+    b.textContent = title;
+    note.append(b);
+    if (line) {
+      const p = document.createElement("div");
+      p.textContent = line;
+      note.append(p);
+    }
+    note.style.display = "flex";
+  };
+
+  /* ---- controls: shown on a tap, hidden again a moment after while a video plays ---- */
+  let hideTimer = null;
+  const showControls = () => {
+    body.classList.add("on");
+    clearTimeout(hideTimer);
+    if (body.classList.contains("vid") && !video.paused) hideTimer = setTimeout(() => body.classList.remove("on"), 3000);
+  };
+  const hideControls = () => {
+    clearTimeout(hideTimer);
+    if (!body.classList.contains("vid") || !video.paused) body.classList.remove("on");
+  };
+
+  /* ---- the video ---- */
+  // How long it is: its duration, or as far as it can be sought (some streams say Infinity).
+  const length = () => (isFinite(video.duration) && video.duration > 0 ? video.duration : video.seekable.length ? video.seekable.end(video.seekable.length - 1) : 0);
+  // A jump asked for before the video knows its length (an iPhone loads nothing until it plays): done once it does.
+  let pending = null;
+  const jump = (to) => {
+    if (video.readyState >= 1 && length()) {
+      video.currentTime = Math.max(0, Math.min(length() - 0.1, to(length())));
+      paint();
+    } else {
+      pending = to;
+      video.play().catch(() => {});
+    }
+  };
+  video.addEventListener("loadedmetadata", () => {
+    if (pending) {
+      const to = pending;
+      pending = null;
+      jump(to);
+    }
+  });
+  const clock = (t) => (isFinite(t) ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}` : "");
+  const paint = (at) => {
+    const len = length();
+    const f = len ? Math.max(0, Math.min(1, (at ?? video.currentTime) / len)) : 0;
+    fill.style.width = `${f * 100}%`;
+    knob.style.left = `${f * 100}%`;
+    time.textContent = len ? `${clock(at ?? video.currentTime)} / ${clock(len)}` : "";
+  };
+  video.addEventListener("timeupdate", () => !scrubbing && paint());
+  video.addEventListener("durationchange", () => paint());
+  video.addEventListener("play", () => (pp.classList.add("playing"), showControls()));
+  video.addEventListener("pause", () => (pp.classList.remove("playing"), showControls()));
+  video.addEventListener("ended", () => (pp.classList.remove("playing"), showControls()));
+
+  pp.addEventListener("click", (e) => {
+    e.stopPropagation();
+    video.paused ? video.play().catch(() => {}) : video.pause();
+    showControls();
+  });
+  $("back").addEventListener("click", (e) => (e.stopPropagation(), jump(() => video.currentTime - 15), showControls()));
+  $("fwd").addEventListener("click", (e) => (e.stopPropagation(), jump(() => video.currentTime + 15), showControls()));
+
+  // The timeline: press, drag, let go, with a finger or a mouse; the picture follows as it moves.
+  let scrubbing = false;
+  const fraction = (x) => {
+    const r = track.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (x - r.left) / r.width));
+  };
+  track.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    scrubbing = true;
+    track.setPointerCapture?.(e.pointerId);
+    const f = fraction(e.clientX);
+    paint(f * length());
+    jump((len) => f * len);
+    clearTimeout(hideTimer);
+  });
+  track.addEventListener("pointermove", (e) => {
+    if (!scrubbing) return;
+    const f = fraction(e.clientX);
+    paint(f * length());
+    jump((len) => f * len);
+  });
+  const release = () => {
+    if (!scrubbing) return;
+    scrubbing = false;
+    showControls();
+  };
+  track.addEventListener("pointerup", release);
+  track.addEventListener("pointercancel", release);
+
+  // The player emptied: nothing of the video is held any more.
+  const stopVideo = () => {
+    pending = null;
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    body.classList.remove("vid");
+    pp.classList.remove("playing");
+  };
+  const wipe = () => {
+    stopVideo();
+    if (shown) shown.close?.();
+    shown = null;
+    ctx.clearRect(0, 0, c.width, c.height);
+    c.width = c.height = 1;
+    body.classList.remove("on");
+  };
+  const draw = () => {
+    const dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(innerWidth * dpr);
+    c.height = Math.round(innerHeight * dpr);
+    ctx.clearRect(0, 0, c.width, c.height);
+    if (!shown) return;
+    const k = Math.min(c.width / shown.width, c.height / shown.height);
+    const w = shown.width * k;
+    const h = shown.height * k;
+    ctx.drawImage(shown, (c.width - w) / 2, (c.height - h) / 2, w, h);
+  };
+  addEventListener("resize", draw);
+
+  const get = (path) => fetch(`${base}${path}${path.includes("?") ? "&" : "?"}d=${id}`, { cache: "no-store", credentials: "omit" });
+  const post = (path, b) => fetch(`${base}${path}?d=${id}`, { method: "POST", cache: "no-store", credentials: "omit", body: JSON.stringify(b) });
+
+  const end = (title, line) => {
+    done = true;
+    wipe();
+    say(title, line);
+  };
+
+  async function hello() {
+    try {
+      const r = await fetch(`${base}/hello`, { method: "POST", cache: "no-store", credentials: "omit", body: JSON.stringify({ device: id, name }) });
+      const v = await r.json();
+      if (v.state === "denied") return end("Not allowed", "The Mac turned this device down.");
+      if (v.state === "busy") return end("Not now", "Someone else is waiting for the Mac's answer. Try again in a moment.");
+      say("Asked the Mac", "Allow this device on the Mac to see the pictures.");
+      poll();
+    } catch {
+      end("Can't reach the Mac", "It may have stopped showing, or this device isn't on its network.");
+    }
+  }
+
+  async function poll() {
+    if (done) return;
+    try {
+      const r = await get("/state");
+      if (r.status === 410 || r.status === 404) return end("Ended", "The Mac stopped showing.");
+      const v = await r.json();
+      if (v.state === "ended") return end("Ended", "The Mac stopped showing.");
+      if (v.state === "denied") return end("Not allowed", "The Mac turned this device down.");
+      state = v.state;
+      if (v.state === "allowed") {
+        remote = !!v.remote;
+        $("name").textContent = v.name || "";
+        $("pos").textContent = v.total ? `${v.index + 1} / ${v.total}` : "";
+        if (v.seq == null) {
+          wipe();
+          say("Nothing showing", "Open a picture on the Mac.");
+        } else if (v.seq !== seq) {
+          seq = v.seq;
+          if (v.video && v.playable) {
+            wipe();
+            note.style.display = "none";
+            video.src = `${base}/frame/${v.seq}/video?d=${id}`;
+            body.classList.add("vid", "on");
+            paint();
+          } else if (v.video) {
+            wipe();
+            say("A video", "In a format this browser can't play: it plays on the Mac.");
+          } else {
+            const p = await get(`/frame/${v.seq}`);
+            if (p.ok && v.seq === seq) {
+              const bmp = await createImageBitmap(await p.blob());
+              stopVideo();
+              if (shown) shown.close?.();
+              shown = bmp;
+              note.style.display = "none";
+              draw();
+            }
+          }
+        }
+      }
+    } catch {
+      // A moment off the network: tried again.
+    }
+    setTimeout(poll, 700);
+  }
+
+  // Swipe to go on or back (when the Mac lets devices); a tap elsewhere shows or hides the controls.
+  const onControls = (t) => t instanceof Element && !!t.closest("#ctl button, #track");
+  let x0 = null;
+  addEventListener("touchstart", (e) => (x0 = onControls(e.target) ? null : e.touches[0].clientX), { passive: true });
+  addEventListener("touchend", (e) => {
+    if (x0 == null || state !== "allowed") return;
+    const dx = e.changedTouches[0].clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 50) {
+      if (remote) post("/go", { dir: dx < 0 ? 1 : -1 });
+    } else body.classList.contains("on") ? hideControls() : showControls();
+  });
+  // A mouse (a laptop's browser): a click shows or hides them, the arrow keys go, space plays.
+  addEventListener("click", (e) => {
+    if ("ontouchstart" in window || onControls(e.target)) return;
+    body.classList.contains("on") ? hideControls() : showControls();
+  });
+  addEventListener("keydown", (e) => {
+    if (state !== "allowed") return;
+    if (e.key === " " && body.classList.contains("vid")) (video.paused ? video.play() : video.pause()), e.preventDefault();
+    if (!remote) return;
+    if (e.key === "ArrowRight") post("/go", { dir: 1 });
+    if (e.key === "ArrowLeft") post("/go", { dir: -1 });
+  });
+  addEventListener("contextmenu", (e) => e.preventDefault());
+  addEventListener("pagehide", wipe);
+
+  hello();
+})();
+</script>
+</body>
+</html>

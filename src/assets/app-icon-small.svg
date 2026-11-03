@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- The app icon at 16-32 px (see app-icon.svg): the top sheet, its corner turned over, the next sheet's corner beneath. -->
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="{{bg}}"/>
+  <g transform="translate(190.64 190.64) scale(2.51)">
+    <path fill="{{ink}}" fill-opacity="0.7" d="M214 158V214H158Z"/>
+    <path fill="{{ink}}" fill-rule="evenodd" stroke="{{bg}}" stroke-width="8" stroke-linejoin="round" paint-order="stroke" d="M128 42A86 86 0 0 1 214 128V158L158 214H128A86 86 0 0 1 42 128A86 86 0 0 1 128 42ZM84 128a44 44 0 1 0 88 0a44 44 0 1 0 -88 0Z"/>
+    <path fill="{{ink}}" fill-opacity="0.45" stroke="{{bg}}" stroke-width="8" stroke-linejoin="round" paint-order="stroke" d="M158 158H214L158 214Z"/>
+  </g>
+</svg>

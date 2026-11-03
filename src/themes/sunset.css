@@ -1,5 +1,7 @@
 /* Sunset: Cozy's warmer sibling. Peach, apricot and plum, soft gradients. */
 [data-theme="sunset"] {
+  /* The apricot as text and icons: deeper than the accent itself, to be read on the light page (4.5:1 or more). */
+  --accent-text: #9a4f2c;
   --bg: #fbeee4;
   --bg-2: #fff7f1;
   --bg-3: #f6dfd0;
@@ -30,7 +32,12 @@
 }
 [data-theme="sunset"] body {
   font-weight: 600;
-  background: linear-gradient(180deg, #fbeee4 0%, #f9e2d8 100%);
+  /* The travel journal's view: the sun going down behind rolling hills, birds by it, clouds passing. */
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 300' preserveAspectRatio='none'%3E%3Cpath d='M0 300L0 19.7L40 24.8L80 30.8L120 36.7L160 41.9L200 46L240 48.8L280 50.2L320 50.5L360 50.3L400 50L440 50.4L480 52L520 55.4L560 60.7L600 67.9L640 76.8L680 87L720 97.5L760 107.8L800 116.9L840 124.1L880 128.9L920 130.8L960 129.9L1000 126.4L1040 120.7L1080 113.4L1120 105.5L1160 97.5L1200 90.3L1240 84.3L1280 79.9L1320 77L1360 75.4L1400 74.7L1440 74.4L1480 73.8L1520 72.2L1560 69.3L1600 64.7L1600 300z' fill='%23f6d9cd' fill-opacity='1'/%3E%3Cpath d='M0 300L0 112.7L40 115.4L80 117L120 117.7L160 117.9L200 118.2L240 119.1L280 121.1L320 124.4L360 129.3L400 135.5L440 142.7L480 150.4L520 157.9L560 164.5L600 169.7L640 172.8L680 173.6L720 171.9L760 168.1L800 162.4L840 155.5L880 148L920 140.6L960 134L1000 128.5L1040 124.4L1080 121.7L1120 120.3L1160 119.7L1200 119.5L1240 119L1280 117.9L1320 115.7L1360 112.2L1400 107.5L1440 101.8L1480 95.6L1520 89.5L1560 84.1L1600 80.1L1600 300z' fill='%23f0c8c2' fill-opacity='1'/%3E%3Cpath d='M0 300L0 163.4L40 157.7L80 153.9L120 152.1L160 152.3L200 153.9L240 156.5L280 159.4L320 162L360 163.8L400 164.7L440 164.6L480 163.8L520 163L560 162.6L600 163.2L640 165.4L680 169.2L720 174.7L760 181.4L800 188.9L840 196.4L880 203L920 208.2L960 211.4L1000 212.4L1040 211.4L1080 208.7L1120 204.8L1160 200.5L1200 196.4L1240 193.1L1280 190.8L1320 189.5L1360 189.2L1400 189.2L1440 189.1L1480 188.3L1520 186.2L1560 182.7L1600 177.8L1600 300z' fill='%23e6b6bb' fill-opacity='1'/%3E%3C/svg%3E") left bottom / 100% 26vh no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 50'%3E%3Cg fill='none' stroke='%238a4f68' stroke-opacity='.5' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M10 30q6 -4.2 12 0q6 -4.2 12 0'/%3E%3Cpath d='M40 18q5 -3.5 10 0q5 -3.5 10 0'/%3E%3Cpath d='M62 34q4 -2.8 8 0q4 -2.8 8 0'/%3E%3Cpath d='M86 22q4.5 -3.1 9 0q4.5 -3.1 9 0'/%3E%3C/g%3E%3C/svg%3E") right 17% bottom 32vh / 110px auto no-repeat,
+    radial-gradient(circle at 76% 84%, rgba(255, 220, 178, 0.95) 0 58px, rgba(255, 200, 158, 0.4) 60px, transparent 240px),
+    linear-gradient(180deg, #fbeee4 0%, #f9e2d8 100%);
 }
 [data-theme="sunset"] h1,
 [data-theme="sunset"] h2,
@@ -59,7 +66,7 @@
 }
 [data-theme="sunset"] .brand {
   color: var(--accent-2);
-  letter-spacing: 0.06em;
+  --brand-tracking: 0.06em;
 }
 [data-theme="sunset"] .thumb {
   border-radius: var(--radius);
@@ -91,4 +98,86 @@
 }
 [data-theme="sunset"] .deco {
   display: block;
+}
+
+/* Sunset after dark: dusk. Plum skies, the apricot still warm, the gradients turned down. */
+[data-theme="sunset"][data-mode="dark"] {
+  --accent-text: var(--accent);
+  --bg: #2a1b26;
+  --bg-2: #35242f;
+  --bg-3: #442e3b;
+  --fg: #f8e9e2;
+  --fg-dim: #c4a3ad;
+  --fg-faint: #846a74;
+  --accent: #f2a071;
+  --accent-fg: #3a1f16;
+  --accent-2: #d98cab;
+  --danger: #ef7b73;
+  --ok: #9ac894;
+  --warn: #ecbb6a;
+  --border: rgba(248, 233, 226, 0.1);
+  --border-strong: rgba(248, 233, 226, 0.26);
+  --hud-bg: rgba(42, 27, 38, 0.9);
+  --glow: 0 4px 14px rgba(242, 160, 113, 0.3);
+  --glow-strong: 0 6px 22px rgba(242, 160, 113, 0.45);
+}
+[data-theme="sunset"][data-mode="dark"] body {
+  /* Dusk: the sun just gone, the horizon still glowing behind the hills, the first stars out. */
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 300' preserveAspectRatio='none'%3E%3Cpath d='M0 300L0 19.7L40 24.8L80 30.8L120 36.7L160 41.9L200 46L240 48.8L280 50.2L320 50.5L360 50.3L400 50L440 50.4L480 52L520 55.4L560 60.7L600 67.9L640 76.8L680 87L720 97.5L760 107.8L800 116.9L840 124.1L880 128.9L920 130.8L960 129.9L1000 126.4L1040 120.7L1080 113.4L1120 105.5L1160 97.5L1200 90.3L1240 84.3L1280 79.9L1320 77L1360 75.4L1400 74.7L1440 74.4L1480 73.8L1520 72.2L1560 69.3L1600 64.7L1600 300z' fill='%233a2434' fill-opacity='1'/%3E%3Cpath d='M0 300L0 112.7L40 115.4L80 117L120 117.7L160 117.9L200 118.2L240 119.1L280 121.1L320 124.4L360 129.3L400 135.5L440 142.7L480 150.4L520 157.9L560 164.5L600 169.7L640 172.8L680 173.6L720 171.9L760 168.1L800 162.4L840 155.5L880 148L920 140.6L960 134L1000 128.5L1040 124.4L1080 121.7L1120 120.3L1160 119.7L1200 119.5L1240 119L1280 117.9L1320 115.7L1360 112.2L1400 107.5L1440 101.8L1480 95.6L1520 89.5L1560 84.1L1600 80.1L1600 300z' fill='%232e1b2a' fill-opacity='1'/%3E%3Cpath d='M0 300L0 163.4L40 157.7L80 153.9L120 152.1L160 152.3L200 153.9L240 156.5L280 159.4L320 162L360 163.8L400 164.7L440 164.6L480 163.8L520 163L560 162.6L600 163.2L640 165.4L680 169.2L720 174.7L760 181.4L800 188.9L840 196.4L880 203L920 208.2L960 211.4L1000 212.4L1040 211.4L1080 208.7L1120 204.8L1160 200.5L1200 196.4L1240 193.1L1280 190.8L1320 189.5L1360 189.2L1400 189.2L1440 189.1L1480 188.3L1520 186.2L1560 182.7L1600 177.8L1600 300z' fill='%2322141f' fill-opacity='1'/%3E%3C/svg%3E") left bottom / 100% 26vh no-repeat,
+    radial-gradient(ellipse 75% 38% at 72% 82%, rgba(242, 160, 113, 0.32), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='460' height='340' viewBox='0 0 460 340'%3E%3Cg fill='%23fff0e6'%3E%3Ccircle cx='119.1' cy='233' r='0.7' fill-opacity='0.5'/%3E%3Ccircle cx='306.4' cy='295.5' r='0.7' fill-opacity='0.3'/%3E%3Ccircle cx='244.4' cy='72.7' r='0.8' fill-opacity='0.3'/%3E%3Ccircle cx='58.1' cy='232.6' r='0.6' fill-opacity='0.7'/%3E%3Ccircle cx='383.8' cy='28.9' r='0.8' fill-opacity='0.6'/%3E%3Ccircle cx='342.6' cy='322.8' r='0.8' fill-opacity='0.4'/%3E%3Ccircle cx='107.7' cy='305.4' r='1.1' fill-opacity='0.6'/%3E%3Ccircle cx='408.8' cy='217.1' r='0.6' fill-opacity='0.4'/%3E%3Ccircle cx='273.6' cy='215.5' r='0.8' fill-opacity='0.6'/%3E%3Ccircle cx='254.9' cy='254.5' r='0.7' fill-opacity='0.4'/%3E%3Ccircle cx='335.3' cy='182.2' r='0.8' fill-opacity='0.3'/%3E%3Ccircle cx='240.4' cy='86.1' r='1.1' fill-opacity='0.4'/%3E%3Ccircle cx='128.9' cy='302.4' r='1.1' fill-opacity='0.5'/%3E%3Ccircle cx='260.1' cy='301.5' r='0.8' fill-opacity='0.3'/%3E%3Ccircle cx='198' cy='213.9' r='1.1' fill-opacity='0.4'/%3E%3Ccircle cx='330.7' cy='317.2' r='0.6' fill-opacity='0.4'/%3E%3Ccircle cx='229.1' cy='237.4' r='1.1' fill-opacity='0.5'/%3E%3Ccircle cx='73.5' cy='140.6' r='0.8' fill-opacity='0.6'/%3E%3Ccircle cx='369.5' cy='69' r='0.8' fill-opacity='0.5'/%3E%3Ccircle cx='302.2' cy='306.5' r='0.7' fill-opacity='0.6'/%3E%3Ccircle cx='97.4' cy='209.9' r='0.6' fill-opacity='0.4'/%3E%3Ccircle cx='334.7' cy='116.1' r='0.8' fill-opacity='0.3'/%3E%3Ccircle cx='362.2' cy='188.8' r='0.7' fill-opacity='0.3'/%3E%3Ccircle cx='197.4' cy='202.3' r='0.6' fill-opacity='0.7'/%3E%3Ccircle cx='379.7' cy='219.3' r='0.6' fill-opacity='0.3'/%3E%3Ccircle cx='142.9' cy='138.7' r='0.8' fill-opacity='0.5'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 460px 340px,
+    linear-gradient(180deg, #2a1b26 0%, #20141f 100%);
+}
+[data-theme="sunset"][data-mode="dark"] .panel,
+[data-theme="sunset"][data-mode="dark"] .modal {
+  background: linear-gradient(180deg, #38262f, #301f29);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+[data-theme="sunset"][data-mode="dark"] .stage,
+[data-theme="sunset"][data-mode="dark"] .viewer {
+  background: #1e1119;
+}
+[data-theme="sunset"][data-mode="dark"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Clouds drifting across, slowly: a strip twice the screen wide, its clouds repeated, slid by half. */
+[data-theme="sunset"] #root::before {
+  content: "";
+  position: fixed;
+  top: 7vh;
+  left: 0;
+  width: 200vw;
+  height: 28vh;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 13% 30% at 18% 44%, rgba(255, 255, 255, 0.6), transparent 70%),
+    radial-gradient(ellipse 9% 22% at 25% 58%, rgba(255, 255, 255, 0.5), transparent 70%),
+    radial-gradient(ellipse 15% 26% at 62% 30%, rgba(255, 255, 255, 0.5), transparent 70%),
+    radial-gradient(ellipse 8% 18% at 69% 44%, rgba(255, 255, 255, 0.45), transparent 70%);
+  background-size: 50% 100%;
+  background-repeat: repeat-x;
+  animation: sunset-drift 240s linear infinite;
+  will-change: transform;
+}
+[data-theme="sunset"][data-mode="dark"] #root::before {
+  background:
+    radial-gradient(ellipse 13% 30% at 18% 44%, rgba(217, 140, 171, 0.1), transparent 70%),
+    radial-gradient(ellipse 9% 22% at 25% 58%, rgba(217, 140, 171, 0.08), transparent 70%),
+    radial-gradient(ellipse 15% 26% at 62% 30%, rgba(242, 160, 113, 0.08), transparent 70%),
+    radial-gradient(ellipse 8% 18% at 69% 44%, rgba(242, 160, 113, 0.07), transparent 70%);
+  background-size: 50% 100%;
+  background-repeat: repeat-x;
+}
+@keyframes sunset-drift {
+  to {
+    transform: translateX(-100vw);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="sunset"] #root::before {
+    animation: none;
+  }
 }

@@ -1,0 +1,37 @@
+[package]
+name = "quire-engine"
+version = "0.1.0"
+description = "Quire's local engine: its models and plugins' pipelines behind a line-based JSON protocol"
+authors = ["Kile"]
+edition = "2024"
+publish = false
+
+# Koharu (MIT OR Apache-2.0) does the work: text detection, OCR, translation
+# with a local language model, inpainting and lettering. Pinned to one commit;
+# raise `rev` deliberately and re-run the engine's checks.
+[dependencies]
+koharu-config = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+koharu-ml = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+koharu-pipeline = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+koharu-rasterizer = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+koharu-renderer = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+koharu-runtime = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+koharu-scene = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+koharu-translator = { git = "https://github.com/koharu-rs/koharu", rev = "3b862cc78de73424e8713128d6e7919cb32bd300" }
+anyhow = "1.0.104"
+base64 = "0.22.1"
+async-trait = "0.1.92"
+# The installed fonts, the way Koharu's renderer lists them (text.rs letters only with those).
+fontique = "0.12.0"
+image = "0.25.10"
+ort = { version = "2.0.0-rc.15", features = ["coreml"] }
+tokenizers = { version = "0.23.2", default-features = false, features = ["onig"] }
+rustls = { version = "0.23.45", default-features = false, features = ["aws-lc-rs", "std"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["full"] }
+# Plugins' own pipelines, compiled to WebAssembly (wasm.rs): Cranelift-compiled, near-native.
+wasmtime = { version = "50.0.1", default-features = false, features = ["cranelift", "runtime", "std", "cache"] }
+
+[profile.release]
+debug = false

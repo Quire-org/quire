@@ -4,7 +4,10 @@ import { formatTime } from "../lib/format";
 import type { MediaItem } from "../lib/types";
 import { FitImage, useFitSize, type FitMode, type Natural } from "./FitImage";
 import { ScrubPreview } from "./ScrubPreview";
-import { Gauge, Pause, Play, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+import { DeviceMobile, Gauge, Pause, Play, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+import { useCast } from "./Cast";
+import { useOriginalShown } from "../versionsStore";
+import { VideoFaceLayer } from "./FacesInPicture";
 
 export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -22,8 +25,19 @@ export function MediaStage({ item, videoRef, fit = "fit", loop = true, onEnded }
 function ImageStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [item.primary]);
+  // O shows what is underneath: for a version, the picture it was made from.
+  const original = useOriginalShown(item);
+  if (original)
+    return (
+      <>
+        <FitImage src={original} mode={fit} alt={`${item.name}: what it was made from`} zoomable />
+        <span className="stage-original mono" role="status">
+          ORIGINAL <kbd className="kbd">O</kbd>
+        </span>
+      </>
+    );
   if (failed) return <Unavailable item={item} reason="The webview cannot decode this image format." />;
-  return <FitImage src={mediaUrl(item)} mode={fit} alt={item.name} onError={() => setFailed(true)} zoomable />;
+  return <FitImage src={mediaUrl(item)} mode={fit} alt={item.name} onError={() => setFailed(true)} zoomable overlayKey={item.key} />;
 }
 
 function RawStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
@@ -47,7 +61,7 @@ function RawStage({ item, fit }: { item: MediaItem; fit: FitMode }) {
         <div className="stage-loading mono">DECODING RAW PREVIEW…</div>
       </div>
     );
-  return <FitImage src={url} mode={fit} alt={item.name} zoomable />;
+  return <FitImage src={url} mode={fit} alt={item.name} zoomable overlayKey={item.key} />;
 }
 
 function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; videoRef: RefObject<HTMLVideoElement | null>; fit: FitMode; loop: boolean; onEnded?: () => void }) {
@@ -61,6 +75,11 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
   const [hover, setHover] = useState<{ t: number; x: number } | null>(null);
   const [controlsOn, setControlsOn] = useState(true);
   const overControls = useRef(false);
+  // Shown on a phone or tablet (Show on another device): it plays there, not here as well.
+  const elsewhere = useCast((x) => (x.info ? (x.devices.find((d) => d.state === "allowed")?.name ?? null) : null));
+  useEffect(() => {
+    if (elsewhere) videoRef.current?.pause();
+  }, [elsewhere, item.primary, videoRef]);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Controls show on any mouse movement and fade after a moment of stillness.
   const poke = () => {
@@ -111,7 +130,8 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
         className={`stage-media ${size ? "sized" : ""}`}
         style={size ?? undefined}
         src={mediaUrl(item)}
-        autoPlay
+        autoPlay={!elsewhere}
+        preload={elsewhere ? "metadata" : "auto"}
         loop={loop}
         onEnded={onEnded}
         muted={muted}
@@ -132,6 +152,17 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
           if (v) v.paused ? v.play() : v.pause();
         }}
       />
+      {/* Its faces (⇧P), on the frame it is paused on: as large as the video is shown, centred as it is. */}
+      {size && (
+        <div className="video-faces" style={size}>
+          <VideoFaceLayer item={item} time={time} paused={!playing} />
+        </div>
+      )}
+      {elsewhere && (
+        <div className="video-elsewhere panel">
+          <DeviceMobile /> Playing on {elsewhere === "A browser" ? "another device" : `the ${elsewhere}`}
+        </div>
+      )}
       <div
         className={`video-controls panel ${controlsOn ? "visible" : ""}`}
         onMouseEnter={() => {

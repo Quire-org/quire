@@ -64,7 +64,7 @@
 }
 [data-theme="gallery"] .brand {
   color: var(--fg);
-  letter-spacing: 0.3em;
+  --brand-tracking: 0.3em;
   font-weight: 500;
 }
 [data-theme="gallery"] .panel,
@@ -104,4 +104,61 @@
 }
 [data-theme="gallery"] .toast {
   border-left-width: 2px;
+}
+
+/* Gallery after hours: black walls, the same nothing else. The images are still the only colour. */
+[data-theme="gallery"][data-mode="dark"] {
+  --bg: #0f0f0f;
+  --bg-2: #141414;
+  --bg-3: #222222;
+  --fg: #f2f2f2;
+  --fg-dim: #9c9c9c;
+  --fg-faint: #5a5a5a;
+  --accent: #f2f2f2;
+  --accent-fg: #0f0f0f;
+  --accent-2: #9c9c9c;
+  --danger: #e36b5e;
+  --ok: #6fbf8a;
+  --warn: #d9a13d;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.25);
+  --hud-bg: rgba(15, 15, 15, 0.92);
+}
+[data-theme="gallery"][data-mode="dark"] .btn.primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+[data-theme="gallery"][data-mode="dark"] .rating-seg.on {
+  color: var(--bg);
+}
+[data-theme="gallery"][data-mode="dark"] .stage,
+[data-theme="gallery"][data-mode="dark"] .viewer {
+  background: #0f0f0f;
+}
+[data-theme="gallery"][data-mode="dark"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+[data-theme="gallery"][data-mode="dark"] .modal {
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+/*
+ * The gallery's wall, lit: pools of light from spots along the ceiling, the wall a shade darker
+ * between them and toward the floor. No colour of its own; the pictures bring that.
+ */
+[data-theme="gallery"] body {
+  background:
+    radial-gradient(ellipse 14% 52% at 16% 4%, #ffffff 30%, rgba(255, 255, 255, 0) 100%),
+    radial-gradient(ellipse 14% 52% at 50% 4%, #ffffff 30%, rgba(255, 255, 255, 0) 100%),
+    radial-gradient(ellipse 14% 52% at 84% 4%, #ffffff 30%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.03) 100%),
+    #ecebe8;
+}
+/* After hours: the same spots on a dark wall, each a soft cone of light from the ceiling. */
+[data-theme="gallery"][data-mode="dark"] body {
+  background:
+    radial-gradient(ellipse 13% 58% at 16% 3%, rgba(255, 255, 255, 0.1) 25%, transparent 100%),
+    radial-gradient(ellipse 13% 58% at 50% 3%, rgba(255, 255, 255, 0.1) 25%, transparent 100%),
+    radial-gradient(ellipse 13% 58% at 84% 3%, rgba(255, 255, 255, 0.1) 25%, transparent 100%),
+    var(--bg);
 }

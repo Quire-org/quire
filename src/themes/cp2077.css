@@ -69,8 +69,8 @@
 }
 
 [data-theme="cp2077"] .brand {
-  color: var(--accent);
-  text-shadow: 0 0 12px rgba(252, 238, 10, 0.5);
+  color: var(--accent-text);
+  --brand-glow: 0 0 12px rgba(252, 238, 10, 0.5);
 }
 [data-theme="cp2077"] .brand::after {
   content: "_";
@@ -115,4 +115,111 @@
 [data-theme="cp2077"] input[type="checkbox"],
 [data-theme="cp2077"] input[type="range"]::-webkit-slider-thumb {
   clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+}
+
+/* The viewer's version switch: cut corners like the buttons beside it. */
+[data-theme="cp2077"] .vs-flags {
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+
+/*
+ * Night City by day: pale concrete and bleached signage under the same acid yellow and cyan. The
+ * cuts, the glow and the scanlines stay; the lines are thinner on paper than on glass.
+ */
+[data-theme="cp2077"][data-mode="light"] {
+  /* The acid yellow can't be read as text on concrete (1.1:1): text and icons take it deep (5.4:1). */
+  --accent-text: #665c00;
+  --bg: #e9e6dc;
+  --bg-2: #f5f3ec;
+  --bg-3: #dcd8ca;
+  --fg: #14140f;
+  --fg-dim: #5a594f;
+  --fg-faint: #9a9889;
+  --accent: #f2e300;
+  --accent-fg: #0a0a06;
+  --accent-2: #0a9aa8;
+  --danger: #e0003a;
+  --ok: #1f8a4c;
+  --warn: #c76b00;
+  --border: rgba(92, 84, 0, 0.22);
+  --border-strong: rgba(92, 84, 0, 0.6);
+  --hud-bg: rgba(233, 230, 220, 0.86);
+  --glow: 0 0 10px rgba(229, 216, 0, 0.45);
+  --glow-strong: 0 0 18px rgba(229, 216, 0, 0.7), 0 0 2px rgba(120, 110, 0, 0.9);
+  --scanlines:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0px, rgba(0, 0, 0, 0.05) 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.12) 100%);
+  --grain: 0.04;
+}
+[data-theme="cp2077"][data-mode="light"] .hud-top,
+[data-theme="cp2077"][data-mode="light"] .hud-bottom {
+  border-color: rgba(120, 110, 0, 0.45);
+}
+[data-theme="cp2077"][data-mode="light"] .brand {
+  --brand-glow: 0 0 10px rgba(229, 216, 0, 0.7);
+}
+[data-theme="cp2077"][data-mode="light"] .modal {
+  box-shadow: 0 0 0 1px rgba(120, 110, 0, 0.35), 0 30px 80px rgba(20, 20, 15, 0.25);
+}
+
+/*
+ * Night City behind every screen: its skyline across the bottom, a window lit here and there, neon
+ * haze over the towers (red, cyan, a little yellow), and rain, two sheets falling at their own speed.
+ * Bars, panels and the viewer keep their plain ground, so pictures stay what the eye goes to.
+ */
+[data-theme="cp2077"] body {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 260'%3E%3Cpath fill='%2310131b' d='M0 132h60v128h-60zM68 158h81v102h-81zM149 146h74v114h-74zM227 156h77v104h-77zM304 148h42v112h-42zM354 153h66v107h-66zM420 62h45v198h-45zM465 139h76v121h-76zM541 155h80v105h-80zM629 114h43v146h-43zM672 136h75v124h-75zM751 134h66v126h-66zM817 92h76v168h-76zM893 122h46v138h-46zM943 154h46v106h-46zM989 118h79v142h-79zM1076 61h83v199h-83zM1163 54h69v206h-69zM1236 107h59v153h-59zM1295 108h84v152h-84zM1379 94h76v166h-76zM1463 56h61v204h-61zM1528 152h72v108h-72zM87 131h43v27h-43zM559 128h43v27h-43zM1004 86h49v32h-49zM1473 33h41v23h-41zM1547 139h34v13h-34zM441.5 36h2v26h-2zM649.5 88h2v26h-2zM324 122h2v26h-2zM502 113h2v26h-2zM854 66h2v26h-2z'/%3E%3Cpath fill='%230a0c12' d='M0 93h61v167h-61zM69 189h41v71h-41zM118 140h61v120h-61zM183 106h44v154h-44zM235 175h71v85h-71zM314 123h58v137h-58zM380 191h50v69h-50zM430 191h47v69h-47zM477 181h78v79h-78zM555 104h67v156h-67zM622 174h52v86h-52zM674 157h45v103h-45zM723 138h75v122h-75zM802 122h44v138h-44zM846 95h65v165h-65zM919 159h61v101h-61zM988 149h42v111h-42zM1038 186h39v74h-39zM1077 154h49v106h-49zM1126 167h43v93h-43zM1169 210h42v50h-42zM1211 198h70v62h-70zM1285 207h75v53h-75zM1360 132h49v128h-49zM1417 129h45v131h-45zM1466 133h58v127h-58zM1528 195h66v65h-66zM1594 151h6v109h-6zM132 120h32v20h-32zM388 168h34v23h-34zM440 179h27v12h-27zM568 90h40v14h-40zM684 140h24v17h-24zM1227 179h38v19h-38zM1301 195h42v12h-42zM1541 172h39v23h-39zM1383.5 106h2v26h-2zM695.5 131h2v26h-2zM147.5 114h2v26h-2zM452.5 165h2v26h-2zM204 80h2v26h-2z'/%3E%3Cpath fill='%23fcee0a' fill-opacity='0.38' d='M13 148h3v4h-3zM48 175h3v4h-3zM20 184h3v4h-3zM103 208h3v4h-3zM89 217h3v4h-3zM124 195h3v4h-3zM138 195h3v4h-3zM159 249h3v4h-3zM217 116h3v4h-3zM217 125h3v4h-3zM196 206h3v4h-3zM217 251h3v4h-3zM276 194h3v4h-3zM297 212h3v4h-3zM241 221h3v4h-3zM297 221h3v4h-3zM320 214h3v4h-3zM362 214h3v4h-3zM421 201h3v4h-3zM421 219h3v4h-3zM518 191h3v4h-3zM497 227h3v4h-3zM532 227h3v4h-3zM603 186h3v4h-3zM589 222h3v4h-3zM589 231h3v4h-3zM642 238h3v4h-3zM743 175h3v4h-3zM750 184h3v4h-3zM757 184h3v4h-3zM771 202h3v4h-3zM757 220h3v4h-3zM743 238h3v4h-3zM836 141h3v4h-3zM822 195h3v4h-3zM822 204h3v4h-3zM880 105h3v4h-3zM866 132h3v4h-3zM894 132h3v4h-3zM859 168h3v4h-3zM953 223h3v4h-3zM1022 177h3v4h-3zM1015 213h3v4h-3zM1022 213h3v4h-3zM1051 232h3v4h-3zM1090 164h3v4h-3zM1104 227h3v4h-3zM1146 222h3v4h-3zM1153 240h3v4h-3zM1160 240h3v4h-3zM1182 220h3v4h-3zM1203 247h3v4h-3zM1217 208h3v4h-3zM1273 244h3v4h-3zM1366 178h3v4h-3zM1451 157h3v4h-3zM1472 152h3v4h-3zM1500 152h3v4h-3zM1493 197h3v4h-3zM1472 215h3v4h-3zM1507 233h3v4h-3zM1486 251h3v4h-3zM1583 250h3v4h-3z'/%3E%3Cpath fill='%2337ebf3' fill-opacity='0.34' d='M48 166h3v4h-3zM27 220h3v4h-3zM89 217h3v4h-3zM124 204h3v4h-3zM152 231h3v4h-3zM276 239h3v4h-3zM355 223h3v4h-3zM341 241h3v4h-3zM436 210h3v4h-3zM539 245h3v4h-3zM582 150h3v4h-3zM568 168h3v4h-3zM603 195h3v4h-3zM568 204h3v4h-3zM603 249h3v4h-3zM708 194h3v4h-3zM750 148h3v4h-3zM778 229h3v4h-3zM822 132h3v4h-3zM829 186h3v4h-3zM815 222h3v4h-3zM852 105h3v4h-3zM887 177h3v4h-3zM953 187h3v4h-3zM1118 227h3v4h-3zM1132 213h3v4h-3zM1252 235h3v4h-3zM1266 235h3v4h-3zM1298 244h3v4h-3zM1507 188h3v4h-3zM1555 223h3v4h-3z'/%3E%3Cpath fill='%23ff003c' fill-opacity='0.45' d='M34 220h3v4h-3zM362 151h3v4h-3zM436 228h3v4h-3zM457 228h3v4h-3zM785 166h3v4h-3zM852 150h3v4h-3zM880 150h3v4h-3zM1001 195h3v4h-3zM1097 236h3v4h-3zM1146 249h3v4h-3zM1196 229h3v4h-3zM1366 250h3v4h-3zM1541 223h3v4h-3z'/%3E%3C/svg%3E") left bottom / 1600px auto repeat-x,
+    radial-gradient(ellipse 55% 50% at 12% 84%, rgba(255, 0, 60, 0.085), transparent 70%),
+    radial-gradient(ellipse 50% 46% at 88% 82%, rgba(55, 235, 243, 0.07), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 55% 0%, rgba(252, 238, 10, 0.035), transparent 70%),
+    var(--bg);
+}
+/* The rain: a tile of streaks moved down by its own height, over and over, so no edge ever shows. */
+[data-theme="cp2077"] #root::before,
+[data-theme="cp2077"] #root::after {
+  content: "";
+  position: fixed;
+  inset: -240px 0 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'%3E%3Cpath d='M57.1 130.6l-1.8 22.7M57.1 -109.4l-1.8 22.7M144.9 150.2l-1.4 17.2M144.9 -89.8l-1.4 17.2M3.2 201l-1.7 20.7M3.2 -39l-1.7 20.7M56.2 239l-2 24.5M56.2 -1l-2 24.5M200.8 114.3l-2.2 27.5M200.8 -125.7l-2.2 27.5M36.1 152.4l-2.5 31.6M36.1 -87.6l-2.5 31.6M125.6 177.9l-2.2 28.1M125.6 -62.1l-2.2 28.1M15.4 182l-2.1 26.6M15.4 -58l-2.1 26.6M72.3 7.4l-2.5 31.6M72.3 -232.6l-2.5 31.6M113.5 172.5l-2.5 31.8M113.5 -67.5l-2.5 31.8M171.4 221.1l-1.8 23.1M171.4 -18.9l-1.8 23.1M192.2 106.7l-2.6 32.8M192.2 -133.3l-2.6 32.8M210.9 23.4l-1.5 18.4M210.9 -216.6l-1.5 18.4M52.1 231.7l-1.9 23.9M52.1 -8.3l-1.9 23.9M150.4 72.2l-2 25.1M150.4 -167.8l-2 25.1M92.6 84.2l-2.1 26.5M92.6 -155.8l-2.1 26.5M140.2 217l-2.3 28.3M140.2 -23l-2.3 28.3M222.9 205.5l-2.7 33.8M222.9 -34.5l-2.7 33.8' stroke='%23a8f3ff' stroke-opacity='0.55' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 240px 240px;
+  opacity: 0.2;
+  animation: cp-rain 0.8s linear infinite;
+  will-change: transform;
+}
+[data-theme="cp2077"] #root::after {
+  inset: -160px 0 0 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cpath d='M99.7 118.7l-1.1 14.4M99.7 -41.3l-1.1 14.4M150.8 118.4l-1.2 15.4M150.8 -41.6l-1.2 15.4M4.6 74.5l-1.2 15.5M4.6 -85.5l-1.2 15.5M103.8 144.1l-0.7 8.9M103.8 -15.9l-0.7 8.9M75.1 39.5l-1 12.4M75.1 -120.5l-1 12.4M91.8 2.1l-0.8 9.7M91.8 -157.9l-0.8 9.7M44.7 146.6l-1.1 14.1M44.7 -13.4l-1.1 14.1M25.5 127.5l-0.7 9.1M25.5 -32.5l-0.7 9.1M98.8 20.3l-0.6 8M98.8 -139.7l-0.6 8M139.4 33.5l-0.8 9.7M139.4 -126.5l-0.8 9.7M157.2 139.6l-0.8 10.3M157.2 -20.4l-0.8 10.3M153.8 86.3l-1.1 13.4M153.8 -73.7l-1.1 13.4M32.8 150.6l-1.1 13.5M32.8 -9.4l-1.1 13.5M154.7 143l-0.8 10.4M154.7 -17l-0.8 10.4M57.8 26.6l-0.7 9.2M57.8 -133.4l-0.7 9.2M10.4 48.2l-1 12.8M10.4 -111.8l-1 12.8M0.5 108.5l-0.9 10.7M0.5 -51.5l-0.9 10.7M49.6 131l-0.9 11.8M49.6 -29l-0.9 11.8M50.5 77l-1.1 13.6M50.5 -83l-1.1 13.6M9.1 156l-0.7 8.2M9.1 -4l-0.7 8.2M120 135.2l-0.7 8.1M120 -24.8l-0.7 8.1M126 58.6l-1 12.6M126 -101.4l-1 12.6' stroke='%23a8f3ff' stroke-opacity='0.4' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 160px 160px;
+  opacity: 0.14;
+  animation-name: cp-rain-far;
+  animation-duration: 1.1s;
+}
+@keyframes cp-rain {
+  to {
+    transform: translateY(240px);
+  }
+}
+@keyframes cp-rain-far {
+  to {
+    transform: translateY(160px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="cp2077"] #root::before,
+  [data-theme="cp2077"] #root::after {
+    animation: none;
+  }
+}
+/* By day: the skyline in concrete under a pale haze; no rain. */
+[data-theme="cp2077"][data-mode="light"] body {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 260'%3E%3Cpath fill='%23e1ddd1' d='M0 132h60v128h-60zM68 158h81v102h-81zM149 146h74v114h-74zM227 156h77v104h-77zM304 148h42v112h-42zM354 153h66v107h-66zM420 62h45v198h-45zM465 139h76v121h-76zM541 155h80v105h-80zM629 114h43v146h-43zM672 136h75v124h-75zM751 134h66v126h-66zM817 92h76v168h-76zM893 122h46v138h-46zM943 154h46v106h-46zM989 118h79v142h-79zM1076 61h83v199h-83zM1163 54h69v206h-69zM1236 107h59v153h-59zM1295 108h84v152h-84zM1379 94h76v166h-76zM1463 56h61v204h-61zM1528 152h72v108h-72zM87 131h43v27h-43zM559 128h43v27h-43zM1004 86h49v32h-49zM1473 33h41v23h-41zM1547 139h34v13h-34zM441.5 36h2v26h-2zM649.5 88h2v26h-2zM324 122h2v26h-2zM502 113h2v26h-2zM854 66h2v26h-2z'/%3E%3Cpath fill='%23d9d5c8' d='M0 93h61v167h-61zM69 189h41v71h-41zM118 140h61v120h-61zM183 106h44v154h-44zM235 175h71v85h-71zM314 123h58v137h-58zM380 191h50v69h-50zM430 191h47v69h-47zM477 181h78v79h-78zM555 104h67v156h-67zM622 174h52v86h-52zM674 157h45v103h-45zM723 138h75v122h-75zM802 122h44v138h-44zM846 95h65v165h-65zM919 159h61v101h-61zM988 149h42v111h-42zM1038 186h39v74h-39zM1077 154h49v106h-49zM1126 167h43v93h-43zM1169 210h42v50h-42zM1211 198h70v62h-70zM1285 207h75v53h-75zM1360 132h49v128h-49zM1417 129h45v131h-45zM1466 133h58v127h-58zM1528 195h66v65h-66zM1594 151h6v109h-6zM132 120h32v20h-32zM388 168h34v23h-34zM440 179h27v12h-27zM568 90h40v14h-40zM684 140h24v17h-24zM1227 179h38v19h-38zM1301 195h42v12h-42zM1541 172h39v23h-39zM1383.5 106h2v26h-2zM695.5 131h2v26h-2zM147.5 114h2v26h-2zM452.5 165h2v26h-2zM204 80h2v26h-2z'/%3E%3C/svg%3E") left bottom / 1600px auto repeat-x,
+    radial-gradient(ellipse 50% 40% at 85% 100%, rgba(10, 154, 168, 0.08), transparent 70%),
+    radial-gradient(ellipse 60% 45% at 15% 0%, rgba(242, 227, 0, 0.1), transparent 70%),
+    var(--bg);
+}
+[data-theme="cp2077"][data-mode="light"] #root::before,
+[data-theme="cp2077"][data-mode="light"] #root::after {
+  display: none;
 }

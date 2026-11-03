@@ -4,3 +4,14 @@ src-tauri/target
 src-tauri/gen/schemas
 .DS_Store
 *.log
+src-tauri/binaries
+engine/target
+__pycache__/
+e2e/out/
+# Rust build folders, wherever a crate is (they hold absolute paths of the machine that built them)
+target/
+# The example library as opened (npm run example): the app writes into it. And what the app keeps
+# in examples/ or examples/library itself, when either is opened directly.
+examples/.work/
+examples/**/.quire*
+examples/**/.DS_Store

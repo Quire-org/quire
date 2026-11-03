@@ -1,21 +1,31 @@
 {
-  "name": "media-sorter",
+  "name": "quire",
   "private": true,
   "version": "0.1.0",
   "description": "Sort, rate and browse photos and videos on an external volume",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node scripts/sidecar.mjs && vite",
+    "build": "node scripts/sidecar.mjs && tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "icon": "node scripts/app-icon.mjs"
+    "icon": "node scripts/app-icon.mjs",
+    "engine": "node scripts/engine.mjs",
+    "sidecar": "node scripts/sidecar.mjs",
+    "pdfium": "node scripts/pdfium.mjs",
+    "example": "node scripts/example.mjs",
+    "e2e": "node e2e/run.mjs"
   },
   "dependencies": {
+    "@fontsource/bangers": "^5.3.0",
+    "@fontsource/caveat": "^5.3.0",
+    "@fontsource/chakra-petch": "^5.3.0",
     "@fontsource/manrope": "^5.2.5",
     "@fontsource/nunito": "^5.2.5",
     "@fontsource/orbitron": "^5.2.5",
+    "@fontsource/pacifico": "^5.3.0",
+    "@fontsource/permanent-marker": "^5.3.0",
     "@fontsource/quicksand": "^5.2.5",
     "@fontsource/rajdhani": "^5.2.5",
     "@fontsource/share-tech-mono": "^5.2.5",
@@ -23,6 +33,7 @@
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-dialog": "^2.2.1",
     "@tauri-apps/plugin-opener": "^2.2.6",
+    "qrcode-generator": "^1.4.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.0.5"
@@ -33,8 +44,9 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.0",
     "jsdom": "^25.0.1",
+    "playwright-core": "1.64.1",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "vitest": "^2.1.9"
+    "vitest": "^5.0.5"
   }
 }

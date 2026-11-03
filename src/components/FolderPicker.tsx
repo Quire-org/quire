@@ -1,3 +1,4 @@
+import { naturalCompare } from "../lib/format";
 import { useMemo, useState } from "react";
 import type { MediaItem } from "../lib/types";
 import { Modal } from "./Modal";
@@ -38,7 +39,7 @@ export function FolderPicker({
         counts.set(key, (counts.get(key) ?? 0) + 1);
       }
     }
-    const paths = [...counts.keys()].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const paths = [...counts.keys()].sort((a, b) => naturalCompare(a, b));
     const parents = new Set(paths.map((p) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : p ? "" : null)).filter((p): p is string => p !== null));
     return paths.map((path) => ({ path, count: counts.get(path) ?? 0, depth: path ? path.split("/").length : 0, hasChildren: parents.has(path) }));
   }, [items]);

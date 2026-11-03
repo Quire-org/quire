@@ -1,12 +1,12 @@
 [package]
-name = "media-sorter"
+name = "quire"
 version = "0.1.0"
 description = "Sort, rate and browse photos and videos on an external volume"
 authors = ["Kile"]
 edition = "2024"
 
 [lib]
-name = "media_sorter_lib"
+name = "quire_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -15,18 +15,33 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
+kamadak-exif = "0.6"
 tauri-plugin-opener = "2"
+# The app updating itself from its GitHub releases (each signed with the release key).
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 walkdir = "2"
-chacha20poly1305 = { version = "0.10", features = ["stream"] }
-argon2 = "0.5"
 rand = "0.8"
 zeroize = { version = "1", features = ["derive"] }
 hex = "0.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
-thiserror = "2"
-sysinfo = { version = "0.33", default-features = false, features = ["disk"] }
+# PDF albums' pages, drawn by pdfium (loaded at run time: npm run pdfium puts it in binaries/).
+pdfium-render = { version = "0.9.4", default-features = false, features = ["image_025", "thread_safe", "pdfium_latest"] }
+# Disks (drive health) and this computer's memory and chip (which language model suits it).
+sysinfo = { version = "0.33", default-features = false, features = ["disk", "system"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
+semver = "1"
+base64 = "0.22"
+quire-tags = { path = "tags" }
+quire-crypto = { path = "crypto" }
+percent-encoding = "2"
+notify = "8"
+# Showing on another device: a session's own certificate, and TLS for it.
+rcgen = { version = "0.13", default-features = false, features = ["crypto", "ring"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+sha2 = "0.10"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -40,6 +55,33 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString", "NSError", "NSData"] }
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSResponder", "NSImage"] }
 objc2-local-authentication = { version = "0.3", features = ["LAContext", "LAError", "LAPublicDefines"] }
+# Quick unlock's key, as a generic password in the user's Keychain.
+security-framework = "3"
+
+# The tag index and each tag's learning run number-heavy loops: optimised in dev builds too (learning a
+# tag took 4.5 s unoptimised, 0.23 s optimised). Built as one piece (codegen-units = 1): optimised and
+# rebuilt incrementally in many pieces, a piece kept from an earlier build once named symbols the new
+# pieces no longer had, and the app failed to link.
+[profile.dev.package.quire-tags]
+opt-level = 3
+codegen-units = 1
+
+# The vault's cipher and passphrase hashing likewise: unoptimised they encrypted and decrypted at about
+# 4 MB/s (over 400 MB/s optimised), so encrypting crawled and every picture in a vault showed late. The
+# libraries under them are optimised too, the cipher's generic code within the crate itself.
+[profile.dev.package.quire-crypto]
+opt-level = 3
+codegen-units = 1
+[profile.dev.package.chacha20]
+opt-level = 3
+[profile.dev.package.poly1305]
+opt-level = 3
+[profile.dev.package.chacha20poly1305]
+opt-level = 3
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
 
 [profile.release]
 codegen-units = 1

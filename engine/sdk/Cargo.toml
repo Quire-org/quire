@@ -1,0 +1,9 @@
+[package]
+name = "quire-engine-sdk"
+version = "0.1.0"
+description = "What a Quire plugin's pipeline (compiled to WebAssembly, run by the engine) can ask of the engine"
+authors = ["Kile"]
+edition = "2024"
+publish = false
+
+[dependencies]

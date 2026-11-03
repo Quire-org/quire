@@ -1,0 +1,300 @@
+/* Manga: paper white and ink black, screentone shading, hard outlines, a sakura accent. */
+[data-theme="manga"] {
+  /* The sakura as text and icons: deeper than the accent itself, to be read on the light page (4.5:1 or more). */
+  --accent-text: #c41c48;
+  --bg: #f4f1ea;
+  --bg-2: #fffdf8;
+  --bg-3: #e9e4d8;
+  --fg: #16151a;
+  --fg-dim: #4e4b55;
+  --fg-faint: #9a96a3;
+  --accent: #e8577c;
+  --accent-fg: #fffdf8;
+  --accent-2: #3d7ff2;
+  --danger: #d8323c;
+  --ok: #2f9e6d;
+  --warn: #e39b1f;
+  --border: rgba(22, 21, 26, 0.55);
+  --border-strong: #16151a;
+  --hud-bg: rgba(255, 253, 248, 0.94);
+  --font-display: "Nunito", "Rajdhani", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 4px;
+  --clip-btn: none;
+  --clip-panel: none;
+  --glow: 3px 3px 0 #16151a;
+  --glow-strong: 4px 4px 0 #16151a;
+  /* Screentone: a fine dot grid over the page, like printed shading. */
+  --scanlines: radial-gradient(circle at 1px 1px, rgba(22, 21, 26, 0.09) 0.9px, transparent 1.1px);
+  --letter: 0.02em;
+  --grain: 0;
+}
+
+[data-theme="manga"] body::before {
+  background-size: 5px 5px;
+  opacity: 1;
+}
+
+[data-theme="manga"] body {
+  font-weight: 700;
+}
+
+/* Panels are drawn with ink: a hard outline and a dropped shadow, like a comic frame. */
+[data-theme="manga"] .panel,
+[data-theme="manga"] .modal,
+[data-theme="manga"] .pop,
+[data-theme="manga"] .plugin-panel {
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--glow);
+  background: var(--bg-2);
+}
+
+[data-theme="manga"] .btn {
+  border: 2px solid var(--border-strong);
+  background: var(--bg-2);
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 900;
+  box-shadow: 2px 2px 0 var(--border-strong);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+[data-theme="manga"] .btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--border-strong);
+}
+[data-theme="manga"] .btn:active {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--border-strong);
+}
+[data-theme="manga"] .btn.ghost {
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+}
+[data-theme="manga"] .btn.ghost:hover {
+  background: rgba(22, 21, 26, 0.06);
+  transform: none;
+}
+[data-theme="manga"] .btn.active,
+[data-theme="manga"] .btn.primary {
+  background: var(--fg);
+  color: var(--bg-2);
+  border-color: var(--fg);
+}
+[data-theme="manga"] .btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--border-strong);
+  /* Halftone across the accent, like a printed colour. */
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.35) 0.8px, transparent 1px);
+  background-size: 4px 4px;
+}
+[data-theme="manga"] .btn.danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--border-strong);
+}
+
+[data-theme="manga"] h1,
+[data-theme="manga"] h2,
+[data-theme="manga"] h3,
+[data-theme="manga"] .brand {
+  text-transform: uppercase;
+  --brand-tracking: 0.08em;
+  font-weight: 900;
+  font-style: italic;
+}
+[data-theme="manga"] .brand {
+  color: var(--fg);
+  background: var(--accent);
+  padding: 2px 8px;
+  border: 2px solid var(--border-strong);
+  box-shadow: 2px 2px 0 var(--border-strong);
+  transform: skewX(-8deg);
+}
+
+/* Speed lines behind the top bar, the way a panel bursts into action. */
+[data-theme="manga"] .hud-top,
+[data-theme="manga"] .topnav {
+  border-bottom: 2px solid var(--border-strong);
+  background-image: repeating-linear-gradient(90deg, transparent 0 18px, rgba(22, 21, 26, 0.05) 18px 19px);
+}
+[data-theme="manga"] .hud-bottom {
+  border-top: 2px solid var(--border-strong);
+}
+
+[data-theme="manga"] input,
+[data-theme="manga"] select,
+[data-theme="manga"] textarea,
+[data-theme="manga"] .input {
+  border: 2px solid var(--border-strong);
+  background: var(--bg-2);
+  color: var(--fg);
+  border-radius: var(--radius);
+}
+
+[data-theme="manga"] .badge {
+  border: 1.5px solid var(--border-strong);
+  background: var(--bg-2);
+  color: var(--fg);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+[data-theme="manga"] .badge.accent,
+[data-theme="manga"] .badge.accent2 {
+  background: var(--accent-2);
+  color: #fff;
+}
+[data-theme="manga"] .badge.ok {
+  background: var(--ok);
+  color: #fff;
+}
+
+/* Thumbnails framed like panels; the chosen one gets the ink. */
+[data-theme="manga"] .thumb,
+[data-theme="manga"] .tile {
+  border: 2px solid var(--border-strong);
+  box-shadow: 3px 3px 0 var(--border-strong);
+  background: var(--bg-2);
+}
+[data-theme="manga"] .thumb.selected,
+[data-theme="manga"] .tile.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+[data-theme="manga"] .kbd {
+  border: 1.5px solid var(--border-strong);
+  box-shadow: 1px 1px 0 var(--border-strong);
+  background: var(--bg-2);
+  color: var(--fg);
+  border-radius: 3px;
+}
+
+[data-theme="manga"] .progress-bar {
+  border: 2px solid var(--border-strong);
+  background: var(--bg-2);
+  border-radius: 0;
+}
+[data-theme="manga"] .progress-fill {
+  background: var(--accent);
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255, 255, 255, 0.35) 6px 8px);
+}
+
+[data-theme="manga"] .rule {
+  border: 0;
+  border-top: 2px solid var(--border-strong);
+}
+
+[data-theme="manga"] .toast {
+  border: 2px solid var(--border-strong);
+  box-shadow: var(--glow);
+  background: var(--bg-2);
+  color: var(--fg);
+}
+
+/* Overlay highlights and the brush in ink and sakura. */
+[data-theme="manga"] .overlay-outline {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--border-strong);
+}
+[data-theme="manga"] .brush-cursor {
+  border-color: var(--fg);
+}
+
+[data-theme="manga"] ::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+/*
+ * Manga at night: the page inverted the way a printed negative is, white ink on black paper. The
+ * outlines, the dropped shadows and the screentone stay, drawn in white; the sakura glows a little.
+ */
+[data-theme="manga"][data-mode="dark"] {
+  --accent-text: var(--accent);
+  --bg: #141318;
+  --bg-2: #1c1b22;
+  --bg-3: #26242d;
+  --fg: #f1ede4;
+  --fg-dim: #b8b3c2;
+  --fg-faint: #6c6878;
+  --accent: #ef6f91;
+  --accent-fg: #16151a;
+  --accent-2: #6ea3ff;
+  --danger: #ef5560;
+  --ok: #4fc08d;
+  --warn: #f0b03a;
+  --border: rgba(241, 237, 228, 0.5);
+  --border-strong: #f1ede4;
+  --hud-bg: rgba(20, 19, 24, 0.94);
+  --glow: 3px 3px 0 #f1ede4;
+  --glow-strong: 4px 4px 0 #f1ede4;
+  --scanlines: radial-gradient(circle at 1px 1px, rgba(241, 237, 228, 0.08) 0.9px, transparent 1.1px);
+}
+[data-theme="manga"][data-mode="dark"] .btn.ghost:hover {
+  background: rgba(241, 237, 228, 0.08);
+}
+[data-theme="manga"][data-mode="dark"] .brand {
+  color: var(--accent-fg);
+}
+[data-theme="manga"][data-mode="dark"] .hud-top,
+[data-theme="manga"][data-mode="dark"] .topnav {
+  background-image: repeating-linear-gradient(90deg, transparent 0 18px, rgba(241, 237, 228, 0.06) 18px 19px);
+}
+
+/*
+ * Manga's page: focus lines rushing in from the edges toward a clear middle, as a panel does at its
+ * big moment, and sakura petals falling past (the theme's one colour), two sizes at their own pace.
+ */
+[data-theme="manga"] body {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cpath d='M2200 493.5L2200 503L1308.4 499.6zM2198.4 567.7L2197.5 583.9L1230.7 515.4zM2194.2 627.3L2192.5 644.3L1244.9 528.6zM2189.1 674L2187.3 687.8L1234.9 537.4zM2180.5 732.9L2177 752.8L1317 560.1zM2173.5 770.9L2171.8 779.7L1270.6 562.3zM2158.1 839.9L2153.7 857L1404.4 602.5zM2139.5 907.1L2133.4 926.8L1287.4 600.4zM2131.2 933.6L2125.1 951.9L1265.9 602.5zM2099.4 1021.2L2096.1 1029.2L1280.7 628.4zM2085.8 1053.9L2080.9 1065L1234.6 625zM2052.7 1125.1L2042.2 1145.7L1220.5 641.4zM2021.6 1183.9L2014.7 1196L1184.2 643.6zM2001.5 1218.6L1993.9 1231.2L1172.1 648.6zM1960.5 1283.2L1950.4 1297.9L1174.3 669zM1949.7 1298.9L1936.2 1317.9L1250.3 710.2zM1908.4 1355.3L1903.2 1362L1141 674.8zM1861.4 1413L1855.8 1419.4L1127.9 687.3zM1825.7 1452.9L1815.6 1463.6L1254.5 781.6zM1786 1493.9L1779.8 1500L1196.1 765.1zM1740.7 1536.9L1727.2 1548.9L1111 729.2zM1682.4 1586.9L1669 1597.6L1076.1 727.3zM1647.2 1614.6L1637.7 1621.7L1077.6 743.2zM1583.6 1660.1L1576 1665.3L1156.3 850.6zM1546.8 1684.2L1537.2 1690.2L1133.7 852.4zM1501.4 1711.6L1489.5 1718.4L1018.1 751.5zM1450.7 1739.6L1432 1749.2L1053.8 825zM1423.8 1753.4L1403.3 1763.3L1020.4 798.3zM1345.5 1789.4L1332.3 1794.9L1002 819.7zM1270 1818.7L1263.1 1821.2L983.5 842.6zM1226.3 1833.5L1212.1 1838L949.4 814.2zM1195.6 1842.9L1183.2 1846.5L945.5 831.7zM1142.7 1857.4L1134.1 1859.5L935.9 860zM1059.7 1875.7L1038.8 1879.5L877.5 782.7zM1000.1 1885.6L980.4 1888.3L872.6 849.5zM965.4 1890.2L950.8 1891.9L866 883.6zM907.6 1895.9L893.4 1896.9L845.4 916.3zM842.1 1899.4L828.4 1899.7L815.4 902.9zM774 1899.8L751.7 1899.2L787.6 807.4zM735.7 1898.5L711 1897.2L775.9 790.4zM681.4 1895L656.5 1892.6L741.1 913.2zM594.5 1884.8L586.5 1883.6L735.3 782.2zM560 1879.3L542.2 1876.1L709 832.3zM463.7 1859L454.4 1856.7L677.1 822.9zM424.8 1848.8L416.6 1846.5L675.7 791.5zM368.8 1831.9L361 1829.4L620.9 861.4zM324 1816.6L304.3 1809.3L599.5 857.7zM267.2 1794.7L257.9 1790.8L563.4 875.6zM205.2 1767.4L184.4 1757.4L544.1 852.4zM155.1 1742.6L148.1 1739L591.2 763.7zM106.8 1716.4L90.9 1707.1L566.4 766.4zM71.1 1695.3L61.7 1689.5L488.8 833.8zM26.2 1666.7L13.5 1658.2L539.8 755.9zM-44.6 1616.5L-52.7 1610.4L489.9 768.5zM-85.3 1584.6L-98.2 1573.9L399.5 819.9zM-142.8 1534.9L-161.2 1517.9L503.5 711zM-186.6 1493.2L-198.3 1481.5L414.1 753.4zM-218.9 1460.1L-224.5 1454.1L346.8 780.2zM-260.1 1414.4L-268.2 1405L386.6 733.2zM-301 1364.8L-306.4 1357.8L341.7 736.1zM-333.4 1321.8L-342.7 1308.8L373 701.9zM-364.7 1276.9L-374.5 1261.9L431.5 660zM-391.5 1235.1L-397.3 1225.5L275.7 711.6zM-429.7 1169.2L-438.4 1153L285.9 681.8zM-457.8 1114.7L-465.6 1098.6L405.7 625.1zM-478.2 1071.2L-484 1058L276.2 652.3zM-490.6 1042.5L-497.5 1025.8L365.8 618.3zM-514.8 980.8L-519.4 968.2L382.6 599.2zM-538.8 909.6L-540.9 902.4L280.8 603.8zM-556.6 845.9L-561.7 825.3L314.5 579.1zM-562.4 822.2L-566.4 804.9L185.7 593.2zM-582.2 722.4L-585.6 700.5L170.2 563.5zM-585.7 699.3L-587.3 688.2L301.6 546zM-595.7 609.6L-596.5 598.6L330.9 523.1zM-597.2 588.9L-598.5 564.9L345.5 516.5zM-599.9 487.9L-599.6 467.4L291.9 494.6zM-599.1 449.8L-598.5 436L260.8 485.5zM-595 382.4L-594 370.7L322.3 472.1zM-589.8 331.1L-587.9 316.3L332.3 460.8zM-577.6 250.4L-576 241.7L372.5 448zM-567.7 200.8L-565.1 189.5L368.5 436.5zM-553.2 141.2L-550.4 130.6L262.1 404.4zM-547.8 121.2L-544.4 109.2L331 411.5zM-521 36.3L-513.8 16.3L202.6 358.2zM-499 -22.2L-490.2 -43.4L221.6 342.9zM-472.6 -83.4L-469 -91.3L225.2 324.7zM-461.7 -106.7L-453.8 -122.9L367 360.3zM-432.3 -164.3L-421.6 -183.8L359.3 340.2zM-403 -216L-396.8 -226.3L393.8 338.9zM-371.8 -266L-362.3 -280.5L334.7 296.5zM-338.5 -314.8L-330.1 -326.4L419.9 318.5zM-307.4 -356.5L-297 -369.8L433.3 310.4zM-275.4 -396.4L-263.1 -410.9L357.4 253.1zM-236.5 -441L-227.7 -450.7L386.2 249.7zM-188.7 -491.2L-173.8 -505.8L409.3 237.6zM-127.4 -548.8L-119.3 -555.9L414.8 210.2zM-93.7 -577.6L-88 -582.3L481.6 245.2zM-53.5 -609.7L-35.4 -623.5L481 221.6zM-12.5 -640.1L0.9 -649.6L451.8 173.4zM28.9 -668.5L39.1 -675.2L482.4 179.3zM98.2 -711.4L104.5 -715L577.9 245.5zM164.6 -747.5L173.3 -751.9L602.2 241.5zM179.8 -755.1L199.6 -764.7L603.7 232.6zM272.4 -796.8L285.6 -802.1L589.2 153.1zM324.7 -816.8L333.6 -820L619.6 166.7zM370.2 -832.4L381.6 -836L646.9 182.1zM410.4 -844.7L420.4 -847.5L659.7 175.8zM477 -862.2L493.9 -866.1L662.4 106.2zM511.5 -869.9L518.7 -871.4L683.3 129.3zM584.9 -883.4L604.1 -886.2L710.2 100.6zM666.8 -893.6L678.7 -894.7L746.5 113.2zM685.8 -895.3L705.1 -896.8L760.8 154.6zM747.8 -899L768.4 -899.6L785.1 170.5zM813.7 -899.9L830.6 -899.7L808.8 133zM902.8 -896.2L913.2 -895.4L833.6 213.4zM955 -891.4L963.7 -890.4L864.9 125.9zM979.2 -888.5L995.9 -886.2L863.5 189.8zM1075.6 -872.6L1086.1 -870.5L895.4 192.6zM1117.3 -863.6L1139.1 -858.3L921.6 167.1zM1189.4 -844.8L1208.6 -839.1L978.6 103.6zM1222.1 -834.8L1242.8 -828.1L936.8 222.1zM1274.8 -817L1292.2 -810.6L982.1 173.4zM1351.7 -786.7L1373.4 -777.2L1019.7 169.6zM1409.7 -760.3L1421.8 -754.4L997 234.6zM1453.8 -737.9L1475.5 -726.2L1080.7 156.6zM1476.7 -725.6L1497.6 -713.8L1065.8 188.6zM1541.3 -687.7L1562.1 -674.4L1106.5 182.2zM1577 -664.6L1595.7 -651.9L1048.2 258.7zM1640.6 -619.5L1658.2 -606.1L1086.4 252.3zM1679.7 -589.1L1689.3 -581.2L1088.9 266.1zM1712.5 -561.8L1728.5 -547.8L1138.8 243.8zM1775.2 -504.5L1780.8 -499.1L1241.9 201.3zM1803.9 -475.8L1816 -463.2L1132 289.7zM1845.1 -431.6L1856 -419.2L1227.8 251.3zM1892.9 -375L1906.1 -358.2L1277.1 251.8zM1940.1 -312.5L1948.1 -301.1L1177.5 324.3zM1974.6 -261.8L1981.2 -251.5L1231.9 316.9zM1991.2 -235.5L2002.8 -216.4L1200.1 339.8zM2024 -179.6L2035.7 -158L1195.2 358.2zM2050.4 -129.7L2058.4 -113.5L1233 358.4zM2086 -53.4L2088.8 -46.8L1262.4 369.6zM2093.2 -36.2L2099.5 -20.8L1209.6 389.8zM2117.4 26.2L2121 36.3L1373.7 365.5zM2132.1 69.2L2134.9 78L1302.5 394zM2152.5 138.3L2155.1 148.2L1261.6 419.7zM2169.3 208.5L2172.1 221.9L1413.5 415.9zM2179.5 261.3L2183.3 284.6L1291.3 446.7zM2188 316.8L2190.5 337.2L1232.8 464.4zM2193.5 365.6L2194.2 373L1237.9 472.9zM2199.1 450.6L2199.5 464.1L1378.8 488.4z' fill='%2316151a' fill-opacity='0.075'/%3E%3C/svg%3E") center / cover no-repeat,
+    var(--bg);
+}
+[data-theme="manga"] #root::before,
+[data-theme="manga"] #root::after {
+  content: "";
+  position: fixed;
+  inset: -560px 0 0 0;
+  z-index: -1;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='760' viewBox='0 0 760 760'%3E%3Cg fill='%23e8577c' fill-opacity='0.4'%3E%3Cpath transform='translate(347.6 82.4) rotate(332.7) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(385.3 237.3) rotate(66.5) scale(1.4)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(468.3 411.2) rotate(33.9) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(101.7 564.9) rotate(249.6) scale(1.1)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(707.9 733.5) rotate(235.4) scale(1.4)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 560px 560px;
+  animation: manga-petals 38s linear infinite;
+  will-change: transform;
+}
+[data-theme="manga"] #root::after {
+  inset: -360px 0 0 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520' viewBox='0 0 520 520'%3E%3Cg fill='%23e8577c' fill-opacity='0.3'%3E%3Cpath transform='translate(446.9 105.8) rotate(321.3) scale(1.1)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(300.5 188.1) rotate(190.8) scale(1.2)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(124.5 320) rotate(79.6) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(50.9 417.3) rotate(255.6) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 360px 360px;
+  animation-name: manga-petals-far;
+  animation-duration: 47s;
+}
+@keyframes manga-petals {
+  to {
+    transform: translateY(560px);
+  }
+}
+@keyframes manga-petals-far {
+  to {
+    transform: translateY(360px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="manga"] #root::before,
+  [data-theme="manga"] #root::after {
+    animation: none;
+  }
+}
+[data-theme="manga"][data-mode="dark"] body {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' preserveAspectRatio='xMidYMid slice'%3E%3Cpath d='M2200 493.5L2200 503L1308.4 499.6zM2198.4 567.7L2197.5 583.9L1230.7 515.4zM2194.2 627.3L2192.5 644.3L1244.9 528.6zM2189.1 674L2187.3 687.8L1234.9 537.4zM2180.5 732.9L2177 752.8L1317 560.1zM2173.5 770.9L2171.8 779.7L1270.6 562.3zM2158.1 839.9L2153.7 857L1404.4 602.5zM2139.5 907.1L2133.4 926.8L1287.4 600.4zM2131.2 933.6L2125.1 951.9L1265.9 602.5zM2099.4 1021.2L2096.1 1029.2L1280.7 628.4zM2085.8 1053.9L2080.9 1065L1234.6 625zM2052.7 1125.1L2042.2 1145.7L1220.5 641.4zM2021.6 1183.9L2014.7 1196L1184.2 643.6zM2001.5 1218.6L1993.9 1231.2L1172.1 648.6zM1960.5 1283.2L1950.4 1297.9L1174.3 669zM1949.7 1298.9L1936.2 1317.9L1250.3 710.2zM1908.4 1355.3L1903.2 1362L1141 674.8zM1861.4 1413L1855.8 1419.4L1127.9 687.3zM1825.7 1452.9L1815.6 1463.6L1254.5 781.6zM1786 1493.9L1779.8 1500L1196.1 765.1zM1740.7 1536.9L1727.2 1548.9L1111 729.2zM1682.4 1586.9L1669 1597.6L1076.1 727.3zM1647.2 1614.6L1637.7 1621.7L1077.6 743.2zM1583.6 1660.1L1576 1665.3L1156.3 850.6zM1546.8 1684.2L1537.2 1690.2L1133.7 852.4zM1501.4 1711.6L1489.5 1718.4L1018.1 751.5zM1450.7 1739.6L1432 1749.2L1053.8 825zM1423.8 1753.4L1403.3 1763.3L1020.4 798.3zM1345.5 1789.4L1332.3 1794.9L1002 819.7zM1270 1818.7L1263.1 1821.2L983.5 842.6zM1226.3 1833.5L1212.1 1838L949.4 814.2zM1195.6 1842.9L1183.2 1846.5L945.5 831.7zM1142.7 1857.4L1134.1 1859.5L935.9 860zM1059.7 1875.7L1038.8 1879.5L877.5 782.7zM1000.1 1885.6L980.4 1888.3L872.6 849.5zM965.4 1890.2L950.8 1891.9L866 883.6zM907.6 1895.9L893.4 1896.9L845.4 916.3zM842.1 1899.4L828.4 1899.7L815.4 902.9zM774 1899.8L751.7 1899.2L787.6 807.4zM735.7 1898.5L711 1897.2L775.9 790.4zM681.4 1895L656.5 1892.6L741.1 913.2zM594.5 1884.8L586.5 1883.6L735.3 782.2zM560 1879.3L542.2 1876.1L709 832.3zM463.7 1859L454.4 1856.7L677.1 822.9zM424.8 1848.8L416.6 1846.5L675.7 791.5zM368.8 1831.9L361 1829.4L620.9 861.4zM324 1816.6L304.3 1809.3L599.5 857.7zM267.2 1794.7L257.9 1790.8L563.4 875.6zM205.2 1767.4L184.4 1757.4L544.1 852.4zM155.1 1742.6L148.1 1739L591.2 763.7zM106.8 1716.4L90.9 1707.1L566.4 766.4zM71.1 1695.3L61.7 1689.5L488.8 833.8zM26.2 1666.7L13.5 1658.2L539.8 755.9zM-44.6 1616.5L-52.7 1610.4L489.9 768.5zM-85.3 1584.6L-98.2 1573.9L399.5 819.9zM-142.8 1534.9L-161.2 1517.9L503.5 711zM-186.6 1493.2L-198.3 1481.5L414.1 753.4zM-218.9 1460.1L-224.5 1454.1L346.8 780.2zM-260.1 1414.4L-268.2 1405L386.6 733.2zM-301 1364.8L-306.4 1357.8L341.7 736.1zM-333.4 1321.8L-342.7 1308.8L373 701.9zM-364.7 1276.9L-374.5 1261.9L431.5 660zM-391.5 1235.1L-397.3 1225.5L275.7 711.6zM-429.7 1169.2L-438.4 1153L285.9 681.8zM-457.8 1114.7L-465.6 1098.6L405.7 625.1zM-478.2 1071.2L-484 1058L276.2 652.3zM-490.6 1042.5L-497.5 1025.8L365.8 618.3zM-514.8 980.8L-519.4 968.2L382.6 599.2zM-538.8 909.6L-540.9 902.4L280.8 603.8zM-556.6 845.9L-561.7 825.3L314.5 579.1zM-562.4 822.2L-566.4 804.9L185.7 593.2zM-582.2 722.4L-585.6 700.5L170.2 563.5zM-585.7 699.3L-587.3 688.2L301.6 546zM-595.7 609.6L-596.5 598.6L330.9 523.1zM-597.2 588.9L-598.5 564.9L345.5 516.5zM-599.9 487.9L-599.6 467.4L291.9 494.6zM-599.1 449.8L-598.5 436L260.8 485.5zM-595 382.4L-594 370.7L322.3 472.1zM-589.8 331.1L-587.9 316.3L332.3 460.8zM-577.6 250.4L-576 241.7L372.5 448zM-567.7 200.8L-565.1 189.5L368.5 436.5zM-553.2 141.2L-550.4 130.6L262.1 404.4zM-547.8 121.2L-544.4 109.2L331 411.5zM-521 36.3L-513.8 16.3L202.6 358.2zM-499 -22.2L-490.2 -43.4L221.6 342.9zM-472.6 -83.4L-469 -91.3L225.2 324.7zM-461.7 -106.7L-453.8 -122.9L367 360.3zM-432.3 -164.3L-421.6 -183.8L359.3 340.2zM-403 -216L-396.8 -226.3L393.8 338.9zM-371.8 -266L-362.3 -280.5L334.7 296.5zM-338.5 -314.8L-330.1 -326.4L419.9 318.5zM-307.4 -356.5L-297 -369.8L433.3 310.4zM-275.4 -396.4L-263.1 -410.9L357.4 253.1zM-236.5 -441L-227.7 -450.7L386.2 249.7zM-188.7 -491.2L-173.8 -505.8L409.3 237.6zM-127.4 -548.8L-119.3 -555.9L414.8 210.2zM-93.7 -577.6L-88 -582.3L481.6 245.2zM-53.5 -609.7L-35.4 -623.5L481 221.6zM-12.5 -640.1L0.9 -649.6L451.8 173.4zM28.9 -668.5L39.1 -675.2L482.4 179.3zM98.2 -711.4L104.5 -715L577.9 245.5zM164.6 -747.5L173.3 -751.9L602.2 241.5zM179.8 -755.1L199.6 -764.7L603.7 232.6zM272.4 -796.8L285.6 -802.1L589.2 153.1zM324.7 -816.8L333.6 -820L619.6 166.7zM370.2 -832.4L381.6 -836L646.9 182.1zM410.4 -844.7L420.4 -847.5L659.7 175.8zM477 -862.2L493.9 -866.1L662.4 106.2zM511.5 -869.9L518.7 -871.4L683.3 129.3zM584.9 -883.4L604.1 -886.2L710.2 100.6zM666.8 -893.6L678.7 -894.7L746.5 113.2zM685.8 -895.3L705.1 -896.8L760.8 154.6zM747.8 -899L768.4 -899.6L785.1 170.5zM813.7 -899.9L830.6 -899.7L808.8 133zM902.8 -896.2L913.2 -895.4L833.6 213.4zM955 -891.4L963.7 -890.4L864.9 125.9zM979.2 -888.5L995.9 -886.2L863.5 189.8zM1075.6 -872.6L1086.1 -870.5L895.4 192.6zM1117.3 -863.6L1139.1 -858.3L921.6 167.1zM1189.4 -844.8L1208.6 -839.1L978.6 103.6zM1222.1 -834.8L1242.8 -828.1L936.8 222.1zM1274.8 -817L1292.2 -810.6L982.1 173.4zM1351.7 -786.7L1373.4 -777.2L1019.7 169.6zM1409.7 -760.3L1421.8 -754.4L997 234.6zM1453.8 -737.9L1475.5 -726.2L1080.7 156.6zM1476.7 -725.6L1497.6 -713.8L1065.8 188.6zM1541.3 -687.7L1562.1 -674.4L1106.5 182.2zM1577 -664.6L1595.7 -651.9L1048.2 258.7zM1640.6 -619.5L1658.2 -606.1L1086.4 252.3zM1679.7 -589.1L1689.3 -581.2L1088.9 266.1zM1712.5 -561.8L1728.5 -547.8L1138.8 243.8zM1775.2 -504.5L1780.8 -499.1L1241.9 201.3zM1803.9 -475.8L1816 -463.2L1132 289.7zM1845.1 -431.6L1856 -419.2L1227.8 251.3zM1892.9 -375L1906.1 -358.2L1277.1 251.8zM1940.1 -312.5L1948.1 -301.1L1177.5 324.3zM1974.6 -261.8L1981.2 -251.5L1231.9 316.9zM1991.2 -235.5L2002.8 -216.4L1200.1 339.8zM2024 -179.6L2035.7 -158L1195.2 358.2zM2050.4 -129.7L2058.4 -113.5L1233 358.4zM2086 -53.4L2088.8 -46.8L1262.4 369.6zM2093.2 -36.2L2099.5 -20.8L1209.6 389.8zM2117.4 26.2L2121 36.3L1373.7 365.5zM2132.1 69.2L2134.9 78L1302.5 394zM2152.5 138.3L2155.1 148.2L1261.6 419.7zM2169.3 208.5L2172.1 221.9L1413.5 415.9zM2179.5 261.3L2183.3 284.6L1291.3 446.7zM2188 316.8L2190.5 337.2L1232.8 464.4zM2193.5 365.6L2194.2 373L1237.9 472.9zM2199.1 450.6L2199.5 464.1L1378.8 488.4z' fill='%23f1ede4' fill-opacity='0.06'/%3E%3C/svg%3E") center / cover no-repeat,
+    var(--bg);
+}
+[data-theme="manga"][data-mode="dark"] #root::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='760' height='760' viewBox='0 0 760 760'%3E%3Cg fill='%23ef6f91' fill-opacity='0.45'%3E%3Cpath transform='translate(347.6 82.4) rotate(332.7) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(385.3 237.3) rotate(66.5) scale(1.4)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(468.3 411.2) rotate(33.9) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(101.7 564.9) rotate(249.6) scale(1.1)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(707.9 733.5) rotate(235.4) scale(1.4)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3C/g%3E%3C/svg%3E");
+}
+[data-theme="manga"][data-mode="dark"] #root::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='520' viewBox='0 0 520 520'%3E%3Cg fill='%23ef6f91' fill-opacity='0.34'%3E%3Cpath transform='translate(446.9 105.8) rotate(321.3) scale(1.1)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(300.5 188.1) rotate(190.8) scale(1.2)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(124.5 320) rotate(79.6) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3Cpath transform='translate(50.9 417.3) rotate(255.6) scale(1.3)' d='M0 10C-7 6 -9 -2 -6 -7C-4 -10 -1.5 -10 0 -7C1.5 -10 4 -10 6 -7C9 -2 7 6 0 10Z'/%3E%3C/g%3E%3C/svg%3E");
+}

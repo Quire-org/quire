@@ -20,7 +20,13 @@
   margin: 0;
 }
 .accent-text {
-  color: var(--accent);
+  color: var(--accent-text);
+}
+.warn-text {
+  color: var(--warn);
+}
+.danger-text {
+  color: var(--danger);
 }
 .recent {
   list-style: none;
@@ -95,6 +101,122 @@
   max-height: none;
   flex-shrink: 0;
 }
+/* An album's page turning away over the next one (PageTurn), in the theme's sticker book motion: a
+   leaf hinged at the page's edge, its back blank, fading as it lands; or Night City's glitchy swipe. */
+.page-turn {
+  z-index: 3;
+  pointer-events: none;
+  perspective: 2600px;
+  overflow: visible;
+}
+.page-leaf {
+  position: relative;
+  flex-shrink: 0;
+  animation-fill-mode: both;
+}
+.page-leaf.leaf {
+  transform-style: preserve-3d;
+}
+/* Until its size is known (a frame or so), the page lies fitted where it was, never at its own size. */
+.page-leaf:not(.go) {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.page-leaf:not(.go) > .stage-media {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.page-leaf > .stage-media,
+.page-leaf::after {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.page-leaf-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fg) 7%, var(--bg-2)), var(--bg-2));
+}
+/* The leaf lands fading: its back fades, not the leaf, as a fading leaf would be drawn flat and
+   show the page's face, mirrored, where it lands. */
+.page-leaf.go > .page-leaf-back {
+  animation: leaf-land linear both;
+  animation-duration: inherit;
+}
+@keyframes leaf-land {
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* A shadow sweeping across the page as it turns. */
+.page-leaf.leaf::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.3), transparent 50%);
+  opacity: 0;
+}
+.page-leaf.leaf.to-right::after {
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.3), transparent 50%);
+}
+.page-leaf.leaf.go::after {
+  animation-name: leaf-shade;
+  animation-duration: inherit;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+.page-leaf.leaf.go.to-left {
+  transform-origin: left center;
+  animation-name: page-leaf-left;
+}
+.page-leaf.leaf.go.to-right {
+  transform-origin: right center;
+  animation-name: page-leaf-right;
+}
+@keyframes page-leaf-left {
+  0% {
+    transform: rotateY(0deg);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.7, 0.4);
+  }
+  50% {
+    transform: rotateY(-90deg);
+    animation-timing-function: cubic-bezier(0.3, 0.6, 0.55, 0.95);
+  }
+  100% {
+    transform: rotateY(-180deg);
+  }
+}
+@keyframes page-leaf-right {
+  0% {
+    transform: rotateY(0deg);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.7, 0.4);
+  }
+  50% {
+    transform: rotateY(90deg);
+    animation-timing-function: cubic-bezier(0.3, 0.6, 0.55, 0.95);
+  }
+  100% {
+    transform: rotateY(180deg);
+  }
+}
+.page-leaf.swipe.go {
+  animation-timing-function: cubic-bezier(0.5, 0, 0.3, 1);
+}
+.page-leaf.swipe.go.to-left {
+  animation-name: holo-out-fwd;
+}
+.page-leaf.swipe.go.to-right {
+  animation-name: holo-out-back;
+}
 .preload {
   position: absolute;
   width: 1px;
@@ -113,6 +235,93 @@
 }
 .stage-loading {
   color: var(--accent-2);
+}
+/* Sort's suggestion of a series: over the picture, above the bottom bar, its pictures as small squares. */
+.series-strip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--hud-bottom-h, 130px) + 12px);
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 32px);
+  padding: 8px 10px;
+}
+.series-strip-say {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--accent-2);
+  white-space: nowrap;
+}
+.series-strip-pics {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+}
+.series-mini {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-2);
+  cursor: pointer;
+}
+.series-mini img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.series-mini.current {
+  border-color: var(--accent);
+  cursor: default;
+}
+.series-mini.on {
+  border-color: var(--accent-2);
+}
+.series-mini.off img {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+.series-mini-mark {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 1px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  color: var(--accent-fg);
+  font-size: 10px;
+}
+/* O on an edited picture: what it was made from shows, said so above it. */
+.stage-original {
+  position: absolute;
+  top: calc(var(--hud-top-h, 56px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--accent-2);
+  border-radius: var(--radius);
+  background: var(--hud-bg);
+  color: var(--accent-2);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+.viewer.hud-hidden .stage-original {
+  top: 12px;
 }
 .stage-unavailable .faint {
   word-break: break-all;
@@ -171,26 +380,235 @@
   background: var(--accent);
 }
 
-.info {
-  position: absolute;
-  top: 70px;
-  right: 16px;
-  padding: 14px 16px;
-  min-width: 280px;
-  max-width: 420px;
-  background: var(--hud-bg);
-  backdrop-filter: blur(6px);
-  font-size: 13px;
+/* Info: a popup over the screen, closed with Esc, its close button or a click beside it. The dim
+   is light, so the picture behind stays in view; in the viewer ← and → still turn pages under it. */
+.info-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.info-panel {
+  width: min(560px, 100%);
+  /* viewport units: a percentage would resolve against the centred cell, i.e. nothing */
+  max-height: min(calc(100vh - 48px), 880px);
   display: flex;
   flex-direction: column;
+  background: var(--bg-2);
+}
+.info-head {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 12px 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.info-cover .thumb-meta {
+  display: none;
+}
+.info-title {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.info-title h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* The rating as ten steps: the panel's one signature. */
+.info-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.info-rating-steps {
+  display: inline-grid;
+  grid-template-columns: repeat(10, 9px);
   gap: 2px;
-  word-break: break-all;
 }
-.info .label {
-  margin-top: 8px;
+.info-rating-steps span {
+  height: 8px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
 }
-.info .label:first-child {
-  margin-top: 0;
+.info-rating-steps span.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.info-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 14px 24px;
+}
+.info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+.info-section > h3.label {
+  margin: 0;
+}
+.info-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+}
+.info-row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.info-row dt {
+  color: var(--fg-dim);
+}
+.info-row dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.info-person {
+  gap: 6px;
+  padding: 2px 10px 2px 2px;
+}
+.info-artist {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.info-artist-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.info-artist:hover .info-artist-name > :first-child,
+.info-artist:focus-visible .info-artist-name > :first-child {
+  color: var(--accent-2);
+}
+.info-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* A picture's crossposts, one under the other. */
+.info-sources {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+/* Versions: the kept original's line with Revert at its end; the versions made from a picture. */
+.info-kept {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.info-kept .btn {
+  margin-left: auto;
+}
+.info-versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+/* Folded away: the tagger's suggestions, the fingerprints. */
+.info-more {
+  border-bottom: 1px solid var(--border);
+}
+.info-more > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 0;
+  list-style: none;
+  cursor: pointer;
+}
+.info-more > summary::-webkit-details-marker {
+  display: none;
+}
+.info-more > summary:hover .label,
+.info-more > summary:focus-visible .label {
+  color: var(--accent-2);
+}
+.info-more-caret {
+  color: var(--fg-dim);
+  transition: transform var(--transition);
+}
+.info-more[open] .info-more-caret {
+  transform: rotate(90deg);
+}
+.info-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 14px;
+}
+.info-sub {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.info-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.info-scores li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.info-scores li > .mono {
+  text-align: right;
+}
+.info-score-bar {
+  height: 4px;
+  background: var(--bg-3);
+}
+.info-score-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent-2);
 }
 
 /* HUD */
@@ -275,8 +693,10 @@
   row-gap: 4px;
 }
 .brand {
+  --brand-tracking: 0.14em;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: var(--brand-tracking);
+  text-shadow: var(--brand-glow);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -355,7 +775,7 @@
 }
 .rating-value {
   min-width: 48px;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Targets */
@@ -400,9 +820,13 @@
   display: flex;
   gap: 6px;
 }
+/* As wide as its buttons: the tabs stay centred while both ends fit, and move over when they don't
+   (a job's ring appearing, say) rather than this end breaking onto a second line. */
 .topnav .hud-right {
   flex: 1;
   gap: 6px;
+  flex-wrap: nowrap;
+  min-width: max-content;
 }
 .topnav.collapsed {
   min-height: 0;
@@ -445,9 +869,121 @@
 
 /* ---------- Browse ---------- */
 .browse {
+  position: relative;
   height: 100%;
   display: grid;
   grid-template-columns: 288px 1fr;
+}
+
+/* ---------- Filters: the same on every screen (components/Filters) ---------- */
+.filters-on {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.filters-on > .btn {
+  justify-content: flex-start;
+}
+/* Over the grid, beside the side panel: the grid changes behind it as the filters do. */
+.filters-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 288px;
+  z-index: 20;
+  width: min(380px, calc(100% - 288px));
+  display: flex;
+  flex-direction: column;
+  border-width: 0 1px 0 0;
+  border-radius: 0;
+  clip-path: none;
+  background: var(--bg-2);
+  box-shadow: 12px 0 40px rgba(0, 0, 0, 0.35);
+  animation: filters-in 0.18s ease-out;
+}
+.chrome-hidden .filters-panel {
+  left: 0;
+  width: min(380px, 100%);
+}
+@keyframes filters-in {
+  from {
+    transform: translateX(-12px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .filters-panel {
+    animation: none;
+  }
+}
+.filters-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.filters-head h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: var(--letter);
+}
+.filters-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 16px 24px;
+  display: flex;
+  flex-direction: column;
+}
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.filter:last-child {
+  border-bottom: 0;
+}
+/* A section that filters something: its heading lit. */
+.filter.on > .label {
+  color: var(--accent-text);
+}
+.pick-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pick-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.pick-row:hover,
+.pick-row:focus-visible {
+  background: var(--bg-3);
+  color: var(--fg);
+  outline: none;
+}
+.pick-row.on {
+  border-color: var(--accent);
+  color: var(--fg);
 }
 .browse-side {
   display: flex;
@@ -458,13 +994,6 @@
   border-radius: 0;
   clip-path: none;
   overflow-y: auto;
-}
-.side-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
 }
 .side-list {
   display: flex;
@@ -484,6 +1013,11 @@
 }
 .side-row input[type="range"] {
   flex: 1;
+}
+/* A text field beside a button takes the room left, so the button stays inside the sidebar. */
+.side-row .input {
+  flex: 1;
+  min-width: 0;
 }
 .check {
   color: var(--fg-dim);
@@ -564,7 +1098,44 @@
 .thumb-badges {
   display: flex;
   gap: 4px;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.thumb-label {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An album among single pictures: its cover on a little stack of pages (drawn inside the
+   tile, so a theme's cut corners don't take it), and the Albums icon by its name. */
+/* An album: its cover on the pages behind it, their edges showing on the right as a book's do. */
+.thumb.album .thumb-media img,
+.thumb.album .thumb-media .thumb-ph {
+  width: calc(100% - 8px);
+  height: 100%;
+  z-index: 1;
+  box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.35);
+}
+.thumb.album .thumb-media::before,
+.thumb.album .thumb-media::after {
+  content: "";
+  position: absolute;
+  background: var(--bg-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--bg-2));
+}
+.thumb.album .thumb-media::before {
+  inset: 6px 0 6px 8px;
+}
+.thumb.album .thumb-media::after {
+  inset: 3px 4px 3px 4px;
+}
+.thumb-name svg,
+.file-tile-name svg {
+  margin-right: 4px;
+  vertical-align: -2px;
+  color: var(--accent-text);
 }
 .trash-tile {
   display: flex;
@@ -591,6 +1162,171 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-2);
+}
+/* ---------- Settings: a screen of its own, topics on the left, a page each on the right ---------- */
+.settings-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  background: var(--bg);
+}
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 18px 14px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.settings-nav-head {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: var(--letter);
+  text-transform: uppercase;
+}
+/* Closing it, at the top right of the window. */
+.settings-close {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  z-index: 2;
+}
+.settings-find {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-dim);
+}
+.settings-find .input {
+  flex: 1;
+  min-width: 0;
+}
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-group .btn {
+  justify-content: flex-start;
+  gap: 8px;
+}
+.settings-folder {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.settings-page {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px 40px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.settings-page > * {
+  width: 100%;
+  max-width: 920px;
+}
+.settings-page > h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  letter-spacing: var(--letter);
+}
+/* A dialog shown as the page: its body, without the dialog's frame. */
+.settings-embed {
+  padding: 0;
+  overflow: visible;
+}
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* A page with only a choice or two: big cards in the middle of its room. */
+.settings-cards-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding-bottom: 8vh;
+  text-align: center;
+}
+/* The whole width of the page: centred in its room, not in the column the other pages keep to. */
+.settings-page > .settings-cards-page {
+  max-width: none;
+}
+.settings-card-icon svg {
+  width: 40px;
+  height: 40px;
+}
+.settings-cards-page > p {
+  max-width: 60ch;
+  margin: 0;
+}
+.settings-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+}
+.settings-card {
+  width: 300px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  clip-path: var(--clip-panel);
+  background: var(--bg-2);
+  color: var(--fg);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    transform var(--transition);
+}
+.settings-card b {
+  font-size: 18px;
+  letter-spacing: var(--letter);
+}
+.settings-card-icon {
+  display: grid;
+  place-items: center;
+  font-size: 40px;
+  color: var(--accent-2);
+}
+.settings-card.primary {
+  border-color: var(--accent);
+}
+.settings-card.primary .settings-card-icon {
+  color: var(--accent-text);
+}
+.settings-card:hover,
+.settings-card:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-2));
+  transform: translateY(-2px);
+  outline: none;
 }
 .modal.wide {
   width: min(900px, 100%);
@@ -634,7 +1370,7 @@ section p {
 }
 .target-row {
   display: grid;
-  grid-template-columns: 44px 180px 1fr auto;
+  grid-template-columns: 44px 180px 1fr auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -649,9 +1385,173 @@ section p {
   font-size: 12px;
 }
 .theme-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+/* A theme to pick, drawn in its own look: the swatch carries that theme's data-theme, so every
+   token below (colours, font, radius, cuts, glow, scanlines) is the theme's own, whatever is on. */
+.theme-swatch {
+  position: relative;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+  aspect-ratio: 16 / 11;
+  text-align: left;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-display);
+  letter-spacing: var(--letter);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  clip-path: var(--clip-btn);
+  overflow: hidden;
+  transition:
+    transform var(--transition),
+    box-shadow var(--transition),
+    border-color var(--transition);
+}
+.theme-swatch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--scanlines);
+}
+.theme-swatch:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--glow);
+  border-color: var(--accent);
+}
+.theme-swatch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.theme-swatch.on {
+  border-color: var(--accent);
+  box-shadow:
+    var(--glow-strong),
+    inset 0 0 0 1px var(--accent);
+}
+.theme-swatch .ts-bar {
+  display: flex;
+  align-items: center;
+  gap: 4%;
+  height: 18%;
+  padding: 0 8%;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+.theme-swatch .ts-bar i {
+  display: block;
+  height: 3px;
+  width: 24%;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.theme-swatch .ts-bar i:nth-child(2) {
+  width: 10%;
+  background: var(--accent-2);
+}
+.theme-swatch .ts-bar i:nth-child(3) {
+  width: 16%;
+  margin-left: auto;
+  background: var(--fg-faint);
+}
+.theme-swatch .ts-tiles {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6%;
+  padding: 8% 8% 5%;
+  min-height: 0;
+}
+.theme-swatch .ts-tiles i {
+  display: block;
+  min-height: 0;
+  border-radius: calc(var(--radius) / 2);
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+}
+.theme-swatch .ts-tiles i:nth-child(2),
+.theme-swatch .ts-tiles i:nth-child(4) {
+  background: var(--bg-2);
+}
+.theme-swatch .ts-tiles i:nth-child(3) {
+  /* One rated: the accent on a corner, as a rating sits on a tile. */
+  background: linear-gradient(135deg, var(--accent) 0 40%, var(--bg-3) 40%);
+  border-color: var(--border-strong);
+}
+.theme-swatch .ts-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8% 7%;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.theme-swatch .ts-name svg {
+  flex: none;
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--accent-text);
+}
+.theme-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
+  margin-top: 12px;
+}
+.mode-row {
+  display: inline-flex;
+  gap: 4px;
+}
+/* On the Home: as many across as fit; in a small block the tiles go and the names stay. */
+.home-themes-wrap {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+}
+.home-themes-wrap .mode-row {
+  flex: none;
+  justify-content: flex-end;
+}
+.home-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  align-content: start;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+@container (max-width: 230px) {
+  .home-themes-wrap .mode-label {
+    display: none;
+  }
+  .home-themes .theme-swatch {
+    aspect-ratio: auto;
+  }
+  .home-themes .theme-swatch .ts-tiles {
+    display: none;
+  }
+  .home-themes .theme-swatch .ts-bar {
+    height: 8px;
+  }
+  .home-themes .theme-swatch .ts-name {
+    padding: 8px 10px;
+  }
 }
 .keys {
   display: flex;
@@ -735,6 +1635,12 @@ section p {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.chip > .ellipsis {
+  min-width: 0;
+}
+.chip > :not(.ellipsis) {
+  flex-shrink: 0;
+}
 .browse-side p {
   margin: 0;
   line-height: 1.35;
@@ -774,6 +1680,9 @@ section p {
   gap: 14px;
 }
 .dupe-group {
+  /* Off-screen groups skip layout and paint. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
   padding: 12px 14px 14px;
 }
 .dupe-head {
@@ -794,6 +1703,14 @@ section p {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/* Whole pictures: each at its own shape, never cropped (a turned photo fits inside its box). */
+.dupe-members.whole {
+  align-items: flex-start;
+}
+.dupe-members.whole .thumb-media img,
+.dupe-members.whole .thumb-media video {
+  object-fit: contain;
 }
 .dupe-meta {
   font-size: 12px;
@@ -877,30 +1794,9 @@ section p {
   text-align: right;
 }
 
-/* ---------- Scan pill ---------- */
-.scan-pill {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  width: 280px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--hud-bg);
-  backdrop-filter: blur(8px);
-  z-index: 90;
-  cursor: pointer;
-  border-color: var(--accent-2);
-}
-.viewer ~ .scan-pill {
-  bottom: 150px;
-}
-.scan-pill-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+/* Text that keeps to one line. */
+.nowrap {
+  white-space: nowrap;
 }
 
 /* ---------- Thumb extras ---------- */
@@ -926,6 +1822,26 @@ section p {
   color: var(--ok);
   border-color: var(--ok);
 }
+/* Settings: how loud the sounds are, and hearing the theme's. */
+.sound-volume {
+  gap: 10px;
+  align-items: center;
+}
+.sound-volume input[type="range"] {
+  width: 160px;
+}
+/* The viewer's Plugins menu: names to the left, "open" to the right. */
+.plugin-menu .btn > .grow {
+  text-align: left;
+}
+.badge.warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.badge.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 
 /* ---------- Albums ---------- */
 .album-grid {
@@ -936,7 +1852,14 @@ section p {
   padding: 16px;
   align-content: start;
 }
+/* Stands in for the rows not rendered, above and below the view, so the grid scrolls as if they were. */
+.album-grid-spacer {
+  grid-column: 1 / -1;
+}
 .album-card {
+  /* Off-screen cards skip layout and paint. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -953,13 +1876,14 @@ section p {
 .album-foot .album-name {
   width: 100%;
 }
+/* Open (and plugins' buttons) on the bottom row; the targets to move the album to stack above it. */
 .album-actions {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap-reverse;
   gap: 4px;
   padding: 8px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
@@ -970,6 +1894,11 @@ section p {
 .album-cover:hover .album-actions {
   opacity: 1;
 }
+/* A long target name is cut short inside the card. */
+.album-actions .btn {
+  min-width: 0;
+  max-width: 100%;
+}
 .tile-rating {
   position: absolute;
   top: 6px;
@@ -978,7 +1907,8 @@ section p {
   background: rgba(0, 0, 0, 0.6);
 }
 .album-cover {
-  aspect-ratio: 4 / 3;
+  /* Shaped like an album's pages (and a Scrapbook cover). */
+  aspect-ratio: 1280 / 1817;
   background: var(--bg);
   overflow: hidden;
   cursor: pointer;
@@ -1008,17 +1938,6 @@ section p {
   letter-spacing: 0.06em;
   font-size: 14px;
   min-width: 0;
-}
-.album-rating {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.album-rating .rating-seg {
-  width: 12px;
-  height: 12px;
-  clip-path: none;
-  border-radius: 2px;
 }
 
 .rename-plan {
@@ -1120,20 +2039,8 @@ section p {
 }
 .estimate .big {
   font-size: 20px;
-  color: var(--accent);
+  color: var(--accent-text);
   font-family: var(--font-mono);
-}
-.kv {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 10px;
-  align-items: baseline;
-}
-.kv > span:nth-child(even) {
-  text-align: right;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 /* ---------- Album cover ---------- */
@@ -1230,7 +2137,7 @@ section p {
   background: #000;
 }
 .viewer.immersive ~ .toasts,
-.viewer.immersive ~ .scan-pill {
+.viewer.immersive ~ .task-pills {
   display: none;
 }
 .viewer.cursor-hidden,
@@ -1267,17 +2174,6 @@ section p {
 }
 
 /* ---------- Slideshow ---------- */
-.slideshow-ctl {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-.slide-interval {
-  padding: 3px 4px;
-  min-height: 28px;
-  font-size: 12px;
-  width: 58px;
-}
 .slide-progress {
   position: absolute;
   left: 0;
@@ -1349,6 +2245,7 @@ section p {
   border-bottom: 1px solid var(--border);
 }
 .file-list {
+  position: relative;
   flex: 1;
   overflow-y: auto;
   padding: 6px 8px;
@@ -1375,9 +2272,25 @@ section p {
   color: var(--accent-2);
   flex-shrink: 0;
 }
-.file-name {
-  flex: 1;
+/* A list row is moved by its icon and name; the blank rest of it starts a selection box. */
+.file-grab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
+  margin-right: auto;
+}
+.file-name {
+  min-width: 0;
+}
+/* The box drawn to select files, in the list's own coordinates so it scrolls with it. */
+.file-box {
+  display: none;
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .file-meta {
   min-width: 90px;
@@ -1555,26 +2468,17 @@ section p {
 .sel.open .sel-btn {
   border-color: var(--accent);
 }
+/* Placed by useFloating (floating.ts): fixed, over everything, below or above its button as there is room. */
 .sel-pop {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 4px);
-  min-width: 100%;
-  max-height: 50vh;
+  position: fixed;
+  max-width: min(380px, calc(100vw - 16px));
   overflow-y: auto;
   padding: 4px 0;
-  z-index: 60;
+  z-index: 500;
   background: var(--bg-2);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   clip-path: none;
   white-space: nowrap;
-}
-.topnav .sel-pop,
-.browse-side .sel-pop,
-.modal .sel-pop,
-.hud-top .sel-pop {
-  bottom: auto;
-  top: calc(100% + 4px);
 }
 .sel-opt {
   display: flex;
@@ -1589,7 +2493,7 @@ section p {
   background: var(--bg-3);
 }
 .sel-opt.on {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* ---------- Popover ---------- */
@@ -1598,14 +2502,13 @@ section p {
   display: inline-block;
 }
 .pop {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 8px);
+  position: fixed;
+  max-width: calc(100vw - 16px);
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 60;
+  z-index: 500;
   background: var(--bg-2);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   clip-path: none;
@@ -1682,12 +2585,6 @@ section p {
   padding-right: 4px;
   min-width: 0;
 }
-.hud-top .pop {
-  bottom: auto;
-  top: calc(100% + 8px);
-  left: auto;
-  right: 0;
-}
 .pop-row {
   display: flex;
   align-items: center;
@@ -1697,6 +2594,7 @@ section p {
 
 /* ---------- Files: icon view ---------- */
 .file-icons {
+  position: relative;
   flex: 1;
   overflow-y: auto;
   display: grid;
@@ -1775,6 +2673,79 @@ section p {
   white-space: nowrap;
 }
 
+/* Choosing a folder of the library, as Files shows them (the system's dialog can't see into a vault). */
+.folder-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.folder-browser-head {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.folder-browser-find {
+  width: 220px;
+}
+.folder-browser-new {
+  gap: 8px;
+}
+.folder-browser-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 8px;
+  height: min(52vh, 460px);
+  overflow-y: auto;
+  align-content: start;
+  padding: 2px;
+}
+.folder-browser-empty {
+  grid-column: 1 / -1;
+  padding: 24px 0;
+  text-align: center;
+}
+.folder-card {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.folder-card:focus-visible {
+  outline-color: var(--accent);
+}
+.folder-card-art {
+  height: 102px;
+}
+/* Readable over the pictures. */
+.folder-card-art .tile-count {
+  background: var(--hud-bg);
+}
+/* Up to four pictures from inside: one fills, two side by side, three with the first tall, four in a square. */
+.folder-mosaic {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+}
+.folder-mosaic img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+}
+.folder-mosaic.n2 {
+  grid-template-columns: 1fr 1fr;
+}
+.folder-mosaic.n3,
+.folder-mosaic.n4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.folder-mosaic.n3 img:first-child {
+  grid-row: span 2;
+}
+
 /* ---------- Stat tiles ---------- */
 .stats {
   display: grid;
@@ -1800,7 +2771,7 @@ section p {
   grid-column: 1 / -1;
 }
 .stat.accent .stat-v {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .stat.clickable {
   cursor: pointer;
@@ -1866,4 +2837,7644 @@ section p {
   line-height: 1.4;
   border-top: 1px solid var(--border);
   padding-top: 10px;
+}
+
+/* ---------- Updates ---------- */
+/* Something waiting in Settings › Updates: a dot on the gear and on the page's name. */
+.settings-btn {
+  position: relative;
+}
+.update-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg-2);
+}
+.settings-btn .update-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+}
+.settings-list .update-dot {
+  margin-left: auto;
+}
+.update-notes {
+  white-space: pre-wrap;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+/* ---------- Plugins ---------- */
+.plugin-frames {
+  position: fixed;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+.plugin-frames iframe {
+  width: 1px;
+  height: 1px;
+  border: 0;
+}
+.plugin-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  flex-shrink: 0;
+}
+.reload-btn.good {
+  color: var(--ok);
+}
+.reload-btn.bad {
+  color: var(--warn);
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.overlay-host {
+  position: relative;
+}
+.overlay-host > img {
+  display: block;
+}
+.plugin-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.overlay-box {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2px 3px;
+  line-height: 1.1;
+  overflow: hidden;
+  color: #111;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  font-family: "Nunito", "Rajdhani", system-ui, sans-serif;
+  font-weight: 700;
+  /* Words never break: a word too wide for its box shrinks the text instead. */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  pointer-events: auto;
+}
+.overlay-box.vertical {
+  writing-mode: vertical-rl;
+}
+/* A plugin's image, under every plugin's text. */
+.overlay-image {
+  position: absolute;
+  display: block;
+  z-index: 0;
+  user-select: none;
+}
+.overlay-box {
+  z-index: 1;
+}
+.plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.plugin-empty {
+  padding: 24px;
+  text-align: center;
+  line-height: 1.5;
+}
+.plugin-card {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plugin-card.off {
+  opacity: 0.7;
+}
+.plugin-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* A plugin's logo: its own, its platform's or the plugin mark, all in one square. */
+.plugin-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--accent-2);
+}
+.plugin-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.plugin-title {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.plugin-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.plugin-actions {
+  gap: 6px;
+}
+.plugin-log {
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+}
+.plugin-log .err {
+  color: var(--danger);
+}
+.plugin-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.plugin-setting {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 4px 12px;
+  align-items: center;
+}
+.plugin-setting > .dim {
+  grid-column: 2;
+}
+.plugin-add .input {
+  min-width: 0;
+}
+.plugin-sub {
+  margin-top: 8px;
+  align-items: flex-start;
+}
+.perm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.perm {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.perm.sensitive {
+  border-color: var(--warn);
+}
+.perm-title {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.model-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.model-row.chosen {
+  border-color: var(--accent-2);
+}
+.model-row.needed {
+  border-color: var(--accent);
+}
+.model-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.model-name {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.model-name.pick {
+  cursor: pointer;
+}
+.model-name input {
+  margin-top: 3px;
+}
+.model-name .badge {
+  margin-left: 8px;
+  gap: 4px;
+}
+.model-note {
+  display: block;
+}
+/* What a language model needs, and which suits this computer. */
+.model-need {
+  display: block;
+  margin-top: 2px;
+}
+/* The row's name keeps to one line; what is said under it wraps. */
+.model-note,
+.model-need {
+  white-space: normal;
+}
+.model-advice {
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.model-progress {
+  gap: 10px;
+  align-items: center;
+}
+.perm-chips .badge {
+  text-transform: none;
+}
+/* A plugin asking the reader to mark part of the image (viewer.pickArea). */
+.area-picker {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: crosshair;
+}
+.area-picker svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.area-picker .stroke polyline {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.area-picker .stroke polygon {
+  fill: color-mix(in srgb, var(--accent) 30%, transparent);
+  stroke: none;
+}
+.area-picker .stroke.mode-1 polyline {
+  stroke: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.area-picker .stroke.mode-1 polygon {
+  fill: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.brush-cursor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.plugin-panel {
+  position: fixed;
+  right: 16px;
+  top: var(--panel-top, 118px);
+  bottom: 96px;
+  z-index: 200;
+  width: 236px;
+  max-height: none;
+  height: fit-content;
+  max-height: calc(100vh - var(--panel-top, 118px) - 96px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(8px);
+}
+.plugin-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.plugin-panel-heading {
+  margin-top: 4px;
+}
+.plugin-panel-text {
+  line-height: 1.35;
+}
+.plugin-panel > .btn {
+  justify-content: flex-start;
+}
+.plugin-panel .pick-section {
+  gap: 4px;
+}
+.plugin-panel .label {
+  font-size: 11px;
+}
+.plugin-panel .plugin-panel-text,
+.plugin-panel .dim.small {
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+.plugin-panel .btn.mode-1.active,
+.brush-cursor.mode-1 {
+  border-color: var(--danger);
+}
+.overlay-outline {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  animation: outline-in 0.25s ease-out;
+}
+@keyframes outline-in {
+  from {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+.pick-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pick-section.row {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.pick-section .label {
+  margin: 0;
+}
+.pick-group {
+  flex-wrap: wrap;
+}
+.pick-group .btn {
+  flex: 1 1 auto;
+}
+
+.model-kind + .model-kind {
+  margin-top: 10px;
+}
+.model-store {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.model-store .check {
+  gap: 8px;
+}
+.model-store .mono {
+  max-width: 320px;
+}
+
+.area-picker.eyedropper {
+  cursor: crosshair;
+}
+/* Faces in the picture on show (⇧P): outlined where they are, named under; a drag marks one it missed. */
+.face-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+/* A video's faces: a box as large as the video is shown, centred as the video is (the stage centres it). */
+.video-faces {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+/* The list's crops are too small for a time on them: it is beside the name. */
+.faces-row .face-at {
+  display: none;
+}
+.face-layer.marking {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+.face-box {
+  position: absolute;
+  padding: 0;
+  border: 2px solid color-mix(in srgb, var(--fg) 70%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.face-box.named {
+  border-color: var(--accent);
+}
+.face-box.guess {
+  border-style: dashed;
+  border-color: var(--accent-2);
+}
+.face-box:hover,
+.face-box.picked {
+  border-width: 3px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.face-layer.marking .face-box {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.face-box-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  border: 1px solid var(--border-strong);
+}
+.face-box.named .face-box-label {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+.face-drag {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent-text);
+  pointer-events: none;
+}
+.faces-panel {
+  left: 16px;
+  right: auto;
+  width: 260px;
+}
+.faces-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.faces-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 6px 3px 3px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.faces-row:hover {
+  background: var(--bg-3);
+}
+.faces-row.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-3));
+}
+.faces-naming {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-2);
+}
+.faces-naming .name-field .row {
+  flex-wrap: wrap;
+}
+.faces-present {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.colour-row {
+  gap: 6px;
+}
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 0 0 2px rgba(0, 0, 0, 0.5);
+  flex: none;
+}
+.swatch.none {
+  background: repeating-linear-gradient(45deg, #666 0 4px, #333 4px 8px);
+}
+
+/* ---------------- Tags ---------------- */
+.tags-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  gap: 12px;
+  padding: 12px;
+  height: calc(100vh - 56px);
+  box-sizing: border-box;
+}
+.tags-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.tags-side section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tags-search {
+  gap: 4px;
+  align-items: center;
+}
+.tags-search .input {
+  width: 200px;
+}
+.tags-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.tags-row:hover {
+  background: var(--bg-3);
+}
+.tags-row.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.tags-row .count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.7;
+}
+.tags-row.tag {
+  padding-left: 16px;
+}
+.tags-type {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+.tags-type-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+}
+.tags-type-head .label {
+  margin: 0;
+}
+.tags-type-head .btn {
+  opacity: 0;
+}
+.tags-type:hover .tags-type-head .btn {
+  opacity: 1;
+}
+.tags-grid-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 8px;
+}
+.tags-grid-head {
+  gap: 8px;
+  align-items: center;
+}
+.tags-grid {
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+.tags-grid-rows {
+  width: 100%;
+}
+.tags-tile .thumb {
+  height: 100%;
+}
+.tags-tile {
+  position: relative;
+}
+/* At the foot of the picture, over it: the name bar under it (30px, as in the layout) stays clear.
+   As many tags as fit whole, then "+n" for the rest (measured in a hidden row of them all). */
+.tags-tile-tags {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 36px;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tags-tile-tags .badge {
+  flex: none;
+  white-space: nowrap;
+}
+.tile-tags-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  gap: 4px;
+  visibility: hidden;
+}
+/* Above an album's stack of pages. */
+.thumb.album + .tags-tile-tags {
+  bottom: 44px;
+}
+/* Yes to the suggestions scrolled past, kept at the bottom of the view. */
+.tags-seen-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(560px, calc(100% - 32px));
+  margin: 12px auto 0;
+  padding: 6px 6px 6px 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.tags-empty {
+  grid-column: 1 / -1;
+  padding: 32px;
+  text-align: center;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* One line, as wide as its row at most: a long name inside is cut short (in an .ellipsis span). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-3);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: default;
+}
+button.chip {
+  cursor: pointer;
+}
+button.chip:hover {
+  border-color: var(--accent);
+}
+.chip.partial {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.chip.suggest {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-3));
+}
+.chip.auto {
+  border-style: dashed;
+}
+.chip.auto.mapped {
+  border-style: solid;
+  border-color: var(--accent-2);
+}
+.chip-x {
+  display: inline-flex;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0 0 0 2px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.chip-x:hover {
+  opacity: 1;
+}
+.tags-add {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tags-add .input {
+  width: 100%;
+}
+.index-pill-thumb {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.index-now {
+  align-items: center;
+  gap: 8px;
+}
+.tags-row-x {
+  margin-left: 4px;
+  opacity: 0;
+}
+.tags-row:hover .tags-row-x {
+  opacity: 0.8;
+}
+.tags-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+.tags-overview section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tag-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+.tag-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  cursor: pointer;
+}
+.tag-card:hover {
+  outline: 2px solid var(--accent);
+}
+.tag-card-covers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-3);
+  align-items: center;
+  justify-items: center;
+}
+.tag-card-covers.n0 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tag-card-covers.n1 {
+  grid-template-columns: 1fr;
+}
+.tag-card-covers.n2 {
+  grid-template-rows: 1fr;
+}
+.tag-card-covers.n3 > :first-child {
+  grid-column: 1 / -1;
+}
+.tag-card-covers > * {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.tag-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.tag-card-foot .ellipsis {
+  flex: 1;
+  min-width: 0;
+}
+.tag-card.suggested {
+  border-style: dashed;
+}
+.tag-card-adopt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tag-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 2px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(8px);
+}
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.context-item:hover {
+  background: var(--bg-3);
+}
+.context-item.danger {
+  color: var(--danger);
+}
+.context-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.context-row {
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.context-menu .rule {
+  margin: 4px 0;
+}
+.type-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.type-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.type-card:hover {
+  outline: 2px solid var(--accent);
+}
+.type-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.type-card-head strong {
+  font-size: 15px;
+}
+.type-card-sub {
+  font-size: 12px;
+}
+.tags-tools {
+  gap: 8px;
+  align-items: center;
+}
+.tags-tools input[type="range"] {
+  width: 110px;
+}
+
+.mtile {
+  position: absolute;
+}
+.tile-info {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.mtile:hover .tile-info {
+  opacity: 1;
+}
+/* A series kept together: one tile, the rest of it showing as leaves behind, and how many. */
+.mtile.stacked > .thumb {
+  box-shadow:
+    4px -4px 0 -1px var(--bg-3),
+    4px -4px 0 0 var(--border),
+    8px -8px 0 -1px var(--bg-2),
+    8px -8px 0 0 var(--border);
+}
+.tile-stack {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  background: var(--hud-bg);
+  color: var(--accent-2);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.tag-card-covers > .thumb,
+.tag-card-covers > .thumb .thumb-media,
+.tag-card-covers > .thumb img {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-width: 100%;
+  object-fit: cover;
+}
+.tag-card-covers > .thumb .thumb-media {
+  padding-top: 0 !important;
+  flex: 1;
+}
+.tag-card-covers > .thumb .thumb-meta {
+  display: none;
+}
+.tag-card {
+  min-width: 0;
+}
+.tags-tile .thumb img {
+  object-fit: cover;
+}
+.tags-tile.suggested .thumb {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+.tags-tile-verdict {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  z-index: 2;
+}
+.tags-tile-verdict .btn {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: 0;
+}
+/* The yes/no buttons have the top-right corner: the rating sits under them (a small button is 28px). */
+.tags-tile.suggested .tile-rating {
+  top: 38px;
+}
+/* And the score makes room for the check of a chosen tile. */
+.tags-tile.suggested.selected .tags-tile-score {
+  left: 32px;
+}
+
+.type-card.bundle {
+  border-style: dashed;
+}
+
+.workers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.worker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.index-pill-thumb.small {
+  width: 28px;
+  height: 28px;
+}
+.tags-type-head .tags-type-caret {
+  opacity: 1;
+  padding: 0 2px;
+}
+.tags-tile-score {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  pointer-events: none;
+}
+.tags-bundle-add {
+  min-width: 220px;
+}
+.tags-bundle-add .tags-add {
+  margin: 0;
+}
+
+.index-failed {
+  color: var(--warn, #e0a030);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-filter-pop {
+  position: fixed;
+  z-index: 60;
+  width: 310px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+.tag-filter-list {
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tag-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.tag-filter-row.in {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.tag-filter-row.out {
+  background: color-mix(in srgb, var(--danger, #d04040) 15%, transparent);
+}
+.chip.danger {
+  border-color: var(--danger, #d04040);
+}
+.tag-filter-picked {
+  margin-top: 4px;
+}
+
+.video-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px 2px;
+}
+.vt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vt-name {
+  width: 160px;
+  flex: none;
+}
+.vt-track {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  background: var(--bg-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.vt-bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 2px;
+  background: var(--accent-2);
+}
+.vt-bar.base {
+  background: var(--accent);
+}
+.vt-bar.none {
+  background: var(--border);
+}
+.vt-extra {
+  width: 170px;
+  flex: none;
+  text-align: right;
+}
+.album-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+.album-chooser-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.album-chooser-row:hover {
+  background: var(--bg-2);
+}
+.album-chooser-thumb {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.guess-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.guess-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.guess-covers {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.guess-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.chip.suggest.new {
+  border-style: dashed;
+}
+.tag-make {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.option-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.option-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.video-timeline.big .vt-track {
+  height: 96px;
+  cursor: pointer;
+}
+.video-timeline.big .vt-name {
+  width: 200px;
+}
+.vt-strip {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.vt-strip img {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+.vt-strip.loading {
+  background: repeating-linear-gradient(90deg, transparent 0 8px, rgba(255, 255, 255, 0.06) 8px 16px);
+}
+.video-timeline.big .vt-bar {
+  overflow: hidden;
+  opacity: 0.95;
+}
+.vt-track.ruler {
+  height: 16px !important;
+  background: transparent;
+  overflow: visible;
+}
+.vt-tick {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.album-translated {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.modal.wide:has(.video-timeline.big) {
+  width: min(1500px, 96vw);
+}
+.vt-player {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.vt-player video {
+  width: 100%;
+  max-height: 46vh;
+  background: #000;
+  border-radius: 6px;
+}
+.vt-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  transition: left 0.25s linear;
+}
+.vt-row.current .vt-name {
+  color: var(--accent-text);
+}
+.vt-name.click {
+  cursor: pointer;
+}
+.vt-name.click:hover {
+  text-decoration: underline;
+}
+.tags-adopt-bar {
+  gap: 6px;
+}
+.tags-adopt-bar .input {
+  width: auto;
+}
+
+/* The viewer's switch between an album and its translated version: one flag split corner to corner,
+   the language being read taking most of it; a switch sweeps the glowing seam across, with a glitch. */
+.version-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.version-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.vs-frame {
+  display: block;
+}
+.vs-flags {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 24px;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+.vs-flags > span {
+  position: absolute;
+  inset: 0;
+  transition: filter 0.4s;
+}
+.flag-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.vs-b {
+  clip-path: polygon(80% 0, 100% 0, 100% 100%, 64% 100%);
+  transition:
+    clip-path 0.52s cubic-bezier(0.75, 0, 0.2, 1),
+    filter 0.4s;
+}
+.version-switch[data-state="trans"] .vs-b {
+  clip-path: polygon(36% 0, 100% 0, 100% 100%, 20% 100%);
+}
+/* The other language, greyed: brighter under the pointer, to say it can be picked. */
+.version-switch[data-state="orig"] .vs-b,
+.version-switch[data-state="trans"] .vs-a {
+  filter: grayscale(0.75) brightness(0.7);
+}
+.version-switch[data-state="orig"]:hover .vs-b,
+.version-switch[data-state="trans"]:hover .vs-a {
+  filter: grayscale(0.3) brightness(0.9);
+}
+.vs-seam {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: 72%;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  transform: skewX(-18deg);
+  transition: left 0.52s cubic-bezier(0.75, 0, 0.2, 1);
+}
+.version-switch[data-state="trans"] .vs-seam {
+  left: 28%;
+}
+.version-switch.run-a .vs-frame {
+  animation: vs-glitch-a 0.3s steps(1);
+}
+.version-switch.run-b .vs-frame {
+  animation: vs-glitch-b 0.3s steps(1);
+}
+@keyframes vs-glitch-a {
+  20% {
+    transform: translateX(2px);
+    filter: drop-shadow(-2px 0 var(--accent-2)) drop-shadow(2px 0 var(--danger));
+  }
+  45% {
+    transform: translateX(-2px) skewX(6deg);
+    filter: drop-shadow(2px 0 var(--accent-2)) drop-shadow(-2px 0 var(--danger));
+  }
+  70% {
+    transform: translateX(1px);
+    filter: none;
+  }
+}
+@keyframes vs-glitch-b {
+  20% {
+    transform: translateX(2px);
+    filter: drop-shadow(-2px 0 var(--accent-2)) drop-shadow(2px 0 var(--danger));
+  }
+  45% {
+    transform: translateX(-2px) skewX(6deg);
+    filter: drop-shadow(2px 0 var(--accent-2)) drop-shadow(-2px 0 var(--danger));
+  }
+  70% {
+    transform: translateX(1px);
+    filter: none;
+  }
+}
+.vs-codes {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  color: var(--fg-faint);
+}
+.vs-codes b {
+  font-weight: 400;
+  transition: color 0.3s;
+}
+.version-switch[data-state="orig"] .vs-codes b:first-child,
+.version-switch[data-state="trans"] .vs-codes b:last-child {
+  color: var(--accent-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .version-switch .vs-frame {
+    animation: none !important;
+  }
+  .vs-b,
+  .vs-seam {
+    transition-duration: 0.01s;
+  }
+}
+
+/* Tucked into the cover's top left corner. */
+.album-flag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  line-height: 0;
+  filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.5));
+}
+.flag {
+  display: block;
+}
+.lang-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lang-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.lang-pick .chips .chip {
+  padding: 3px;
+  line-height: 0;
+}
+
+.dupe-more {
+  padding: 16px;
+  text-align: center;
+}
+
+/* ---------- Activity: the ring at the top, its drop-down, the full page ---------- */
+.activity-btn {
+  position: relative;
+  gap: 4px;
+}
+.activity-ring circle {
+  fill: none;
+  stroke-width: 2.4;
+}
+.activity-ring-track {
+  stroke: var(--bg-3);
+}
+.activity-ring-fill {
+  stroke: var(--accent-2);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.4s ease;
+}
+.activity-ring-dot {
+  fill: var(--accent-text);
+  stroke: none !important;
+  transform-origin: 9px 9px;
+  animation: spin 1.4s linear infinite;
+}
+.activity-ring.unknown .activity-ring-fill {
+  transform-origin: 9px 9px;
+  animation: spin 1.2s linear infinite;
+}
+.activity-ring.paused .activity-ring-fill {
+  stroke: var(--fg-dim);
+}
+.activity-count {
+  font-size: 11px;
+  color: var(--accent-2);
+}
+.activity-pop {
+  position: fixed;
+  z-index: 400;
+  width: min(380px, calc(100vw - 16px));
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(10px);
+  border-color: var(--accent-2);
+}
+.activity-pop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.activity-row-thumb {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.activity-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.activity-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.activity-controls {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+.activity-open {
+  align-self: stretch;
+  justify-content: center;
+}
+.activity-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px clamp(16px, 4vw, 48px) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.activity-page-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.activity-page-head h2 {
+  margin: 0;
+}
+.activity-empty {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 560px;
+}
+.job-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.job-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.job-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.job-title h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.job-bar {
+  height: 8px;
+}
+.job-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.job-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.job-thumb {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* The app's own confirm dialog (components/Confirm.tsx). */
+.confirm-body {
+  max-width: 460px;
+  line-height: 1.5;
+}
+.confirm-field {
+  width: 100%;
+  margin-top: 10px;
+}
+.confirm-actions {
+  margin-top: 16px;
+  gap: 8px;
+}
+
+.dupes-matching {
+  /* The width of the list it stands in for. */
+  margin: 0 0 12px;
+  width: 100%;
+}
+
+.activity-row.ended {
+  opacity: 0.6;
+}
+.activity-row.ended .activity-row-thumb {
+  color: var(--ok);
+}
+
+/* ---- Tags: the board of folders, a tag's page, dragging tags ---- */
+/* At most three columns, each folder under the one before it in its column: a long folder leaves no
+   gap beside it, as a row of a grid would. */
+.tag-folders {
+  columns: 340px 3;
+  column-gap: 12px;
+}
+.tag-folder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  break-inside: avoid;
+  transition: outline-color 0.1s ease, background 0.1s ease;
+}
+.tag-folder.new {
+  border-style: dashed;
+  opacity: 0.8;
+}
+.tag-folder.new:focus-within {
+  opacity: 1;
+}
+.tag-folder.drop-can {
+  outline: 1px dashed var(--border-strong);
+}
+.tag-folder.drop-over,
+.tags-type.drop-over {
+  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-2));
+}
+.tags-type.drop-over {
+  border-radius: var(--radius);
+}
+/* Its name and "pick one" first; the counts fit beside them, or go under them, never squeezed. */
+.tag-folder-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+.tag-folder-head .badge,
+.tag-folder-head .small {
+  white-space: nowrap;
+}
+.tag-folder-head strong {
+  font-size: 15px;
+}
+.tag-folder-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  border: 0;
+  padding: 2px 0;
+  background: transparent;
+  color: var(--warn);
+  font: inherit;
+  cursor: pointer;
+}
+.tag-folder-warn:hover {
+  text-decoration: underline;
+}
+.chip.tag-chip,
+.tags-row.tag,
+.tag-card[draggable="true"] {
+  cursor: grab;
+}
+.chip.tag-chip:active,
+.tags-row.tag:active {
+  cursor: grabbing;
+}
+.dragging {
+  opacity: 0.4;
+}
+.tag-folder.exclusive .tag-chip {
+  border-radius: var(--radius);
+}
+.tags-row.tag .ellipsis {
+  min-width: 0;
+}
+.tags-row.tag .tags-row-x {
+  margin-left: 0;
+  padding: 0 4px;
+}
+
+.tags-index-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+/* The index bar's sentence wraps rather than losing its end. */
+.index-note {
+  white-space: normal;
+}
+.index-closer {
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tags-index-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chip.pick {
+  border-color: var(--accent-2);
+}
+.chip.pick.active,
+.pick-one-choices .chip.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.chip.pick.active .dim {
+  color: inherit;
+}
+.pick-one-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+}
+.pick-one-add .btn {
+  font-size: 11.5px;
+  padding-inline: 6px;
+}
+.pick-one-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-3);
+}
+.pick-one-choices .label {
+  margin: 0;
+}
+
+
+.tag-card-foot.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+.tag-card-foot.stacked .row {
+  align-items: center;
+  font-weight: 400;
+}
+.tag-card-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+/* ---- Tags: the board's side panel ---- */
+.tag-folder {
+  cursor: pointer;
+}
+.tag-folder:hover {
+  outline: 1px solid var(--border-strong);
+}
+.tag-folder.selected {
+  outline: 2px solid var(--accent);
+}
+.tag-folder-head strong {
+  min-width: 6ch;
+}
+.chip.tag-chip.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.chip.tag-chip.active .dim {
+  color: inherit;
+}
+.chip.link {
+  cursor: pointer;
+}
+.chip.link:hover {
+  border-color: var(--accent);
+}
+.inspector {
+  gap: 10px;
+}
+.inspector-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inspector-head h3 {
+  margin: 0;
+  font-size: 17px;
+  min-width: 0;
+}
+.inspector-actions {
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.inspector-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  cursor: pointer;
+}
+.inspector-strip:empty {
+  display: none;
+}
+.inspector-strip > .thumb {
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.inspector-strip > .thumb .thumb-meta {
+  display: none;
+}
+.inspector-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.inspector-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inspector .related {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+}
+.inspector .related .row {
+  align-items: center;
+  gap: 2px;
+}
+
+/* ---- Tags: subtags ---- */
+.chip-tree {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 2px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 999px;
+}
+.chip.tag-chip.sub {
+  font-size: 11.5px;
+  padding: 2px 7px;
+  background: transparent;
+}
+.chip.tag-chip.drop-over,
+.tags-row.tag.drop-over {
+  outline: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-3));
+}
+.inspector-parent {
+  align-items: center;
+  gap: 6px;
+}
+.search-field {
+  align-items: center;
+  gap: 6px;
+}
+.word-row {
+  align-items: center;
+  gap: 6px;
+}
+
+.conflict-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
+}
+.conflict-actions .row {
+  align-items: center;
+  gap: 6px;
+}
+.conflict-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.conflict-field .sel {
+  flex: 1;
+  min-width: 0;
+}
+.conflict-all {
+  align-self: flex-start;
+}
+.conflict-actions .btn {
+  max-width: 100%;
+  min-width: 0;
+}
+/* A dropdown in a narrow panel fills its place and cuts long names short, never spilling out. */
+.conflict-field .sel-btn,
+.inspector-actions .sel-btn,
+.tag-card-adopt .sel,
+.tag-card-adopt .sel-btn {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.sel-btn .ellipsis {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+.sel-opt .ellipsis {
+  min-width: 0;
+}
+.sel-search {
+  margin: 2px 6px 6px;
+  width: calc(100% - 12px);
+  box-sizing: border-box;
+}
+.sel-group {
+  padding: 6px 12px 2px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-dim, var(--fg));
+  opacity: 0.7;
+}
+
+/* ---------------- Scrapbook ---------------- */
+.scrap-screen {
+  display: flex;
+  flex-direction: column;
+}
+.scrap-top {
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.scrap-top .label {
+  margin: 0;
+}
+.scrap-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 12px;
+  padding: 12px;
+}
+.scrap-stage {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--fg) 6%, transparent) 0 25%, transparent 0 50%) 0 0 / 24px 24px;
+  border-radius: var(--radius);
+}
+.scrap-page {
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+  touch-action: none;
+  user-select: none;
+}
+.scrap-page canvas {
+  display: block;
+}
+.scrap-sel {
+  position: absolute;
+  border: 1.5px dashed var(--accent);
+  pointer-events: none;
+}
+.scrap-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--accent);
+  pointer-events: auto;
+  cursor: nwse-resize;
+}
+.scrap-handle.nw {
+  left: -8px;
+  top: -8px;
+}
+.scrap-handle.ne {
+  right: -8px;
+  top: -8px;
+  cursor: nesw-resize;
+}
+.scrap-handle.sw {
+  left: -8px;
+  bottom: -8px;
+  cursor: nesw-resize;
+}
+.scrap-handle.se {
+  right: -8px;
+  bottom: -8px;
+}
+.scrap-handle.turn {
+  left: 50%;
+  top: -34px;
+  margin-left: -7px;
+  cursor: grab;
+  background: var(--accent);
+}
+/* A bar's knob sits inside the page, at its top. */
+.scrap-sel.bar .scrap-handle.turn {
+  top: 10px;
+}
+.scrap-sel.bar .scrap-handle.turn::after {
+  display: none;
+}
+.scrap-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bar-swatch {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.scrap-handle.turn::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 12px;
+  width: 2px;
+  height: 18px;
+  background: var(--accent);
+}
+.scrap-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.scrap-tabs {
+  flex-wrap: wrap;
+}
+.scrap-selected,
+.scrap-shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scrap-selected textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font: inherit;
+}
+.scrap-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* The row's name: at least 48px so short names line up, wider when the name is longer (never under what follows). */
+.scrap-field > .small:first-child {
+  min-width: 48px;
+  flex: none;
+  white-space: nowrap;
+}
+.scrap-field input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+.scrap-field .sel {
+  flex: 1;
+  min-width: 0;
+}
+.scrap-field .sel-btn {
+  width: 100%;
+}
+.scrap-field input[type="color"] {
+  width: 36px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: none;
+}
+.scrap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+}
+.scrap-grid.photos {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+/* Pictures to pick from are shown whole, not cropped to the square. */
+.scrap-grid.photos .thumb-media img {
+  object-fit: contain;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+.scrap-grid.backgrounds {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+.scrap-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-3);
+  color: var(--fg);
+  cursor: pointer;
+  aspect-ratio: 1;
+}
+.scrap-tile:hover {
+  border-color: var(--accent);
+}
+.scrap-tile img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.scrap-tile.photo {
+  padding: 0;
+  overflow: hidden;
+}
+.scrap-tile.bg {
+  aspect-ratio: auto;
+}
+.scrap-tile.bg canvas {
+  width: 100%;
+  height: auto;
+  border-radius: calc(var(--radius) - 2px);
+}
+.scrap-tile.busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.scrap-tile-x {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  opacity: 0;
+}
+.scrap-tile:hover .scrap-tile-x {
+  opacity: 1;
+}
+.scrap-looks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.scrap-look {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 20px;
+  cursor: pointer;
+}
+.scrap-look:hover {
+  outline: 2px solid var(--accent);
+}
+.sticker-maker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sticker-stage {
+  display: flex;
+  justify-content: center;
+  background: #000;
+  border-radius: var(--radius);
+}
+.sticker-stage canvas {
+  max-width: 100%;
+  max-height: 60vh;
+  cursor: pointer;
+  touch-action: none;
+}
+.sticker-stage canvas.lasso {
+  cursor: crosshair;
+}
+.sticker-wait {
+  padding: 32px;
+  text-align: center;
+}
+button.chip.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.scrap-screen {
+  height: 100%;
+}
+
+.album-cover img.album-scrap {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+img.tag-banner {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+img.tag-banner.wide {
+  max-height: 180px;
+  flex: none;
+  cursor: default;
+}
+
+.tune-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+  min-height: 0;
+}
+.tune-stage {
+  position: relative;
+  height: min(62vh, 680px);
+  min-height: 360px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  touch-action: none;
+  user-select: none;
+  /* A checkerboard: what is see-through shows as such. */
+  background: repeating-conic-gradient(#cfcfcf 0 25%, #f4f4f4 0 50%) 0 0 / 20px 20px;
+}
+/* The sticker, fitted, then zoomed and moved as a whole. */
+.tune-zoom {
+  position: absolute;
+  inset: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+.tune-stage canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+/* Painting: the brush's circle is the pointer. */
+.tune-stage.painting,
+.tune-stage.painting canvas {
+  cursor: none;
+}
+.tune-stage.on-black {
+  background: #000;
+}
+.tune-stage.on-white {
+  background: #fff;
+}
+.tune-stage.movable {
+  cursor: grab;
+}
+.tune-stage.movable:active {
+  cursor: grabbing;
+}
+.tune-keys {
+  line-height: 1.4;
+}
+.tune-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tune-controls .label {
+  margin: 0;
+}
+.tune-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+@media (max-width: 900px) {
+  .tune-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.modal.wide:has(.sticker-maker) {
+  width: min(1100px, 100%);
+}
+
+/* ---- the mini browser: picking a picture ---- */
+.mini-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.mini-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mini-head .sel {
+  max-width: 100%;
+}
+.mini-head .sel-btn {
+  max-width: 220px;
+}
+.mini-search {
+  flex: 1;
+  min-width: 140px;
+}
+/* The columns grow downwards inside a box that scrolls: a column box with a set height would add
+   columns off to the side instead. */
+.mini-scroll {
+  max-height: 62vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.scrap-side .mini-scroll {
+  max-height: none;
+  overflow: visible;
+}
+.mini-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* The last row keeps its pictures at the row's height instead of stretching them across. */
+.mini-rows::after {
+  content: "";
+  flex-grow: 1000;
+}
+.mini-tile {
+  position: relative;
+  height: var(--row);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+.mini-tile .mini-pick,
+.mini-tile .mini-pick img {
+  width: 100%;
+  height: 100%;
+}
+.mini-tile .mini-pick img {
+  object-fit: contain;
+}
+.mini-pick {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.mini-pick img {
+  display: block;
+}
+.mini-tile:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.mini-action {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+}
+.mini-tile:hover .mini-action {
+  opacity: 1;
+}
+.mini-more {
+  align-self: center;
+}
+.scrap-shelf.busy {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.finder-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 14px;
+}
+.finder-layout .sticker-stage {
+  position: relative;
+  align-items: center;
+}
+.sticker-stage.busy canvas {
+  opacity: 0.6;
+}
+.sticker-looking {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #fff;
+  font-weight: 700;
+  pointer-events: none;
+}
+.finder-modes {
+  flex-wrap: wrap;
+}
+@media (max-width: 900px) {
+  .finder-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------- Scrapbook: covers ---------------- */
+.covers-home {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.covers-head {
+  align-items: center;
+  gap: 8px;
+}
+.covers-head .label {
+  margin: 0;
+}
+.covers-grid {
+  display: grid;
+  gap: 12px;
+}
+.covers-grid.album {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+.covers-grid.tag {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+.cover-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+.cover-card-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-3);
+  cursor: pointer;
+}
+.cover-card.album .cover-card-pic {
+  aspect-ratio: 1280 / 1817;
+}
+.cover-card.tag .cover-card-pic {
+  aspect-ratio: 2 / 1;
+}
+.cover-card-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cover-card-pic:hover {
+  outline: 2px solid var(--accent);
+}
+.cover-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.new-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.new-cover-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---------------- Scrapbook: the sticker book ---------------- */
+.sticker-book-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 44px 8px 8px;
+}
+.sticker-book {
+  position: relative;
+  flex: none;
+  width: min(1400px, calc(100vw - 56px), calc((100vh - 116px) * 1.45));
+  aspect-ratio: 1.45;
+  perspective: 2600px;
+  user-select: none;
+}
+.book-cover {
+  position: absolute;
+  inset: 0;
+  padding: 14px;
+  border-radius: 20px;
+  background: linear-gradient(160deg, #f08aa3, #d65b78 60%, #c24b69);
+  box-shadow: 0 18px 40px rgba(80, 20, 40, 0.35), inset 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+/* Stitching round the cover. */
+.book-cover::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 15px;
+  pointer-events: none;
+}
+.book-spread {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  transform-style: preserve-3d;
+}
+.book-page {
+  position: relative;
+  padding: 44px 22px 34px;
+  background: #fffaf0 radial-gradient(#ead9bd 1.2px, transparent 1.6px) 0 0 / 18px 18px;
+  color: #6a4a55;
+  overflow: hidden;
+  box-sizing: border-box;
+  font-family: "Caveat", "Nunito", cursive;
+}
+.book-page.left {
+  border-radius: 10px 0 0 10px;
+  box-shadow: inset -22px 0 26px -18px rgba(90, 50, 30, 0.35);
+}
+.book-page.right {
+  border-radius: 0 10px 10px 0;
+  box-shadow: inset 22px 0 26px -18px rgba(90, 50, 30, 0.35);
+}
+.book-page.blank {
+  background: #fffaf0;
+}
+.book-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 6px;
+  margin-left: -3px;
+  background: linear-gradient(90deg, rgba(90, 50, 30, 0.25), rgba(255, 255, 255, 0.5), rgba(90, 50, 30, 0.25));
+  pointer-events: none;
+  z-index: 6;
+}
+.book-slots {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), 1fr);
+  grid-template-rows: repeat(var(--rows, 4), 1fr);
+  gap: clamp(5px, calc(36px / var(--cols, 3)), 12px);
+  height: 100%;
+}
+.book-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px dashed #ecdcbf;
+  border-radius: 14px;
+  min-height: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.book-slot.picked {
+  border-style: solid;
+  border-color: #e9758f;
+  background: rgba(255, 214, 224, 0.45);
+}
+.book-sticker {
+  width: 88%;
+  height: 88%;
+  transform: rotate(var(--tilt));
+  transition: transform 0.18s ease, filter 0.18s ease;
+  filter: drop-shadow(0 2px 2px rgba(80, 40, 30, 0.28));
+}
+.book-sticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+/* Your own stickers: a white die-cut edge. */
+.book-slot.mine .book-sticker img {
+  filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff);
+}
+.book-slot:hover .book-sticker {
+  transform: rotate(0deg) scale(1.14) translateY(-4px);
+  filter: drop-shadow(0 8px 8px rgba(80, 40, 30, 0.3));
+}
+.book-washi {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-2deg);
+  padding: 2px 22px;
+  font: 700 20px "Caveat", cursive;
+  color: #5a3a44;
+  background: repeating-linear-gradient(45deg, rgba(255, 182, 193, 0.9) 0 8px, rgba(255, 214, 224, 0.9) 8px 16px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+.book-washi.m0 {
+  background: repeating-linear-gradient(45deg, rgba(160, 205, 255, 0.9) 0 8px, rgba(205, 228, 255, 0.9) 8px 16px);
+}
+.book-washi.m1 {
+  background: repeating-linear-gradient(45deg, rgba(180, 225, 150, 0.9) 0 8px, rgba(215, 240, 195, 0.9) 8px 16px);
+}
+.book-washi.m2 {
+  background: repeating-linear-gradient(45deg, rgba(255, 200, 140, 0.9) 0 8px, rgba(255, 225, 190, 0.9) 8px 16px);
+}
+.book-washi.m3 {
+  background: repeating-linear-gradient(45deg, rgba(205, 170, 255, 0.9) 0 8px, rgba(228, 210, 255, 0.9) 8px 16px);
+}
+.book-washi.m4 {
+  background: repeating-linear-gradient(45deg, rgba(255, 225, 120, 0.9) 0 8px, rgba(255, 240, 180, 0.9) 8px 16px);
+}
+.book-washi.m5 {
+  background: repeating-linear-gradient(45deg, rgba(140, 220, 220, 0.9) 0 8px, rgba(195, 240, 240, 0.9) 8px 16px);
+}
+.book-washi.m6 {
+  background: repeating-linear-gradient(45deg, rgba(255, 175, 160, 0.9) 0 8px, rgba(255, 215, 205, 0.9) 8px 16px);
+}
+.book-washi.mine {
+  background: repeating-linear-gradient(45deg, rgba(167, 230, 205, 0.9) 0 8px, rgba(205, 245, 228, 0.9) 8px 16px);
+}
+.book-washi.sky {
+  background: repeating-linear-gradient(45deg, rgba(160, 205, 255, 0.9) 0 8px, rgba(205, 228, 255, 0.9) 8px 16px);
+}
+.book-washi.nature {
+  background: repeating-linear-gradient(45deg, rgba(180, 225, 150, 0.9) 0 8px, rgba(215, 240, 195, 0.9) 8px 16px);
+}
+.book-washi.animals {
+  background: repeating-linear-gradient(45deg, rgba(255, 200, 140, 0.9) 0 8px, rgba(255, 225, 190, 0.9) 8px 16px);
+}
+.book-washi.food {
+  background: repeating-linear-gradient(45deg, rgba(255, 175, 160, 0.9) 0 8px, rgba(255, 215, 205, 0.9) 8px 16px);
+}
+.book-washi.party {
+  background: repeating-linear-gradient(45deg, rgba(205, 170, 255, 0.9) 0 8px, rgba(228, 210, 255, 0.9) 8px 16px);
+}
+.book-washi.faces {
+  background: repeating-linear-gradient(45deg, rgba(255, 225, 120, 0.9) 0 8px, rgba(255, 240, 180, 0.9) 8px 16px);
+}
+.book-washi.symbols {
+  background: repeating-linear-gradient(45deg, rgba(140, 220, 220, 0.9) 0 8px, rgba(195, 240, 240, 0.9) 8px 16px);
+}
+.book-number {
+  position: absolute;
+  bottom: 8px;
+  font: 600 16px "Caveat", cursive;
+  color: #b9a184;
+}
+/* In the middle at the foot, clear of the turning buttons in the corners. */
+.book-number {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.book-title,
+.book-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+}
+.book-title-name {
+  font: 400 clamp(28px, 4vw, 52px) "Pacifico", cursive;
+  color: #d65b78;
+  text-shadow: 3px 3px 0 #ffe1e8;
+}
+.book-title-sub,
+.book-empty {
+  font: 600 22px "Caveat", cursive;
+}
+.book-title-hint {
+  font: 500 17px "Caveat", cursive;
+  color: #a98e74;
+}
+/* The turning leaf: hinged at the spine, a page on each face. */
+.book-leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 50%;
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  animation-fill-mode: forwards;
+  will-change: transform;
+  z-index: 5;
+}
+.book-leaf.forward {
+  animation-name: leaf-forward;
+}
+.book-leaf.back {
+  animation-name: leaf-back;
+}
+/*
+ * Each face shows for its half of the turn only, swapping as the leaf stands edge-on. Hiding the back
+ * by backface-visibility alone isn't enough in WebKit: a face's own layers (tape, a tilted label, a
+ * sticker's shadow) show through the leaf until the turn ends.
+ */
+.book-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  animation-duration: inherit;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+.book-leaf.forward .book-face.front,
+.book-leaf.back .book-face.back {
+  animation-name: face-first-half;
+}
+.book-leaf.forward .book-face.back,
+.book-leaf.back .book-face.front {
+  animation-name: face-second-half;
+}
+@keyframes face-first-half {
+  0%,
+  49.9% {
+    visibility: visible;
+  }
+  50%,
+  100% {
+    visibility: hidden;
+  }
+}
+@keyframes face-second-half {
+  0%,
+  49.9% {
+    visibility: hidden;
+  }
+  50%,
+  100% {
+    visibility: visible;
+  }
+}
+.book-face > .book-page {
+  position: absolute;
+  inset: 0;
+}
+.book-face.back {
+  transform: rotateY(180deg);
+}
+/* A shadow sweeping across the page as it turns. */
+.book-face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(60, 30, 20, 0.22), transparent 45%);
+  animation: inherit;
+  animation-name: leaf-shade;
+}
+/*
+ * The turn: edge-on (90°) exactly halfway, so the faces swap unseen; speeding up to there and slowing
+ * after, one smooth ease. A pixel in front of the pages it lies on, so neither shows through the other.
+ */
+@keyframes leaf-forward {
+  0% {
+    transform: translateZ(1px) rotateY(0deg);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.7, 0.4);
+  }
+  50% {
+    transform: translateZ(1px) rotateY(-90deg);
+    animation-timing-function: cubic-bezier(0.3, 0.6, 0.55, 0.95);
+  }
+  100% {
+    transform: translateZ(1px) rotateY(-180deg);
+  }
+}
+@keyframes leaf-back {
+  0% {
+    transform: translateZ(1px) rotateY(-180deg);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.7, 0.4);
+  }
+  50% {
+    transform: translateZ(1px) rotateY(-90deg);
+    animation-timing-function: cubic-bezier(0.3, 0.6, 0.55, 0.95);
+  }
+  100% {
+    transform: translateZ(1px) rotateY(0deg);
+  }
+}
+@keyframes leaf-shade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.book-corner {
+  position: absolute;
+  bottom: 12px;
+  z-index: 7;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #c24b69;
+  box-shadow: 0 2px 6px rgba(80, 30, 40, 0.25);
+  cursor: pointer;
+  font-size: 18px;
+}
+.book-corner:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.book-corner.left {
+  left: 22px;
+}
+.book-corner.right {
+  right: 22px;
+}
+.book-ribbons {
+  position: absolute;
+  top: 26px;
+  right: -38px;
+  bottom: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+}
+.book-ribbon {
+  writing-mode: vertical-rl;
+  padding: 10px 6px;
+  border: 0;
+  border-radius: 0 9px 9px 0;
+  background: hsl(calc(var(--i) * 38 + 330) 75% 76%);
+  color: #4d3038;
+  font: 700 12px "Nunito", sans-serif;
+  cursor: pointer;
+  box-shadow: 2px 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease;
+}
+.book-ribbon:hover,
+.book-ribbon.active {
+  transform: translateX(5px);
+}
+.book-scrub {
+  width: min(560px, 80vw);
+  align-items: center;
+  gap: 10px;
+}
+.book-scrub input {
+  flex: 1;
+}
+
+/* ---------------- the sticker book in each theme ----------------
+   Cozy's stitched pink scrapbook is the book above; each other theme makes it its own thing.
+   The stickers keep their colours: only how they sit changes. */
+.book-label {
+  display: none;
+}
+
+/* Swiped (Night City's holopad): one screen at a time, sliding over with a glitch. */
+.book-spread.swipe {
+  display: block;
+  overflow: hidden;
+  transform-style: flat;
+}
+.holo-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.holo-screen.out,
+.holo-screen.in {
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.5, 0, 0.3, 1);
+}
+.holo-screen.out.fwd {
+  animation-name: holo-out-fwd;
+}
+.holo-screen.in.fwd {
+  animation-name: holo-in-fwd;
+}
+.holo-screen.out.back {
+  animation-name: holo-out-back;
+}
+.holo-screen.in.back {
+  animation-name: holo-in-back;
+}
+@keyframes holo-out-fwd {
+  0% {
+    transform: none;
+    opacity: 1;
+    clip-path: inset(0);
+  }
+  28% {
+    transform: translateX(-2%);
+    clip-path: inset(0);
+  }
+  32% {
+    transform: translateX(-5%);
+    clip-path: inset(34% 0 48% 0);
+  }
+  36% {
+    clip-path: inset(0);
+  }
+  100% {
+    transform: translateX(-16%);
+    opacity: 0;
+    clip-path: inset(0);
+  }
+}
+@keyframes holo-in-fwd {
+  0% {
+    transform: translateX(16%);
+    opacity: 0;
+    clip-path: inset(0);
+  }
+  58% {
+    opacity: 0.85;
+    clip-path: inset(0);
+  }
+  63% {
+    transform: translateX(2%);
+    clip-path: inset(52% 0 30% 0);
+  }
+  67% {
+    clip-path: inset(0);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+    clip-path: inset(0);
+  }
+}
+@keyframes holo-out-back {
+  0% {
+    transform: none;
+    opacity: 1;
+    clip-path: inset(0);
+  }
+  32% {
+    transform: translateX(5%);
+    clip-path: inset(48% 0 34% 0);
+  }
+  36% {
+    clip-path: inset(0);
+  }
+  100% {
+    transform: translateX(16%);
+    opacity: 0;
+    clip-path: inset(0);
+  }
+}
+@keyframes holo-in-back {
+  0% {
+    transform: translateX(-16%);
+    opacity: 0;
+    clip-path: inset(0);
+  }
+  63% {
+    transform: translateX(-2%);
+    clip-path: inset(30% 0 52% 0);
+  }
+  67% {
+    clip-path: inset(0);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+    clip-path: inset(0);
+  }
+}
+/* A scan line sweeping across as the screen changes. */
+.holo-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16%;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(55, 235, 243, 0.22) 44%, rgba(255, 255, 255, 0.6) 50%, rgba(55, 235, 243, 0.22) 56%, transparent);
+  mix-blend-mode: screen;
+  animation-fill-mode: both;
+  animation-timing-function: linear;
+}
+.holo-sweep.fwd {
+  animation-name: holo-sweep-fwd;
+}
+.holo-sweep.back {
+  animation-name: holo-sweep-back;
+}
+@keyframes holo-sweep-fwd {
+  from {
+    left: 100%;
+  }
+  to {
+    left: -16%;
+  }
+}
+@keyframes holo-sweep-back {
+  from {
+    left: -16%;
+  }
+  to {
+    left: 100%;
+  }
+}
+@keyframes holo-flicker {
+  0%,
+  46%,
+  49%,
+  52%,
+  100% {
+    opacity: 1;
+  }
+  47% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Read right to left (the manga volume): its ribbons on the left. */
+.sticker-book-wrap.rtl {
+  padding: 8px 8px 8px 44px;
+}
+.sticker-book-wrap.rtl .book-ribbons {
+  right: auto;
+  left: -38px;
+  align-items: flex-end;
+}
+.sticker-book-wrap.rtl .book-ribbon {
+  border-radius: 9px 0 0 9px;
+}
+.sticker-book-wrap.rtl .book-ribbon:hover,
+.sticker-book-wrap.rtl .book-ribbon.active {
+  transform: translateX(-5px);
+}
+/* Its stickers fill each row from the right, a row not full too; what is on a sticker still reads as usual. */
+.sticker-book-wrap.rtl .book-slots {
+  direction: rtl;
+}
+.sticker-book-wrap.rtl .book-slot {
+  direction: ltr;
+}
+
+/* Night City: a holopad. A dark slab, a cyan screen with scanlines, stickers as flickering holograms in HUD brackets. */
+.sticker-book-wrap.book-cp2077 .sticker-book {
+  perspective: none;
+}
+.sticker-book-wrap.book-cp2077 .book-cover {
+  padding: 18px;
+  border-radius: 28px;
+  background: linear-gradient(160deg, #1b1e27, #0b0d12 55%, #13161d);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.55), inset 0 0 0 2px #2c313c, inset 0 0 0 5px #0b0d12, inset 0 0 0 6px rgba(55, 235, 243, 0.22);
+}
+.sticker-book-wrap.book-cp2077 .book-cover::before {
+  inset: 6px auto auto calc(50% - 3px);
+  width: 6px;
+  height: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: #37ebf3;
+  box-shadow: 0 0 8px #37ebf3;
+}
+.sticker-book-wrap.book-cp2077 .book-spread {
+  border-radius: 12px;
+  background: radial-gradient(ellipse at 50% 40%, rgba(55, 235, 243, 0.12), transparent 70%), linear-gradient(rgba(55, 235, 243, 0.05) 1px, transparent 1px) 0 0 / 100% 22px, linear-gradient(90deg, rgba(55, 235, 243, 0.05) 1px, transparent 1px) 0 0 / 22px 100%, #04070b;
+  box-shadow: inset 0 0 50px rgba(55, 235, 243, 0.14), 0 0 0 1px rgba(55, 235, 243, 0.4), 0 0 24px rgba(55, 235, 243, 0.18);
+}
+.sticker-book-wrap.book-cp2077 .book-spread::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px);
+}
+.sticker-book-wrap.book-cp2077 .book-page {
+  padding: 46px 20px 36px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #bdf9ff;
+  font-family: "Chakra Petch", "Rajdhani", sans-serif;
+}
+.sticker-book-wrap.book-cp2077 .book-spine {
+  width: 1px;
+  margin-left: 0;
+  background: repeating-linear-gradient(180deg, rgba(55, 235, 243, 0.5) 0 6px, transparent 6px 12px);
+}
+.sticker-book-wrap.book-cp2077 .book-washi {
+  top: 16px;
+  left: 26px;
+  transform: none;
+  padding: 3px 16px 3px 10px;
+  background: #fcee0a;
+  color: #07080c;
+  font: 700 13px "Chakra Petch", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  clip-path: polygon(0 0, 100% 0, 100% 55%, calc(100% - 9px) 100%, 0 100%);
+  box-shadow: none;
+}
+.sticker-book-wrap.book-cp2077 .book-washi::before {
+  content: "// ";
+}
+.sticker-book-wrap.book-cp2077 .book-slot {
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(#37ebf3, #37ebf3) top left / 12px 1px no-repeat,
+    linear-gradient(#37ebf3, #37ebf3) top left / 1px 12px no-repeat,
+    linear-gradient(#37ebf3, #37ebf3) top right / 12px 1px no-repeat,
+    linear-gradient(#37ebf3, #37ebf3) top right / 1px 12px no-repeat,
+    linear-gradient(#37ebf3, #37ebf3) bottom left / 12px 1px no-repeat,
+    linear-gradient(#37ebf3, #37ebf3) bottom left / 1px 12px no-repeat,
+    linear-gradient(#37ebf3, #37ebf3) bottom right / 12px 1px no-repeat,
+    linear-gradient(#37ebf3, #37ebf3) bottom right / 1px 12px no-repeat,
+    rgba(55, 235, 243, 0.04);
+}
+.sticker-book-wrap.book-cp2077 .book-slot.picked {
+  background-color: rgba(252, 238, 10, 0.14);
+}
+.sticker-book-wrap.book-cp2077 .book-sticker {
+  filter: drop-shadow(0 0 6px rgba(55, 235, 243, 0.45));
+  animation: holo-flicker 6s infinite;
+  animation-delay: calc(var(--flicker) * -1);
+}
+.sticker-book-wrap.book-cp2077 .book-slot.mine .book-sticker img {
+  filter: none;
+  -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.7) 2px 3px);
+  mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.7) 2px 3px);
+}
+.sticker-book-wrap.book-cp2077 .book-slot:hover .book-sticker {
+  transform: scale(1.12) translateY(-3px);
+  filter: drop-shadow(0 0 12px rgba(55, 235, 243, 0.8));
+  animation: none;
+}
+.sticker-book-wrap.book-cp2077 .book-number {
+  font: 500 12px "Share Tech Mono", monospace;
+  color: rgba(55, 235, 243, 0.6);
+}
+.sticker-book-wrap.book-cp2077 .book-number::before {
+  content: "PG_";
+}
+.sticker-book-wrap.book-cp2077 .book-title-name {
+  font: italic 700 clamp(26px, 3.6vw, 46px) "Chakra Petch", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fcee0a;
+  text-shadow: -2px 0 0 #37ebf3, 3px 3px 0 #ff003c;
+}
+.sticker-book-wrap.book-cp2077 .book-title-sub,
+.sticker-book-wrap.book-cp2077 .book-empty {
+  font: 500 16px "Share Tech Mono", monospace;
+  text-transform: uppercase;
+  color: #37ebf3;
+}
+.sticker-book-wrap.book-cp2077 .book-title-hint {
+  font: 500 13px "Chakra Petch", sans-serif;
+  color: rgba(189, 249, 255, 0.6);
+}
+.sticker-book-wrap.book-cp2077 .book-corner {
+  border: 1px solid rgba(55, 235, 243, 0.6);
+  border-radius: 0;
+  background: rgba(4, 7, 11, 0.85);
+  color: #37ebf3;
+  box-shadow: none;
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
+}
+.sticker-book-wrap.book-cp2077 .book-ribbons {
+  right: -40px;
+}
+.sticker-book-wrap.book-cp2077 .book-ribbon {
+  border-radius: 0;
+  border-left: 3px solid #37ebf3;
+  background: #0b0d12;
+  color: #37ebf3;
+  font: 500 11px "Share Tech Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: none;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+}
+.sticker-book-wrap.book-cp2077 .book-ribbon.active {
+  background: #fcee0a;
+  color: #07080c;
+  border-left-color: #ff003c;
+}
+
+/* Ghost: a matte black field notebook with an elastic band; grey grid paper, stickers taped in. */
+.sticker-book-wrap.book-ghost .book-cover {
+  border-radius: 14px;
+  background: linear-gradient(160deg, #27282b, #141416);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.sticker-book-wrap.book-ghost .book-cover::before {
+  inset: 0 2px 0 auto;
+  width: 9px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(90deg, #0b0b0c, #34343a 50%, #0b0b0c);
+  z-index: 8;
+}
+.sticker-book-wrap.book-ghost .book-page {
+  background: linear-gradient(rgba(0, 0, 0, 0.055) 1px, transparent 1px) 0 0 / 20px 20px, linear-gradient(90deg, rgba(0, 0, 0, 0.055) 1px, transparent 1px) 0 0 / 20px 20px, #f1f1ee;
+  color: #2b2b2b;
+  font-family: "Rajdhani", sans-serif;
+}
+.sticker-book-wrap.book-ghost .book-page.left {
+  box-shadow: inset -22px 0 26px -18px rgba(0, 0, 0, 0.3);
+}
+.sticker-book-wrap.book-ghost .book-page.right {
+  box-shadow: inset 22px 0 26px -18px rgba(0, 0, 0, 0.3);
+}
+.sticker-book-wrap.book-ghost .book-washi {
+  transform: translateX(-50%) rotate(-1.5deg);
+  background: rgba(200, 200, 194, 0.88);
+  color: #222;
+  font: 500 14px "Share Tech Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.sticker-book-wrap.book-ghost .book-slot {
+  border: 0;
+  border-radius: 4px;
+}
+.sticker-book-wrap.book-ghost .book-slot::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 34%;
+  height: 12px;
+  transform: translateX(-50%) rotate(-3deg);
+  background: rgba(205, 205, 199, 0.8);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+.sticker-book-wrap.book-ghost .book-slot.picked {
+  background: rgba(0, 0, 0, 0.06);
+  outline: 2px solid #2b2b2b;
+}
+.sticker-book-wrap.book-ghost .book-number {
+  font: 500 12px "Share Tech Mono", monospace;
+  color: #8a8a8a;
+}
+.sticker-book-wrap.book-ghost .book-title-name {
+  font: 700 clamp(28px, 4vw, 48px) "Rajdhani", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: #1d1d1f;
+  text-shadow: none;
+}
+.sticker-book-wrap.book-ghost .book-title-sub,
+.sticker-book-wrap.book-ghost .book-empty {
+  font: 500 16px "Share Tech Mono", monospace;
+  color: #555;
+}
+.sticker-book-wrap.book-ghost .book-title-hint {
+  font: 500 14px "Rajdhani", sans-serif;
+  color: #777;
+}
+.sticker-book-wrap.book-ghost .book-spine {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.22), rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.22));
+}
+.sticker-book-wrap.book-ghost .book-corner {
+  background: #1b1b1d;
+  color: #eee;
+  border-radius: 6px;
+}
+.sticker-book-wrap.book-ghost .book-ribbon {
+  background: #1b1b1d;
+  color: #ddd;
+  font: 500 11px "Share Tech Mono", monospace;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Midnight: a star atlas. Navy leather with a silver line, night pages with faint stars and a constellation. */
+.sticker-book-wrap.book-midnight .book-cover {
+  border-radius: 16px;
+  background: linear-gradient(160deg, #1c2a4a, #0b1426 60%, #08101f);
+  box-shadow: 0 18px 40px rgba(0, 0, 12, 0.55), inset 0 0 0 2px rgba(201, 212, 234, 0.22);
+}
+.sticker-book-wrap.book-midnight .book-cover::before {
+  inset: 5px;
+  border: 1px solid rgba(201, 212, 234, 0.55);
+  border-radius: 12px;
+}
+.sticker-book-wrap.book-midnight .book-page {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 80'%3E%3Cpath d='M8 60 30 44 52 50 70 24 96 30 112 12' fill='none' stroke='%23c9d4ea' stroke-opacity='.3' stroke-width='.6'/%3E%3Cg fill='%23fff' fill-opacity='.75'%3E%3Ccircle cx='8' cy='60' r='1.6'/%3E%3Ccircle cx='30' cy='44' r='1.3'/%3E%3Ccircle cx='52' cy='50' r='1.8'/%3E%3Ccircle cx='70' cy='24' r='1.3'/%3E%3Ccircle cx='96' cy='30' r='1.6'/%3E%3Ccircle cx='112' cy='12' r='2'/%3E%3C/g%3E%3C/svg%3E") right 18px bottom 34px / 36% auto no-repeat,
+    radial-gradient(1.2px 1.2px at 20% 30%, rgba(255, 255, 255, 0.9), transparent) 0 0 / 140px 120px,
+    radial-gradient(1px 1px at 70% 80%, rgba(255, 255, 255, 0.7), transparent) 0 0 / 90px 110px,
+    radial-gradient(1.4px 1.4px at 40% 60%, rgba(255, 255, 255, 0.8), transparent) 0 0 / 170px 150px,
+    radial-gradient(1px 1px at 85% 15%, rgba(255, 255, 255, 0.55), transparent) 0 0 / 60px 70px,
+    radial-gradient(ellipse at 30% 20%, #18284d, transparent 70%),
+    #0f1a33;
+  color: #c9d4ea;
+  font-family: "Quicksand", sans-serif;
+}
+.sticker-book-wrap.book-midnight .book-page.left {
+  box-shadow: inset -22px 0 26px -18px rgba(0, 0, 0, 0.6);
+}
+.sticker-book-wrap.book-midnight .book-page.right {
+  box-shadow: inset 22px 0 26px -18px rgba(0, 0, 0, 0.6);
+}
+.sticker-book-wrap.book-midnight .book-page.blank {
+  background: #0f1a33;
+}
+.sticker-book-wrap.book-midnight .book-washi {
+  top: 14px;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  background: none;
+  box-shadow: none;
+  color: #e6ecf7;
+  font: 600 13px "Orbitron", sans-serif;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.sticker-book-wrap.book-midnight .book-washi::before {
+  content: "✦ ";
+  color: #7cc4ff;
+}
+.sticker-book-wrap.book-midnight .book-washi::after {
+  content: " ✦";
+  color: #7cc4ff;
+}
+.sticker-book-wrap.book-midnight .book-slot {
+  border: 1px dashed rgba(124, 196, 255, 0.18);
+  border-radius: 8px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0 6 4 10 5 6 6 5 10 4 6 0 5 4 4Z' fill='%237cc4ff'/%3E%3C/svg%3E") top 3px left 3px / 9px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0 6 4 10 5 6 6 5 10 4 6 0 5 4 4Z' fill='%237cc4ff'/%3E%3C/svg%3E") top 3px right 3px / 9px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0 6 4 10 5 6 6 5 10 4 6 0 5 4 4Z' fill='%237cc4ff'/%3E%3C/svg%3E") bottom 3px left 3px / 9px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M5 0 6 4 10 5 6 6 5 10 4 6 0 5 4 4Z' fill='%237cc4ff'/%3E%3C/svg%3E") bottom 3px right 3px / 9px no-repeat;
+}
+.sticker-book-wrap.book-midnight .book-slot.picked {
+  border: 1px solid #7cc4ff;
+  background-color: rgba(124, 196, 255, 0.12);
+}
+.sticker-book-wrap.book-midnight .book-sticker {
+  filter: drop-shadow(0 0 6px rgba(124, 196, 255, 0.35));
+}
+.sticker-book-wrap.book-midnight .book-number {
+  font: 500 11px "Orbitron", sans-serif;
+  color: #7d8fb3;
+}
+.sticker-book-wrap.book-midnight .book-title-name {
+  font: 700 clamp(24px, 3.4vw, 42px) "Orbitron", sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #e6ecf7;
+  text-shadow: 0 0 14px rgba(124, 196, 255, 0.45);
+}
+.sticker-book-wrap.book-midnight .book-title-sub,
+.sticker-book-wrap.book-midnight .book-empty {
+  font: 600 18px "Quicksand", sans-serif;
+  color: #9fb3d9;
+}
+.sticker-book-wrap.book-midnight .book-title-hint {
+  font: 500 14px "Quicksand", sans-serif;
+  color: #7d8fb3;
+}
+.sticker-book-wrap.book-midnight .book-spine {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45), rgba(201, 212, 234, 0.25), rgba(0, 0, 0, 0.45));
+}
+.sticker-book-wrap.book-midnight .book-corner {
+  background: rgba(15, 26, 51, 0.92);
+  color: #c9d4ea;
+  box-shadow: 0 0 0 1px rgba(201, 212, 234, 0.4);
+}
+.sticker-book-wrap.book-midnight .book-ribbon {
+  background: linear-gradient(90deg, #c9d4ea, #8fa3c9);
+  color: #0b1426;
+  font: 600 10px "Orbitron", sans-serif;
+  letter-spacing: 0.08em;
+}
+
+/* Sunset: a travel journal. Kraft board bound with twine, cream pages, stickers in photo corners, months stamped. */
+.sticker-book-wrap.book-sunset .book-cover {
+  border-radius: 10px;
+  background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 7px), repeating-linear-gradient(25deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 5px), linear-gradient(160deg, #c99a6a, #a97a4e);
+  box-shadow: 0 18px 40px rgba(90, 50, 20, 0.4), inset 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+.sticker-book-wrap.book-sunset .book-cover::before {
+  inset: 12px auto 12px 4px;
+  width: 4px;
+  border: 0;
+  border-radius: 2px;
+  background: repeating-linear-gradient(0deg, #efdfbd 0 5px, #c8b085 5px 9px);
+}
+.sticker-book-wrap.book-sunset .book-page {
+  padding-top: 56px;
+  background: radial-gradient(rgba(150, 110, 70, 0.17) 1px, transparent 1.4px) 0 0 / 16px 16px, #f6ead3;
+  color: #6b4a32;
+}
+.sticker-book-wrap.book-sunset .book-washi {
+  top: 12px;
+  padding: 2px 12px;
+  border: 3px double #b8432f;
+  border-radius: 8px;
+  background: none;
+  box-shadow: none;
+  color: #b8432f;
+  font: 700 13px "Share Tech Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  transform: translateX(-50%) rotate(-6deg);
+  opacity: 0.85;
+  mix-blend-mode: multiply;
+}
+.sticker-book-wrap.book-sunset .book-washi::before {
+  content: "✈ ";
+}
+.sticker-book-wrap.book-sunset .book-slot {
+  border: 0;
+  border-radius: 2px;
+  background:
+    linear-gradient(135deg, #6b4a32 50%, transparent 50%) top left / 16px 16px no-repeat,
+    linear-gradient(225deg, #6b4a32 50%, transparent 50%) top right / 16px 16px no-repeat,
+    linear-gradient(45deg, #6b4a32 50%, transparent 50%) bottom left / 16px 16px no-repeat,
+    linear-gradient(315deg, #6b4a32 50%, transparent 50%) bottom right / 16px 16px no-repeat,
+    rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 3px rgba(107, 74, 50, 0.25);
+}
+.sticker-book-wrap.book-sunset .book-slot.picked {
+  background-color: #fff3e0;
+  box-shadow: 0 0 0 2px #f0996b;
+}
+.sticker-book-wrap.book-sunset .book-number {
+  color: #a5856a;
+}
+.sticker-book-wrap.book-sunset .book-title-name {
+  color: #c0503a;
+  text-shadow: 2px 2px 0 #fbd9c4;
+}
+.sticker-book-wrap.book-sunset .book-title-hint {
+  color: #a5856a;
+}
+.sticker-book-wrap.book-sunset .book-spine {
+  background: linear-gradient(90deg, rgba(107, 74, 50, 0.3), rgba(255, 255, 255, 0.5), rgba(107, 74, 50, 0.3));
+}
+.sticker-book-wrap.book-sunset .book-corner {
+  background: #fffaf0;
+  color: #b8432f;
+}
+.sticker-book-wrap.book-sunset .book-ribbon {
+  background: #c99a6a;
+  color: #4a3020;
+  font: 500 11px "Share Tech Mono", monospace;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Manga: a tankōbon. Black binding, white pages with screentone, stickers in inked panels, months in speech bubbles, read right to left. */
+.sticker-book-wrap.book-manga .book-cover {
+  border-radius: 6px;
+  background: #121212;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+.sticker-book-wrap.book-manga .book-cover::before {
+  inset: 5px;
+  border: 2px solid #fff;
+  border-radius: 3px;
+}
+.sticker-book-wrap.book-manga .book-page {
+  padding-top: 58px;
+  background: linear-gradient(to bottom, #fff 62%, rgba(255, 255, 255, 0)), radial-gradient(rgba(0, 0, 0, 0.16) 1px, transparent 1.3px) 0 0 / 6px 6px, #fff;
+  color: #111;
+  font-family: "Nunito", sans-serif;
+}
+.sticker-book-wrap.book-manga .book-page.left,
+.sticker-book-wrap.book-manga .book-page.right {
+  border-radius: 2px;
+}
+.sticker-book-wrap.book-manga .book-page.left {
+  box-shadow: inset -18px 0 22px -18px rgba(0, 0, 0, 0.35);
+}
+.sticker-book-wrap.book-manga .book-page.right {
+  box-shadow: inset 18px 0 22px -18px rgba(0, 0, 0, 0.35);
+}
+.sticker-book-wrap.book-manga .book-washi {
+  top: 6px;
+  padding: 5px 22px;
+  border: 2.5px solid #111;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 3px 3px 0 #111;
+  color: #111;
+  font: 400 18px "Bangers", cursive;
+  letter-spacing: 0.06em;
+  transform: translateX(-50%) rotate(-2deg);
+}
+.sticker-book-wrap.book-manga .book-washi::after {
+  content: "";
+  position: absolute;
+  left: 26%;
+  bottom: -13px;
+  width: 16px;
+  height: 13px;
+  background: #111;
+  clip-path: polygon(0 0, 100% 0, 15% 100%);
+}
+.sticker-book-wrap.book-manga .book-washi::before {
+  content: "";
+  position: absolute;
+  left: calc(26% + 4px);
+  bottom: -7px;
+  width: 9px;
+  height: 8px;
+  background: #fff;
+  clip-path: polygon(0 0, 100% 0, 15% 100%);
+  z-index: 1;
+}
+.sticker-book-wrap.book-manga .book-slots {
+  gap: 8px;
+}
+.sticker-book-wrap.book-manga .book-slot {
+  border: 3px solid #111;
+  border-radius: 0;
+  background: radial-gradient(rgba(0, 0, 0, 0.13) 1px, transparent 1.3px) 0 0 / 5px 5px, #fff;
+}
+.sticker-book-wrap.book-manga .book-slot.picked {
+  border-color: #e8577c;
+  box-shadow: 4px 4px 0 #111;
+}
+.sticker-book-wrap.book-manga .book-sticker {
+  filter: drop-shadow(2px 2px 0 #111);
+}
+.sticker-book-wrap.book-manga .book-number {
+  font: 400 15px "Bangers", cursive;
+  color: #111;
+}
+.sticker-book-wrap.book-manga .book-title-name {
+  font: 400 clamp(30px, 4.4vw, 58px) "Bangers", cursive;
+  letter-spacing: 0.04em;
+  color: #111;
+  text-shadow: 3px 3px 0 #e8577c;
+}
+.sticker-book-wrap.book-manga .book-title-sub,
+.sticker-book-wrap.book-manga .book-empty {
+  font: 400 20px "Bangers", cursive;
+  letter-spacing: 0.05em;
+  color: #444;
+}
+.sticker-book-wrap.book-manga .book-title-hint {
+  font: 600 14px "Nunito", sans-serif;
+  color: #555;
+}
+.sticker-book-wrap.book-manga .book-spine {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.25));
+}
+.sticker-book-wrap.book-manga .book-corner {
+  border: 2.5px solid #111;
+  background: #fff;
+  color: #111;
+  box-shadow: 2px 2px 0 #111;
+}
+.sticker-book-wrap.book-manga .book-ribbon {
+  background: #111;
+  color: #fff;
+  font: 400 13px "Bangers", cursive;
+  letter-spacing: 0.08em;
+  box-shadow: none;
+}
+.sticker-book-wrap.book-manga .book-ribbon.active {
+  background: #e8577c;
+}
+
+/* Gallery: an art catalogue. Linen and white, lots of air, each sticker on a plinth with a museum label. */
+.sticker-book-wrap.book-gallery .book-cover {
+  border-radius: 4px;
+  background: #f4f4f1;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.sticker-book-wrap.book-gallery .book-cover::before {
+  display: none;
+}
+.sticker-book-wrap.book-gallery .book-page {
+  padding: 50px 22px 34px;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: "Manrope", sans-serif;
+}
+.sticker-book-wrap.book-gallery .book-page.left {
+  border-radius: 2px 0 0 2px;
+  box-shadow: inset -18px 0 22px -20px rgba(0, 0, 0, 0.18);
+}
+.sticker-book-wrap.book-gallery .book-page.right {
+  border-radius: 0 2px 2px 0;
+  box-shadow: inset 18px 0 22px -20px rgba(0, 0, 0, 0.18);
+}
+.sticker-book-wrap.book-gallery .book-washi {
+  top: 20px;
+  left: 30px;
+  right: 30px;
+  transform: none;
+  padding: 0 0 5px;
+  border-bottom: 1px solid #1a1a1a;
+  background: none;
+  box-shadow: none;
+  color: #1a1a1a;
+  font: 600 11px "Manrope", sans-serif;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+.sticker-book-wrap.book-gallery .book-slot {
+  flex-direction: column;
+  gap: 4px;
+  border: 0;
+  border-radius: 0;
+}
+/* As big as the slot allows above its plinth and label. */
+.sticker-book-wrap.book-gallery .book-sticker {
+  flex: none;
+  width: 92%;
+  height: calc(100% - 28px);
+  filter: drop-shadow(0 6px 7px rgba(0, 0, 0, 0.16));
+}
+/* The plinth under it, then its label. */
+.sticker-book-wrap.book-gallery .book-slot::before {
+  content: "";
+  order: 1;
+  flex: none;
+  width: 54%;
+  height: 7px;
+  background: linear-gradient(#f0f0ed, #d6d6d2);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.08);
+}
+.sticker-book-wrap.book-gallery.dense .book-sticker {
+  height: calc(100% - 13px);
+}
+.sticker-book-wrap.book-gallery .book-label {
+  display: block;
+  order: 2;
+  font: 500 9px "Manrope", sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #777;
+}
+/* Small slots: no room for labels. */
+.sticker-book-wrap.dense .book-label {
+  display: none;
+}
+.sticker-book-wrap.book-gallery .book-slot.picked {
+  background: #f4f4f1;
+  outline: 1px solid #1a1a1a;
+}
+.sticker-book-wrap.book-gallery .book-number {
+  font: 500 11px "Manrope", sans-serif;
+  color: #9a9a9a;
+}
+.sticker-book-wrap.book-gallery .book-title-name {
+  font: 500 clamp(24px, 3.4vw, 42px) "Manrope", sans-serif;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  text-shadow: none;
+}
+.sticker-book-wrap.book-gallery .book-title-sub,
+.sticker-book-wrap.book-gallery .book-empty {
+  font: 500 13px "Manrope", sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6b6b6b;
+}
+.sticker-book-wrap.book-gallery .book-title-hint {
+  font: 500 13px "Manrope", sans-serif;
+  color: #8a8a8a;
+}
+.sticker-book-wrap.book-gallery .book-spine {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.8), rgba(0, 0, 0, 0.08));
+}
+.sticker-book-wrap.book-gallery .book-corner {
+  border: 1px solid #1a1a1a;
+  background: #fff;
+  color: #1a1a1a;
+  box-shadow: none;
+}
+.sticker-book-wrap.book-gallery .book-ribbon {
+  border: 1px solid #1a1a1a;
+  border-left: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #1a1a1a;
+  font: 600 10px "Manrope", sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: none;
+}
+.sticker-book-wrap.book-gallery .book-ribbon.active {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+/* In the tab bar: the slider, on the right. */
+.page-tabs-end {
+  align-self: center;
+}
+.book-controls {
+  gap: 20px;
+  align-items: center;
+}
+.book-size {
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+}
+.book-size input {
+  width: 110px;
+}
+.page-tabs-end .book-scrub {
+  width: min(340px, 30vw);
+}
+/* A sticker's story: over the page across from it, inside the cover's rim. */
+.sticker-info {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  width: calc(50% - 14px);
+  box-sizing: border-box;
+  z-index: 6;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.sticker-info.on-left {
+  left: 14px;
+  border-radius: 10px 0 0 10px;
+}
+.sticker-info.on-right {
+  right: 14px;
+  border-radius: 0 10px 10px 0;
+}
+.sticker-info .label {
+  margin: 0;
+}
+.sticker-info-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  border-radius: var(--radius);
+  background: repeating-conic-gradient(#e8e8e8 0 25%, #f7f7f7 0 50%) 0 0 / 16px 16px;
+}
+.sticker-info-pic img {
+  max-width: 90%;
+  max-height: 90%;
+  filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff) drop-shadow(0 3px 4px rgba(0, 0, 0, 0.25));
+}
+.sticker-info-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+.sticker-info-facts dt {
+  color: var(--fg-dim, var(--fg));
+  opacity: 0.75;
+}
+.sticker-info-facts dd {
+  margin: 0;
+}
+/* The whole picture it was cut from, in its own shape. */
+.sticker-info-source {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  cursor: pointer;
+}
+.sticker-info-source img {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: calc(var(--radius) / 2);
+}
+
+/* Older stickers know only their picture's name: the pictures by it, to say which. */
+.sticker-info-named {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 4px;
+}
+.sticker-info-named button {
+  padding: 0;
+  border: 0;
+  aspect-ratio: 1;
+  border-radius: calc(var(--radius) / 2);
+  overflow: hidden;
+  background: var(--bg-2);
+  cursor: pointer;
+}
+.sticker-info-named img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.sticker-info-guess {
+  gap: 6px;
+}
+
+/* Tabs of a page, under the top bar: what the page shows (Images or Albums, Covers or Stickers). */
+.page-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  opacity: 0.7;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.page-tab:hover {
+  opacity: 1;
+}
+.page-tab.active {
+  opacity: 1;
+  border-bottom-color: var(--accent);
+  color: var(--accent-text);
+}
+.page-tabs .tags-search {
+  padding-bottom: 6px;
+}
+
+/* ---------------- importing and organising ---------------- */
+.import-dialog,
+.organise {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: min(720px, 86vw);
+}
+.import-dialog section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.import-source {
+  gap: 6px;
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--border);
+}
+.import-where {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.import-dest {
+  padding: 6px 10px;
+  background: var(--bg-3);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+.import-dupes {
+  max-height: 40vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.import-dupe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0.65;
+}
+.import-dupe.kept {
+  opacity: 1;
+  background: var(--bg-3);
+}
+.import-dupe > .grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.import-thumb {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: calc(var(--radius) / 2);
+  overflow: hidden;
+  background: var(--bg-3);
+}
+.import-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.import-review,
+.import-done {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* Room for the new bucket's hint whole. */
+.organise .scrap-field .input {
+  width: 340px;
+  min-width: 0;
+}
+.organise-rows {
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.organise-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+.organise-to {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-basis: 100%;
+}
+.bucket-row {
+  align-items: center;
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border);
+}
+/* A bucket folder's tag and the folder it stands for. */
+.place-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 6px;
+}
+.place-missing {
+  gap: 6px;
+  color: var(--warn);
+}
+
+/* ---------------- showing on another device ---------------- */
+.cast {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 620px;
+}
+.cast-safe {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cast-safe li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.cast-safe li svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ok);
+}
+.cast-safe li.warn svg,
+.cast-warn svg {
+  color: var(--warn);
+}
+.cast-warn.ok svg {
+  color: var(--ok);
+}
+.cast-link {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.cast-qr {
+  width: 200px;
+  height: 200px;
+  flex: none;
+  border-radius: 6px;
+}
+.cast-link-text {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cast-url,
+.cast-fp {
+  user-select: text;
+  -webkit-user-select: text;
+  overflow-wrap: anywhere;
+  padding: 4px 8px;
+  background: var(--bg-3);
+  border-radius: var(--radius);
+}
+.cast-warn {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.cast-devices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cast-device {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cast-device .ok {
+  color: var(--ok);
+}
+/* A device asking, while the panel is closed. */
+.cast-ask {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 900;
+  width: min(420px, calc(100vw - 32px));
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+/* A video playing on a phone or tablet instead (Show on another device). */
+.video-elsewhere {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ---------- Grouped tabs: one bar; the open group is a menu of every screen, its screens beside it ---------- */
+.topnav-tabs {
+  align-items: stretch;
+  align-self: stretch;
+  margin: -8px 0;
+}
+.nav-groupbox {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+  margin-right: 4px;
+  border-right: 1px solid var(--border);
+}
+.nav-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-family: var(--font-display, inherit);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
+}
+.nav-group:hover,
+.nav-group:focus-visible,
+.nav-groupbox.open .nav-group {
+  border-color: var(--accent);
+  outline: none;
+}
+.nav-caret {
+  color: var(--fg-dim);
+  transition: transform var(--transition);
+}
+.nav-groupbox.open .nav-caret {
+  transform: rotate(180deg);
+  color: var(--accent-text);
+}
+.subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-top: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+.subtab:hover,
+.subtab:focus-visible {
+  color: var(--fg);
+  outline: none;
+  border-bottom-color: var(--border-strong);
+}
+.subtab.on {
+  color: var(--accent-2);
+  border-bottom-color: var(--accent-2);
+}
+.subtab .kbd,
+.nav-item .kbd {
+  opacity: 0.45;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+}
+/* The tabs' keys follow the ⌘ rule; the menu, where the keys are looked up, always shows them. */
+.subtab .kbd {
+  display: none;
+}
+html.show-keys .subtab .kbd {
+  display: inline-flex;
+}
+.nav-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 230px;
+  padding: 10px 6px;
+  background: var(--bg-2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.nav-menu-group .label {
+  padding: 0 8px 4px;
+}
+.nav-menu-group.here .label {
+  color: var(--fg);
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: left;
+  cursor: pointer;
+}
+.nav-item:hover,
+.nav-item:focus-visible {
+  color: var(--fg);
+  background: var(--bg-3, rgba(255, 255, 255, 0.05));
+  outline: none;
+}
+.nav-item:focus-visible {
+  border-left-color: var(--accent);
+}
+.nav-item.on {
+  color: var(--accent-2);
+  border-left-color: var(--accent-2);
+}
+.nav-menu-foot {
+  padding: 6px 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+/* A narrow window keeps the brand whole: the library path goes first, then the names of the tabs
+   not open (their icons stay, the name in the tooltip). */
+@media (max-width: 1240px) {
+  .topnav .hud-root {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .subtab:not(.on) .subtab-label {
+    display: none;
+  }
+}
+
+/* ---------- Find: a platform's pages, pictures first, picks into the library ---------- */
+.find-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 288px 1fr;
+}
+.find-layout.side-hidden {
+  grid-template-columns: 1fr;
+}
+.find-layout.side-hidden .find-side {
+  display: none;
+}
+.find-main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.find-side-help {
+  margin-top: auto;
+  line-height: 1.7;
+}
+.find-side-help .kbd,
+.find-search .kbd,
+.find-query .kbd {
+  display: inline-flex;
+}
+/* The search over the results: a box holding its terms as chips and what is being typed, its order beside it. */
+.find-searchbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px 0;
+}
+.find-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.find-account img {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+.find-account-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.find-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-dim);
+}
+.find-search .input {
+  flex: 1;
+  min-width: 0;
+}
+.find-query {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  color: var(--fg-dim);
+  cursor: text;
+}
+.find-query:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+.find-query input {
+  flex: 1;
+  min-width: 140px;
+  padding: 4px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+}
+/* Another section is showing: the last search's terms wait, dimmed. */
+.find-query.idle .chip {
+  opacity: 0.55;
+}
+.find-hints {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.find-hints button {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.find-hints button:hover,
+.find-hints button.on {
+  background: var(--bg-3);
+  color: var(--accent-2);
+}
+/* The search's terms: a click flips one between needed and left out (struck through), × takes it off. */
+.find-term {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.find-query .chip:hover {
+  border-color: var(--accent);
+}
+.find-query .chip.left-out {
+  color: var(--fg-dim);
+}
+.find-query .chip.left-out .find-term {
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+}
+.find-results {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.find-head {
+  flex: none;
+}
+.find-title {
+  font-size: 18px;
+  min-width: 0;
+}
+.find-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 96px;
+}
+.find-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.find-tile {
+  position: relative;
+  flex: none;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  cursor: pointer;
+  clip-path: var(--clip-btn);
+  transition:
+    outline-color var(--transition),
+    box-shadow var(--transition);
+}
+.find-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.find-tile:hover,
+.find-tile.focused {
+  outline-color: var(--accent-2);
+}
+.find-tile.picked {
+  outline-color: var(--accent);
+  box-shadow: var(--glow);
+}
+.find-tile:focus-visible {
+  outline-color: var(--accent-2);
+}
+.find-ph {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-3);
+  color: var(--fg-faint);
+  font-size: 12px;
+}
+.find-badges {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  /* On a narrow tile they wrap, right-aligned, instead of running out of it. */
+  max-width: calc(100% - 12px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.find-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--hud-bg);
+  color: var(--fg);
+}
+.find-badge.alarm {
+  background: var(--danger);
+  color: var(--bg);
+  font-weight: 700;
+}
+/* In the basket, a work of several pages: each page a single picture, or (lit) an album of its own. */
+.find-album {
+  border: 0;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+.find-album:hover {
+  color: var(--accent-text);
+}
+.find-album.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.find-have {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  background: var(--hud-bg);
+  color: var(--ok);
+}
+.find-tile.picked .find-have,
+.find-tile:hover .find-have,
+.find-tile.focused .find-have {
+  display: none;
+}
+.find-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  background: var(--hud-bg);
+  color: var(--fg);
+  font-size: 12px;
+  text-align: left;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.find-tile:hover .find-caption,
+.find-tile.focused .find-caption {
+  opacity: 1;
+}
+.find-end {
+  height: 1px;
+}
+.find-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 16px;
+}
+/* An artist's tags on their page in Find: the one picked lit; how many works carry each, faint. */
+.find-artist-tags {
+  padding: 0 0 14px;
+}
+.find-artist-tags .chip {
+  gap: 6px;
+}
+.find-artist-tags .chip.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-3));
+}
+
+/* Drive health: a known fault of the drive's model, worth a firmware check. */
+.drive-note {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+/* A platform's tag linked to one of yours: your tag beside it. */
+/* A work's tags of one kind (who is in it, what it is from…), its label over its chips. */
+.find-tag-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.find-tags .chip.linked {
+  border-color: var(--accent-2);
+}
+.find-tag-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  color: var(--accent-2);
+}
+.source-missing {
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* Why the backup folder can't be used, under it. */
+.backup-problem {
+  margin: 4px 0 0;
+  color: var(--danger);
+}
+.find-error {
+  color: var(--danger);
+}
+.find-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+.find-empty-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 34rem;
+}
+/* One work in two languages: the note over the albums, and each pair in its review. */
+.album-versions-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent-2);
+  border-radius: var(--radius);
+}
+.version-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.version-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+/* Linking a platform's account to one of the library's artists: the list to pick from. */
+.artist-link-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+/* An artist met on two platforms: a page in common, and joining them or not. */
+.artist-same {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-2);
+  border-radius: var(--radius);
+}
+/* Find source's review: your picture, the work like it, what it is, and yes or no. */
+.source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 64vh;
+  overflow-y: auto;
+}
+.source-row {
+  display: grid;
+  grid-template-columns: 96px 96px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.source-pic {
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-2);
+  border-radius: calc(var(--radius) / 2);
+  overflow: hidden;
+}
+.source-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+button.source-pic {
+  padding: 0;
+  border: 1px solid transparent;
+  cursor: zoom-in;
+}
+button.source-pic:hover,
+button.source-pic:focus-visible {
+  border-color: var(--accent-2);
+}
+/* An artist's other pages, a site a line; a site Find has a plugin for shows its icon and can be linked. */
+.artist-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 640px;
+}
+.artist-pages-site {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 4px 8px;
+  border-left: 2px solid transparent;
+  border-radius: var(--radius);
+}
+.artist-pages-site.integrated {
+  border-left-color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 7%, transparent);
+}
+.artist-pages-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 90px;
+}
+.artist-pages-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.artist-pages-links .btn {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+/* Yours and the work found, large and side by side. */
+.source-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.compare-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.compare-pair figure {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  min-width: 0;
+}
+.compare-pair img {
+  width: 100%;
+  height: 62vh;
+  object-fit: contain;
+  background: var(--bg-2);
+  border-radius: calc(var(--radius) / 2);
+}
+.compare-pair figure > span {
+  display: grid;
+  place-items: center;
+  height: 62vh;
+  background: var(--bg-2);
+}
+/* One picture as the compare shows two: as large, a face in it outlined. */
+.compare-one figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.compare-one-frame {
+  position: relative;
+  height: 62vh;
+  max-width: 100%;
+}
+.compare-one-frame[style] {
+  height: auto;
+}
+.compare-one-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--bg-2);
+  border-radius: calc(var(--radius) / 2);
+}
+.compare-one-mark {
+  position: absolute;
+  border: 2px solid var(--accent-2);
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.compare-pair-caption {
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+.compare-pair-pages {
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.source-compare-acts {
+  align-items: center;
+}
+.source-what {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.source-what .row {
+  max-width: 100%;
+}
+.source-acts {
+  display: flex;
+  gap: 6px;
+}
+/* Saved searches: the star by a view's title, the list with what is new in each, and what is new on a tile. */
+.find-save.on {
+  color: var(--accent-2);
+}
+.find-saved-head {
+  align-items: center;
+}
+.find-saved {
+  justify-content: flex-start;
+  gap: 6px;
+}
+.find-new-count {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-2);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.find-new-note {
+  color: var(--accent-2);
+}
+.find-badge.new {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+/* A platform of several sites: the one shown, and Add a site. */
+.find-sites {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.find-sites > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+/* The site picker takes the room there is, its name cut short rather than over the + beside it. */
+.find-sites .sel {
+  display: flex;
+}
+.find-sites .sel-btn {
+  flex: 1;
+  min-width: 0;
+}
+/* A platform's or site's own icon, beside its name. */
+.platform-icon {
+  flex: none;
+  object-fit: contain;
+  border-radius: 3px;
+}
+/* A work's language on its tile, as on an album's card: out of the basket corner's way when it shows,
+   and never in the way of a click on it (under it, faded). */
+.find-flag {
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+.find-tile:hover .find-flag,
+.find-tile.focused .find-flag,
+.find-tile:has(.find-corner.on) .find-flag,
+.find-tile:has(.find-corner.choose) .find-flag {
+  opacity: 0;
+}
+/* Signing in with what a platform asks for: its fields stacked, the button last. */
+.find-sign-in {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 26rem;
+}
+.find-sign-in p {
+  margin: 0;
+}
+.find-sign-in-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: stretch;
+}
+.find-empty-body h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 26px;
+}
+.find-empty-body p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Looking closer: the work's pages large, what is known of it beside them. */
+.find-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  background: var(--bg);
+}
+.find-preview-pages {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+.find-preview-page {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.find-preview-page img {
+  max-width: 100%;
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
+}
+.find-preview-page .find-ph {
+  height: 60vh;
+}
+/* H, looking closer: only the work's pages (the reader's bar and strip, and the side panel, away). */
+.find-preview.bare {
+  grid-template-columns: 1fr;
+}
+.find-preview.bare .find-preview-side,
+.find-preview.bare .find-reader-bar,
+.find-preview.bare .find-strip {
+  display: none;
+}
+.find-preview-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+  clip-path: none;
+  overflow-y: auto;
+}
+.find-preview-title {
+  font-size: 22px;
+  line-height: 1.2;
+}
+.find-artist {
+  align-self: flex-start;
+}
+.find-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.find-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Sort's artist button: who made it, cut short. */
+.find-badges > .find-have {
+  position: static;
+}
+/* Looked for, and not in the library: new to you. */
+.find-have.fresh {
+  color: var(--accent-2);
+}
+.find-basket-check {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+.find-preview-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.find-tags {
+  flex-wrap: wrap;
+}
+.find-caption-text {
+  white-space: pre-wrap;
+  color: var(--fg-dim);
+  line-height: 1.5;
+}
+
+/* The picks: how many, and bringing them in. */
+.find-pickbar {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 12;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(720px, calc(100% - 32px));
+  padding: 8px 8px 8px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+/* While looking closer, the picks sit under the pages, clear of the side. */
+.find-main.previewing .find-pickbar {
+  left: calc((100% - 340px) / 2);
+  width: min(640px, calc(100% - 372px));
+}
+.find-login {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.find-login p {
+  margin: 0;
+  line-height: 1.5;
+}
+.find-login-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.find-login-browser .row {
+  align-self: stretch;
+  gap: 8px;
+}
+.find-login .kbd {
+  display: inline-flex;
+}
+
+/* Find: the right-click menu's keys, the basket, artists, related works, and "do I have this?" */
+.find-menu-label {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+.find-menu-label .kbd {
+  display: inline-flex;
+  opacity: 0.55;
+  font-size: 10px;
+  min-width: 18px;
+  height: 18px;
+}
+.find-basket-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.find-badge.kept {
+  background: var(--accent-2);
+  color: var(--bg);
+}
+.find-artists {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.find-artist-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+.find-artist-who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.find-artist-who img {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+.find-artist-who:hover b,
+.find-artist-who:focus-visible b {
+  color: var(--accent-2);
+}
+.find-artist-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.find-artist-recent {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.find-recent {
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  cursor: pointer;
+}
+.find-recent:hover,
+.find-recent:focus-visible {
+  outline-color: var(--accent-2);
+}
+.find-recent img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.find-artist-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.find-artist-head img {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+.find-artist-head h2 {
+  font-size: 22px;
+}
+.find-related {
+  width: 100%;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.find-related h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+.find-check {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.find-check-yes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ok);
+}
+.find-check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.find-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.find-check-thumb .thumb-meta {
+  display: none;
+}
+/* The artist the copies were given: a line under them. */
+.find-check-artist {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.find-check-artist-text {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* What can be done about it, on a line of its own under the name. */
+.find-check-artist-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex-basis: 100%;
+  padding-left: 30px;
+}
+.find-check-artist-acts .btn {
+  white-space: nowrap;
+}
+.find-check-thumb {
+  flex: none;
+  width: 48px;
+}
+.find-check-where {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.find-check .btn {
+  margin-top: 4px;
+}
+.find-check-pop {
+  position: fixed;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 340px;
+  padding: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Artists: who made the pictures ---------- */
+.artists-main {
+  overflow-y: auto;
+}
+.artists-body,
+.artist-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 16px 20px 64px;
+}
+.artists-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.artists-head h2,
+.artist-suggestions h2 {
+  font-size: 18px;
+}
+.artist-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.artist-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px 8px 8px;
+}
+.artist-suggestion-pics {
+  display: grid;
+  grid-template-columns: repeat(4, 56px);
+  gap: 4px;
+}
+.artist-suggestion-pics .thumb-meta {
+  display: none;
+}
+.artist-suggestion-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.artist-icon {
+  flex: none;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+}
+.artist-initials {
+  display: inline-grid;
+  place-items: center;
+  color: var(--fg-dim);
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.artists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.artist-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  clip-path: var(--clip-btn);
+  transition: outline-color var(--transition);
+}
+.artist-card:hover,
+.artist-card:focus-visible {
+  outline-color: var(--accent-2);
+}
+.artist-card-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.artist-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.merge {
+  position: relative;
+}
+.merge-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.merge-menu .btn {
+  justify-content: flex-start;
+}
+/* What is known of an artist, under their banner: their platforms, other pages, and filling it in. */
+.artist-about {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.artist-rename {
+  font-size: 20px;
+  width: min(360px, 100%);
+}
+.artist-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* The platforms an artist is on, a line each: icon, name, account, then following them there. */
+.artist-platforms {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 640px;
+}
+.artist-platform {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+/* A platform of several sites: the same account on each, a line each under the platform's. */
+.artist-platform-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.artist-platform-site {
+  margin-left: 22px;
+  padding-block: 3px;
+  border-style: dashed;
+}
+.artist-link-field {
+  gap: 6px;
+}
+.artist-link-field .input {
+  width: 280px;
+}
+.artist-bio {
+  margin: 0;
+  max-width: 70ch;
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--fg-dim);
+}
+.artist-pics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+/* An artist's albums, as their pictures. */
+.artist-album-empty {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--fg);
+}
+/* An artist's page: theirs, found from their platform, like their style, more on the platform. */
+.artist-tabs {
+  margin: 4px 0 4px;
+}
+.artist-tabs .page-tab .mono {
+  margin-left: 6px;
+}
+/* Pictures like theirs: picked ones outlined, to say yes or no to together. */
+.artist-style > .small {
+  margin-bottom: 10px;
+}
+.artist-style .artists-head {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.artist-style-tile {
+  position: relative;
+  min-width: 0;
+}
+.artist-style-tile .thumb-meta {
+  display: none;
+}
+/* Their works found in the library, to say yes or no to: surest first, the less sure dimmed. */
+.artist-found .artists-head {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.artist-found > .small {
+  margin-bottom: 10px;
+}
+.artist-found-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.artist-found-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.artist-found-tile .thumb-meta {
+  display: none;
+}
+.artist-found-tile.unsure .thumb {
+  outline: 2px dashed var(--warn);
+  outline-offset: -2px;
+}
+.artist-found-score {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.artist-found-tile.unsure .artist-found-score {
+  background: var(--warn);
+  color: #000;
+}
+.artist-found-actions {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  display: flex;
+  gap: 4px;
+}
+.artist-found-actions .btn {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: 0;
+}
+.artist-to-check {
+  color: var(--warn);
+}
+/* More of their work on their platform: what isn't in the library, to look at or keep. */
+.artist-more-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+.artist-more-next {
+  display: block;
+  margin: 10px auto 0;
+}
+.artist-more-tile {
+  position: relative;
+  min-width: 0;
+}
+.artist-more-open {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  overflow: hidden;
+  cursor: pointer;
+}
+.artist-more-open img,
+.artist-more-open .find-ph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.artist-more-open:hover,
+.artist-more-open:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -2px;
+}
+.artist-more-pages {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+  background: var(--hud-bg);
+  color: var(--fg);
+}
+.artist-more-platforms {
+  margin-bottom: 10px;
+}
+.artist-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Which folder of yours in a bucket (⇧ and its key in the viewer). */
+.own-folder-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: min(440px, 80vw);
+}
+.own-folder-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.own-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.own-folder-row.on {
+  background: var(--bg-3);
+  color: var(--fg);
+}
+.artist-picker-name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+  text-align: left;
+}
+.artist-picker-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.artist-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.artist-picker-row:hover,
+.artist-picker-row:focus-visible {
+  background: var(--bg-3);
+  color: var(--fg);
+  outline: none;
+}
+.artist-picker-row.on {
+  color: var(--accent-2);
+}
+.artist-picker-tick {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  flex: none;
+}
+.artist-picker-row.on .artist-picker-tick {
+  border-color: var(--accent-2);
+}
+.artist-picker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Following an artist on their platform: pointed at, Following says Unfollow; the menu opens downward. */
+.follow-btn .follow-stop {
+  display: none;
+}
+.follow-btn.following:hover:not(:disabled) .follow-is {
+  display: none;
+}
+.follow-btn.following:hover:not(:disabled) .follow-stop {
+  display: inline;
+}
+.follow-btn.following:hover:not(:disabled) {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* An artist's icon on their banner, as the photo taped on: clicked, cut a new one from their art. */
+.banner-photo {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.banner-photo-edit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 28px;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.banner-photo:hover .banner-photo-edit,
+.banner-photo:focus-visible .banner-photo-edit {
+  opacity: 1;
+}
+.banner-photo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -4px;
+}
+/* An artist's icon cut from their art: their pictures to pick from, then a circle placed on one. */
+.icon-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.icon-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+.icon-pick-tile {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+  cursor: pointer;
+  overflow: hidden;
+}
+.icon-pick-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--transition);
+}
+.icon-pick-tile:hover,
+.icon-pick-tile:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+.icon-pick-tile:hover img {
+  transform: scale(1.05);
+}
+.icon-crop {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.icon-crop-stage {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.icon-crop-stage:active {
+  cursor: grabbing;
+}
+.icon-crop-stage img {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+}
+/* The circle kept; around it, the rest of the picture dimmed. */
+.icon-crop-circle {
+  position: absolute;
+  border-radius: 50%;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.6);
+  outline: 2px solid var(--accent);
+  pointer-events: none;
+}
+.icon-crop-side {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.icon-crop-previews {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.icon-crop-preview {
+  position: relative;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-3);
+}
+.icon-crop-preview img {
+  position: absolute;
+  max-width: none;
+}
+.icon-crop-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-dim);
+}
+.icon-crop-zoom input {
+  flex: 1;
+}
+
+/* Find: a tile's corner (into the basket while browsing, chosen to import in the basket), and a page's tick. */
+.find-corner {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  background: var(--hud-bg);
+  color: var(--fg);
+  cursor: pointer;
+  transition:
+    opacity var(--transition),
+    background var(--transition),
+    color var(--transition);
+}
+.find-corner.basket {
+  opacity: 0;
+}
+.find-tile:hover .find-corner,
+.find-tile.focused .find-corner,
+.artist-more-tile:hover .find-corner,
+.find-corner.on,
+.find-corner:focus-visible {
+  opacity: 1;
+}
+.find-corner.basket.on {
+  color: var(--accent-2);
+  border-color: var(--accent-2);
+}
+.find-corner.choose.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.find-corner:hover {
+  border-color: var(--accent-2);
+}
+.find-pages-kept {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.find-preview-page {
+  position: relative;
+}
+.find-preview-page img {
+  transition: opacity var(--transition);
+}
+.find-preview-page.left-out img {
+  opacity: 0.3;
+}
+.find-page-keep {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--hud-bg);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.find-page-keep.on {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+
+/* A work of an album platform, read as an album: the page (turned as the theme's book turns
+   them), a bar saying where and which way, and its pages small, each kept or left out. */
+.find-reader {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.find-reader-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  cursor: pointer;
+}
+.find-reader-stage > .fitbox {
+  position: absolute;
+  inset: 12px;
+  width: auto;
+  height: auto;
+}
+.find-reader-end {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  cursor: default;
+}
+.find-reader-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border);
+}
+.find-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+/* Read right to left, its pages run that way too. */
+.find-reader.rtl .find-strip {
+  direction: rtl;
+}
+.find-strip-page {
+  position: relative;
+  flex: 0 0 auto;
+  direction: ltr;
+}
+.find-strip-pic {
+  display: block;
+  width: 60px;
+  height: 84px;
+  padding: 0;
+  border: 2px solid transparent;
+  background: var(--bg-2);
+  overflow: hidden;
+  cursor: pointer;
+}
+.find-strip-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.find-strip-page.on .find-strip-pic {
+  border-color: var(--accent);
+}
+/* Picked to come in on its own: marked in the accent's second colour. */
+.find-strip-page.picked .find-strip-pic {
+  border-color: var(--accent-2);
+}
+.find-strip-page.picked.on .find-strip-pic {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-2);
+  outline-offset: -4px;
+}
+.find-strip-page .find-page-keep {
+  top: auto;
+  bottom: 2px;
+  left: 2px;
+  height: 18px;
+  gap: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+/* ---------- People ---------- */
+.people-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 16px 20px 80px;
+}
+.convert-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+}
+.convert-bar-text {
+  flex: 1;
+  min-width: 0;
+}
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+.who-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+}
+.who-faces {
+  display: flex;
+  gap: 8px;
+}
+.who-faces img {
+  width: clamp(120px, 12.5vw, 196px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius);
+}
+.who-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.who-main h2 {
+  font-size: 26px;
+}
+.who-guess b {
+  color: var(--fg);
+}
+.who-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.who-queue {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 16px;
+  border-left: 1px solid var(--border);
+}
+.who-queue-list {
+  display: grid;
+  grid-template-columns: repeat(3, 58px);
+  gap: 8px;
+}
+.who-mini {
+  position: relative;
+  padding: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  cursor: pointer;
+}
+.who-mini img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+}
+.who-mini > .mono {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 0 4px;
+  font-size: 10px;
+  background: var(--hud-bg);
+  color: var(--fg);
+}
+.who-mini.now {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -2px;
+}
+.who-mini:hover,
+.who-mini:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.who-done {
+  padding: 4px 0;
+}
+.name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.name-field .input {
+  width: min(360px, 100%);
+  font-size: 15px;
+}
+.name-field .row {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.name-field .chip img,
+.with .chip img,
+.merge-menu img {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;
+  border-radius: 999px;
+}
+.roster-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.roster-head h2 {
+  font-size: 18px;
+}
+.roster-find {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-dim);
+}
+.roster-find .input {
+  width: 180px;
+}
+.roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 160px);
+  gap: 14px 12px;
+}
+.roster-person {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.roster-person img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  transition: outline-color var(--transition);
+}
+.roster-person:hover img,
+.roster-person:focus-visible img {
+  outline-color: var(--accent-2);
+}
+.roster-person:focus-visible {
+  outline: none;
+}
+.roster-name {
+  font-weight: 700;
+  font-size: 15px;
+}
+.roster-meta {
+  font-size: 11px;
+}
+.roster-empty {
+  padding: 8px 0;
+}
+.people-undo {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 14px;
+  z-index: 5;
+}
+
+.person-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 20px 48px;
+}
+.person-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.person-head h2 {
+  font-size: 26px;
+}
+.person-rename {
+  font-size: 18px;
+  width: 260px;
+}
+/* The one keepsake on a person's or an artist's page: their banner, a page from the theme's own sticker book. */
+.sticker-book-wrap.banner-host {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0;
+}
+.banner-frame {
+  position: relative;
+}
+.sticker-book-wrap.banner-host .banner-page {
+  height: clamp(160px, 13vw, 192px);
+  padding: 0;
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.sticker-book-wrap.book-cp2077.banner-host .banner-page {
+  background: radial-gradient(ellipse at 30% 40%, rgba(55, 235, 243, 0.12), transparent 70%), linear-gradient(rgba(55, 235, 243, 0.05) 1px, transparent 1px) 0 0 / 100% 22px, linear-gradient(90deg, rgba(55, 235, 243, 0.05) 1px, transparent 1px) 0 0 / 22px 100%, #04070b;
+  box-shadow: inset 0 0 50px rgba(55, 235, 243, 0.14), 0 0 0 1px rgba(55, 235, 243, 0.4);
+}
+.sticker-book-wrap.banner-host.editing .banner-page {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+/* Their picture, as a photo sticker on the page. */
+.banner-cut {
+  position: absolute;
+  left: 48px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-3deg);
+  border: 4px solid #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+  line-height: 0;
+  overflow: hidden;
+}
+.banner-cut .face-crop,
+.banner-cut .artist-icon {
+  border: none;
+  border-radius: 2px;
+}
+.banner-cut .face-crop,
+.banner-cut img.artist-icon {
+  display: block;
+}
+.banner-cut .artist-initials {
+  display: grid;
+  line-height: 1;
+}
+/* The tape holds the sticker down. */
+.sticker-book-wrap.banner-host .banner-tape {
+  top: 10px;
+  left: 92px;
+  right: auto;
+  z-index: 2;
+}
+/* The name and its line as one block beside the sticker. */
+.banner-words {
+  position: absolute;
+  left: 236px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: calc(100% - 260px);
+}
+.banner-hand {
+  font-weight: 700;
+  font-size: 68px;
+  line-height: 0.95;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+.banner-line {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+/* The stickers put on it, over everything on the page. */
+.banner-stickers {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.banner-stick {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.banner-host:hover .banner-stick,
+.banner-stick:focus-visible {
+  opacity: 1;
+}
+/* While stickering: the page takes the pointer, the handles reach past its edge. */
+.banner-edit {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: default;
+  touch-action: none;
+}
+.banner-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 12px;
+}
+.banner-tray-head {
+  align-items: center;
+  gap: 12px;
+}
+.person-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.years {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 96px;
+  margin-top: 8px;
+}
+.year {
+  flex: 1;
+  max-width: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.year span {
+  width: 100%;
+  min-height: 3px;
+  background: color-mix(in srgb, var(--accent-2) 22%, transparent);
+  border-top: 2px solid color-mix(in srgb, var(--accent-2) 60%, transparent);
+  transition: background var(--transition);
+}
+.year:hover span,
+.year:focus-visible span {
+  background: color-mix(in srgb, var(--accent-2) 40%, transparent);
+}
+.year.on span {
+  background: var(--accent-2);
+  border-top-color: var(--accent-2);
+}
+.year em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.year.on em {
+  color: var(--accent-2);
+}
+.with {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.split-field .name-field {
+  flex-direction: row;
+  align-items: center;
+  margin: 0;
+}
+.split-field .name-field .input {
+  width: 260px;
+}
+.person-pics-head {
+  flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+}
+.person-pics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 8px;
+}
+.person-pic {
+  position: relative;
+  padding: 0;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+.person-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.character-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px 24px;
+}
+.character-facts .fact > .row {
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.character-facts .chip .mono,
+.character-facts .chip .faint {
+  margin-left: 2px;
+}
+.no-face-found {
+  margin-bottom: 18px;
+}
+.person-pic .facebox {
+  position: absolute;
+  border: 2px solid var(--accent-2);
+  transition: border-color var(--transition);
+}
+.person-pic:hover .facebox,
+.person-pic.selected .facebox {
+  border-color: var(--accent-2);
+}
+
+/* A face cut from its picture. */
+.face-crop {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  overflow: hidden;
+  background: var(--bg-3);
+  border-radius: var(--radius);
+}
+.face-crop img {
+  position: absolute;
+  max-width: none;
+  transition: opacity var(--transition);
+}
+/* Cut out by the backend: the square itself. */
+.face-crop img.face-cut {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.face-crop.round {
+  border-radius: 999px;
+}
+.roster-person .face-crop {
+  border: 1px solid var(--border);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  transition: outline-color var(--transition);
+}
+.roster-person:hover .face-crop,
+.roster-person:focus-visible .face-crop {
+  outline-color: var(--accent-2);
+}
+.people-scan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.leave-out {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.who-mini .face-crop {
+  border-radius: 0;
+}
+/* Keycaps always shown in a keyboard run (naming faces), not only on ⌘. */
+.keyed .kbd {
+  display: inline-flex;
+}
+
+/* People: checking a group before naming it, and the faces found by themselves. */
+.who-check {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+.who-check-all {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.who-check-grid,
+.found-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 104px);
+  gap: 8px;
+}
+.found-sub {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+/* Given someone but like none of their other faces: to check, in the warning colour. */
+.found.has-doubts {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--border));
+}
+.found-face.doubt .face-crop {
+  outline: 2px dotted var(--warn);
+  outline-offset: -2px;
+}
+.person-pic .facebox.doubt {
+  border-color: var(--warn);
+  border-style: dotted;
+}
+.roster-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.roster-doubts {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 60%, transparent);
+}
+.who-check-face {
+  position: relative;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.who-check-face .face-crop {
+  display: block;
+  outline: 2px solid var(--accent-2);
+  outline-offset: -2px;
+}
+.who-check-face.unsure .face-crop {
+  outline-color: var(--warn);
+}
+.who-check-face.out .face-crop {
+  outline-color: transparent;
+}
+.who-check-face.out .face-crop img,
+.face-crop.left-out img {
+  opacity: 0.25 !important;
+}
+.who-check-tick {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  background: var(--accent-2);
+  color: var(--bg);
+}
+.who-check-face.out .who-check-tick {
+  background: var(--hud-bg);
+  color: var(--fg-dim);
+}
+.who-check-unsure {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  background: var(--warn);
+  color: var(--bg);
+}
+.found {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.found-head {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.found-face {
+  position: relative;
+}
+.found-face .face-crop {
+  display: block;
+}
+/* The face being said to be someone else's, while their name is typed. */
+.found-face.naming .face-crop {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.found-face.unsure .face-crop {
+  outline: 2px solid var(--warn);
+  outline-offset: -2px;
+}
+.found-actions {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+/* Over the picture, in every theme: dark, as on the tag tiles. */
+.found-actions .btn {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: 0;
+}
+.found-sub > span {
+  flex: 1 1 320px;
+  min-width: 0;
+  white-space: normal;
+}
+.person-pic .facebox.found {
+  border-style: dashed;
+}
+.person-more {
+  justify-content: center;
+}
+@media (max-width: 1240px) {
+  .who-faces > :nth-child(3) {
+    display: none;
+  }
+}
+
+
+/* ---------- Home: the board a library opens on ---------- */
+.home-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.home-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+}
+.home-board {
+  display: grid;
+  position: relative;
+  min-height: 100%;
+  align-content: start;
+}
+/* Fit: the rows share the window's height, so the board never scrolls once every block fits at the smallest row. */
+.home-board.fit {
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+.home-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.home-block-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 6px 12px 4px;
+}
+.home-block-title {
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  /* One line: a name too long for its block ends in an ellipsis (whole in its tooltip). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The big blocks lead: their names in the display size, the small ones in the control size. */
+.home-block.size-l .home-block-title {
+  font-size: 20px;
+}
+.home-block.size-m .home-block-title {
+  font-size: 17px;
+}
+.home-block.size-xs .home-block-title {
+  font-size: 13px;
+}
+/* A block without its name: all content, its tools over its corner on hover. */
+.home-block.bare .home-block-body {
+  padding-top: 12px;
+}
+.home-block-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.home-block:hover .home-block-tools,
+.home-block-tools:focus-within {
+  opacity: 1;
+}
+/* Arranging: a block's × over its top right corner, on hover. */
+.home-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--fg);
+  background: var(--bg-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.home-block:hover .home-del,
+.home-block.selected .home-del,
+.home-del:focus-visible {
+  opacity: 1;
+}
+.home-del:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+button.home-block-title {
+  cursor: pointer;
+}
+button.home-block-title:hover {
+  color: var(--accent-2);
+}
+.home-block-head .kbd {
+  display: none;
+}
+html.show-keys .home-block-head .kbd {
+  display: inline-flex;
+}
+.home-block-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+/* Arranging: the board's columns drawn faintly, blocks held by their bodies, the one picked in Scanner. */
+.home-board.arranging {
+  background-image: repeating-linear-gradient(90deg, transparent 0 calc((100% - 24px - (var(--cols) - 1) * 10px) / var(--cols)), color-mix(in srgb, var(--accent-2) 7%, transparent) calc((100% - 24px - (var(--cols) - 1) * 10px) / var(--cols)) calc((100% - 24px - (var(--cols) - 1) * 10px) / var(--cols) + 10px));
+  background-origin: content-box;
+}
+.home-board.arranging .home-block {
+  cursor: grab;
+  user-select: none;
+}
+.home-board.arranging .home-block-body {
+  opacity: 0.55;
+}
+.home-block.selected {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 1px var(--accent-2), var(--glow);
+}
+.home-size {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  border-right: 2px solid var(--accent-2);
+  border-bottom: 2px solid var(--accent-2);
+}
+.home-drop {
+  border: 1px dashed var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 8%, transparent);
+  pointer-events: none;
+}
+.home-start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.home-narrow {
+  grid-column: 1 / -1;
+}
+/* Arranging: its controls in the top bar, in place of the tabs. */
+.home-arrange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+}
+.home-arrange-mark {
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+/* The block menu (Add). */
+.home-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.home-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.home-menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* A picked block's settings: a panel over the board, on the side away from the block. */
+.home-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 30;
+  width: 340px;
+  max-width: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.home-panel.on-left {
+  right: auto;
+  left: 12px;
+}
+.home-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.home-filters-head {
+  display: flex;
+  align-items: center;
+}
+.home-kind {
+  display: flex;
+  align-items: flex-start;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.home-kind:hover {
+  border-color: var(--accent-2);
+}
+.home-kind-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 4px 7px 10px;
+  text-align: left;
+  font: inherit;
+  color: var(--fg);
+  background: none;
+  border: 0;
+  cursor: grab;
+}
+.home-kind-name {
+  font-weight: 600;
+}
+.home-kind-on {
+  white-space: nowrap;
+  color: var(--accent-2);
+}
+.home-kind-add {
+  margin: 4px 4px 0 0;
+}
+.home-picked-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.home-picked-title {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.home-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.home-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.home-checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+}
+.home-folder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+/* A Home to start from. */
+.home-presets {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.home-presets-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.home-preset-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.home-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  text-align: left;
+  font: inherit;
+  color: var(--fg);
+  cursor: pointer;
+}
+.home-preset:hover,
+.home-preset:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--glow);
+}
+.home-preset-map {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2px;
+  aspect-ratio: 4 / 3;
+}
+.home-preset-map i {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+}
+.home-preset-map i.g-work {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-3));
+}
+.home-preset-map i.g-pickup {
+  background: color-mix(in srgb, var(--accent-2) 22%, var(--bg-3));
+}
+.home-preset-map i.g-rediscover {
+  background: color-mix(in srgb, var(--fg) 14%, var(--bg-3));
+}
+.home-preset-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* What blocks hold. */
+.home-mosaic {
+  position: relative;
+  display: block;
+}
+.home-mosaic-tile {
+  position: absolute;
+}
+.home-mosaic-tile .home-pic {
+  width: 100%;
+  height: 100%;
+}
+.home-pics {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 4px;
+}
+.home-pic,
+.home-one,
+.home-cover {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: var(--bg);
+  cursor: pointer;
+}
+.home-pic img,
+.home-one img,
+.home-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.home-pic:hover::after,
+.home-pic:focus-visible::after,
+.home-one:hover::after,
+.home-cover:hover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--accent-2);
+}
+.home-pic-label {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+}
+.home-one-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.home-one {
+  flex: 1;
+}
+.home-pin {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.home-one-wrap:hover .home-pin,
+.home-pin:focus-visible {
+  opacity: 1;
+}
+.home-quiet {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.home-quiet-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.home-big {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.home-big b {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 700;
+}
+.home-big span {
+  color: var(--fg-dim);
+}
+.home-sort-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.home-faces {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+.home-face-row {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+}
+.home-face {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.home-face .mono {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+}
+.home-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+.home-row,
+.home-reading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  text-align: left;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.home-row:hover,
+.home-reading:hover {
+  border-color: var(--accent-2);
+}
+.home-reading {
+  align-items: stretch;
+  padding: 6px;
+}
+.home-reading img,
+.home-reading-ph {
+  width: 52px;
+  height: 74px;
+  flex: none;
+  object-fit: cover;
+  background: var(--bg);
+}
+.home-reading-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.home-bar {
+  display: block;
+  height: 4px;
+  background: var(--bg);
+}
+.home-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent-2);
+}
+.home-last,
+.home-status {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+}
+.home-last .btn,
+.home-status .btn,
+.home-quiet .btn {
+  max-width: 100%;
+  min-width: 0;
+}
+.home-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.home-status .home-bar {
+  width: 100%;
+}
+.home-slide {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+.home-slide-pic {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: home-slide-in 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes home-slide-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-slide-pic {
+    animation: none;
+  }
+}
+.home-slide-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+}
+.home-covers {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+}
+.home-cover {
+  height: 100%;
+  aspect-ratio: 1280 / 1817;
+  flex: none;
+}
+/* Buttons that fit their block (fit.tsx): whole names, then shortened, then icons, then +N. */
+.home-fit {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  overflow: hidden;
+}
+.home-fit-btn {
+  max-width: 100%;
+  min-width: 0;
+}
+.home-fit.short .home-fit-btn .ellipsis {
+  max-width: 96px;
+}
+.home-fit.icons .home-fit-btn {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+/* Several platforms in one block (rows.tsx): a row each under its logo, or one grid with logos on the pictures. */
+.home-rows {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+.home-rows-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.home-rows-body.empty {
+  flex: 0;
+}
+/* Platforms waiting for Connect: one strip of buttons over the pictures there are. */
+.home-rows-connect {
+  flex: none;
+  display: flex;
+  height: 30px;
+}
+.home-rows-connect.alone {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.home-row-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+.home-row-head,
+.home-list-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--fg-dim);
+}
+.home-row-head {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.home-row-head:hover {
+  color: var(--accent-2);
+}
+.home-tile {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.home-tile .home-pic {
+  width: 100%;
+  height: 100%;
+}
+.home-tile-logo {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: inline-flex;
+  padding: 2px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+.home-list-group,
+.home-checks-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.home-jobs .activity-row {
+  padding: 4px 0;
+}
+/* In a window this narrow, Arrange is its icon (its name in the tooltip). */
+@media (max-width: 1240px) {
+  .home-arrange-label {
+    display: none;
+  }
+}
+.brand-home {
+  font: inherit;
+  font-family: var(--font-display);
+  color: var(--accent-text);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.brand-home:disabled {
+  cursor: default;
+}
+/* The mark is the name's Q: a capital's height on the baseline (a little over, as round letters
+   are), in the name's colour, glow and tracking (themes set those on .brand). */
+.brand-mark {
+  width: 1.04cap;
+  height: 1.04cap;
+  margin-right: var(--brand-tracking);
+  vertical-align: -0.02cap;
+  filter: drop-shadow(var(--brand-glow));
+}
+.brand-home:not(:disabled):hover,
+.brand-home.on {
+  color: var(--accent-2);
+  text-shadow: var(--glow);
+}
+
+/* Asking before going online: a Connect button where a platform's page or pictures would load. */
+.connect-gate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--fg-dim);
+}
+.connect-gate.small {
+  padding: 6px;
+  height: 100%;
+  min-height: 0;
+}
+
+/* The Home's stickers: over the board and its blocks, seen only, until arranging. */
+.home-stickers {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.home-sticker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.home-sticker-art {
+  position: absolute;
+  flex: none;
+  pointer-events: none;
+}
+.home-stickers.arranging .home-sticker {
+  pointer-events: auto;
+  cursor: grab;
+}
+.home-stickers.arranging .home-sticker:hover .home-del,
+.home-sticker.picked .home-del {
+  opacity: 1;
+}
+.home-sticker-sel {
+  inset: 0;
+}
+/* A random sticker while arranging: the cut-out shape of one of its picks, black inside with a white edge, a question mark; the next every moment. */
+.home-random {
+  position: absolute;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.home-random-cut {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  animation: home-random-in 180ms ease-out;
+}
+.home-random-shapes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+.home-random-shape {
+  fill: #000;
+  stroke: #fff;
+  stroke-width: 5;
+  stroke-linejoin: round;
+  opacity: 0;
+  animation: home-random-shape 4.8s infinite;
+  animation-delay: calc(var(--i) * -1.2s);
+}
+.home-random-mark {
+  position: relative;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+@keyframes home-random-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes home-random-shape {
+  0%,
+  21% {
+    opacity: 1;
+  }
+  25%,
+  96% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-random-shape,
+  .home-random-cut {
+    animation: none;
+  }
+  .home-random-shape:first-child {
+    opacity: 1;
+  }
+}
+.home-sticker-sel .scrap-handle {
+  pointer-events: auto;
+}
+
+/* A face from a video: the moment it was seen at, on its crop. */
+.face-crop {
+  position: relative;
+}
+.face-crop .face-at {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 4px;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--fg);
+  background: var(--hud-bg);
+  border-radius: 3px;
+  pointer-events: none;
 }

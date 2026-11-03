@@ -1,26 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- App icon template. {{bg}} {{ink}} {{dim}} {{dot}} are filled from the active theme. -->
+  <!-- App icon template: {{bg}} and {{ink}} are filled from the active theme (src/lib/appIcon.ts). A gathering of sheets, each a Q with a window; the top one's corner turned over into the window as the tail. -->
   <rect x="100" y="100" width="824" height="824" rx="184" fill="{{bg}}"/>
-  <g transform="translate(0 18)">
-  <!-- two frames behind: the stack being culled -->
-  <rect x="300" y="196" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{dim}}" stroke-width="22"/>
-  <rect x="262" y="236" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{dim}}" stroke-width="22"/>
-  <!-- the frame in front -->
-  <rect x="224" y="276" width="520" height="340" rx="30" fill="{{bg}}" stroke="{{ink}}" stroke-width="34"/>
-  <circle cx="330" cy="372" r="34" fill="{{dot}}"/>
-  <path d="M276 568 L384 428 L458 516 L540 392 L690 568 Z" fill="{{ink}}" stroke="{{ink}}" stroke-width="24" stroke-linejoin="round"/>
-  <!-- rating bar, 7 of 10 -->
-  <g>
-    <rect x="224" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
-    <rect x="281.3" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
-    <rect x="338.7" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
-    <rect x="396" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
-    <rect x="453.3" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
-    <rect x="510.7" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
-    <rect x="568" y="692" width="44" height="100" rx="8" fill="{{ink}}"/>
-    <rect x="625.3" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
-    <rect x="682.7" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
-    <rect x="740" y="692" width="44" height="100" rx="8" fill="{{dim}}" opacity="0.55"/>
-  </g>
+  <g transform="translate(190.64 190.64) scale(2.51)">
+    <path fill="{{ink}}" fill-opacity="0.45" fill-rule="evenodd" stroke="{{bg}}" stroke-width="8" stroke-linejoin="round" paint-order="stroke" d="M140 54A86 86 0 0 1 226 140V226H140A86 86 0 0 1 54 140A86 86 0 0 1 140 54ZM96 140a44 44 0 1 0 88 0a44 44 0 1 0 -88 0Z"/>
+    <path fill="{{ink}}" fill-opacity="0.7" fill-rule="evenodd" stroke="{{bg}}" stroke-width="8" stroke-linejoin="round" paint-order="stroke" d="M128 42A86 86 0 0 1 214 128V214H128A86 86 0 0 1 42 128A86 86 0 0 1 128 42ZM84 128a44 44 0 1 0 88 0a44 44 0 1 0 -88 0Z"/>
+    <path fill="{{ink}}" fill-rule="evenodd" stroke="{{bg}}" stroke-width="8" stroke-linejoin="round" paint-order="stroke" d="M116 30A86 86 0 0 1 202 116V146L146 202H116A86 86 0 0 1 30 116A86 86 0 0 1 116 30ZM72 116a44 44 0 1 0 88 0a44 44 0 1 0 -88 0Z"/>
+    <path fill="{{ink}}" fill-opacity="0.45" stroke="{{bg}}" stroke-width="8" stroke-linejoin="round" paint-order="stroke" d="M146 146H202L146 202Z"/>
   </g>
 </svg>

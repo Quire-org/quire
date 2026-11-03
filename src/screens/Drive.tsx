@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { ArrowSquareOut, AppWindow } from "@phosphor-icons/react";
 import { useStore } from "../store";
 import { api } from "../lib/api";
 import { Modal } from "../components/Modal";
@@ -14,6 +16,21 @@ const BUS_LABEL: Record<string, string> = {
   internal: "Internal drive",
   unknown: "Unknown bus",
 };
+
+/** SanDisk's drives, and Western Digital's (who made SanDisk's until 2025): their firmware updates are there. */
+const isSanDisk = (vendor: string | null) => !!vendor && /sandisk|western digital|^wd\b/i.test(vendor);
+const SANDISK_FIRMWARE = "https://www.westerndigital.com/support/firmwareupdate";
+
+/** A USB link speed in words, and what it says about the cable or port. */
+function linkOf(gbps: number | null, version: string | null): { speed: string; hint: string | null } | null {
+  if (gbps == null) return null;
+  const speed = gbps >= 1 ? `${gbps % 1 ? gbps.toFixed(1) : gbps} Gb/s` : `${Math.round(gbps * 1000)} Mb/s`;
+  const v = Number(version ?? 0);
+  if (v >= 3 && gbps < 5) return { speed, hint: "Connected at USB 2 speed: the cable or the port is holding it back. Try a USB-C cable made for data, in a port on the Mac itself." };
+  if (v >= 3.1 && gbps < 10) return { speed, hint: "It can go faster than this. A USB-C cable rated for 10 Gb/s, in a port on the Mac itself rather than a hub, lets it." };
+  if (gbps >= 10) return { speed, hint: "As fast as a Mac connects a USB 3 drive." };
+  return { speed, hint: null };
+}
 
 /** Expected sequential read speeds, MB/s, to put a benchmark into context. */
 function expectedSpeed(bus: string): [number, number] | null {
@@ -43,6 +60,7 @@ export function Drive() {
   const [verify, setVerify] = useState<VerifyProgress | null>(null);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const stopVerify = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (s.root) api.driveInfo(s.root).then(setInfo).catch((e) => s.toast(String(e), "error"));
@@ -67,10 +85,13 @@ export function Drive() {
     setVerifyResult(null);
     setVerify(null);
     try {
-      setVerifyResult(await api.verifyReadability(s.root, setVerify));
+      const run = api.verifyReadability(s.root, setVerify);
+      stopVerify.current = run.stop;
+      setVerifyResult(await run.done);
     } catch (e) {
       s.toast(String(e), "error");
     } finally {
+      stopVerify.current = null;
       setVerifying(false);
     }
   };
@@ -81,6 +102,8 @@ export function Drive() {
   const smartUsable = !!smart && (smart.passed != null || smart.percentUsed != null);
   const bus = info?.bus ?? "unknown";
   const exp = expectedSpeed(bus);
+  const link = info ? linkOf(info.linkGbps, info.usbVersion) : null;
+  const sandisk = isSanDisk(info?.vendor ?? null);
 
   // Verdict: what we can actually say.
   let verdict: { tone: "good" | "bad" | "unknown"; title: string; body: string } | null = null;
@@ -131,10 +154,37 @@ export function Drive() {
               {info.removable ? " · removable" : ""}
               {info.solidState != null ? (info.solidState ? " · solid state" : " · spinning") : ""}
             </span>
+            {info.vendor && (
+              <>
+                <span className="label">Made by</span>
+                <span>{info.vendor}</span>
+              </>
+            )}
             {info.model && (
               <>
                 <span className="label">Model</span>
                 <span>{smart?.model ?? info.model}</span>
+              </>
+            )}
+            {info.serial && (
+              <>
+                <span className="label">Serial</span>
+                <span>{info.serial}</span>
+              </>
+            )}
+            {info.firmware && (
+              <>
+                <span className="label">Firmware</span>
+                <span>{info.firmware}</span>
+              </>
+            )}
+            {link && (
+              <>
+                <span className="label">Connection</span>
+                <span>
+                  USB{info.usbVersion ? ` ${info.usbVersion}` : ""}, connected at <span className="accent-text">{link.speed}</span>
+                  {link.hint && <span className="dim"> · {link.hint}</span>}
+                </span>
               </>
             )}
             <span className="label">File system</span>
@@ -155,6 +205,36 @@ export function Drive() {
               <h3>{verdict.title}</h3>
               <p className="dim small">{verdict.body}</p>
             </div>
+          )}
+
+          {info.vendor && (info.vendorApps.length > 0 || sandisk) && (
+            <>
+              <hr className="rule" />
+              <section>
+                <h3>From {info.vendor}</h3>
+                <p className="dim small">
+                  {info.vendor}'s own tools update the drive's firmware and change its settings (sleep, a password). Quire can't do those itself: {info.vendor} offers no way for other apps to.
+                </p>
+                <div className="row">
+                  {info.vendorApps.map((a) => (
+                    <button key={a.path} className="btn sm" onClick={() => void api.driveOpenApp(a.path).catch((e) => s.toast(String(e), "error"))} title={a.path}>
+                      <AppWindow /> Open {a.name}
+                    </button>
+                  ))}
+                  {sandisk && (
+                    <button className="btn sm" onClick={() => void openUrl(SANDISK_FIRMWARE)} title="SanDisk's firmware updates, on Western Digital's support site">
+                      <ArrowSquareOut /> Check for firmware updates
+                    </button>
+                  )}
+                </div>
+                {sandisk && !info.vendorApps.length && <p className="faint small">SanDisk's app isn't installed on this Mac.</p>}
+                {sandisk && /extreme/i.test(info.model ?? "") && (
+                  <p className="small drive-note">
+                    SanDisk Extreme and Extreme Pro portable SSDs (V2) had a firmware fault in 2023 that could make them disconnect and lose data; a firmware update fixes it. If yours is a V2, check that it has the update.
+                  </p>
+                )}
+              </section>
+            </>
           )}
 
           <hr className="rule" />
@@ -186,8 +266,8 @@ export function Drive() {
             <div className="sec-head">
               <h3>Readability check</h3>
               {verifying ? (
-                <button className="btn sm danger" onClick={() => void api.cancelVerify()}>
-                  Cancel
+                <button className="btn sm danger" onClick={() => stopVerify.current?.()} title="Also in Activity, where it can be paused">
+                  Stop
                 </button>
               ) : (
                 <button className="btn sm" onClick={() => void runVerify()}>
@@ -196,8 +276,9 @@ export function Drive() {
               )}
             </div>
             <p className="dim small">
-              Reads every byte on the folder and reports files that fail. An unreadable file is the earliest visible symptom of a
-              failing card; copy everything off and retire it if any appear.
+              Reads every byte on the folder and reports files that fail: the one health check that works on any drive, counters or not.
+              An unreadable file is the earliest visible symptom of a failing card or drive; copy everything off and retire it if any
+              appear. It runs in Activity, where it can be paused.
             </p>
             {verify && verifying && (
               <div className="progress">

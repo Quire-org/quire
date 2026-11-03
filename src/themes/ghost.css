@@ -26,3 +26,22 @@
 [data-theme="ghost"] .rating-seg.on {
   background: var(--accent);
 }
+
+/* Ghost by day: the same nothing, on white. */
+[data-theme="ghost"][data-mode="light"] {
+  --bg: #f4f4f4;
+  --bg-2: #ffffff;
+  --bg-3: #e6e6e6;
+  --fg: #111111;
+  --fg-dim: #6a6a6a;
+  --fg-faint: #b0b0b0;
+  --accent: #111111;
+  --accent-fg: #ffffff;
+  --accent-2: #555555;
+  --danger: #c43d3d;
+  --ok: #2e7d4f;
+  --warn: #a86f00;
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.35);
+  --hud-bg: rgba(244, 244, 244, 0.85);
+}

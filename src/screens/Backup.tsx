@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useStore } from "../store";
 import { api, pickFolder } from "../lib/api";
 import { Modal } from "../components/Modal";
-import { fmtEta, useCountdown } from "../components/ScanPill";
+import { fmtEta, useCountdown } from "../lib/eta";
 import { formatBytes, formatDate, tailPath } from "../lib/format";
 import type { BackupOutcome, BackupPlan, BackupProgress } from "../lib/types";
 
@@ -19,6 +19,8 @@ export function Backup() {
   const [verify, setVerify] = useState(true);
   const [plan, setPlan] = useState<BackupPlan | null>(null);
   const [planning, setPlanning] = useState(false);
+  // Why the backup folder can't be compared (inside this library, say): said under it, not as a toast.
+  const [problem, setProblem] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<BackupProgress | null>(null);
   const [outcome, setOutcome] = useState<BackupOutcome | null>(null);
@@ -36,6 +38,7 @@ export function Backup() {
     if (dir) {
       s.setLibraryField({ backupDest: dir });
       setPlan(null);
+      setProblem(null);
       setOutcome(null);
     }
   };
@@ -46,15 +49,16 @@ export function Backup() {
     setOutcome(null);
     try {
       setPlan(await api.backupPlan(s.root, dest, s.library, skipTrash));
+      setProblem(null);
     } catch (e) {
-      s.toast(String(e), "error");
+      setProblem(String(e).replace(/^Error: /, ""));
     } finally {
       setPlanning(false);
     }
   };
 
   useEffect(() => {
-    if (dest && !plan && !planning) void analyse();
+    if (dest && !plan && !planning && !problem) void analyse();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dest, skipTrash]);
 
@@ -97,12 +101,13 @@ export function Backup() {
         ) : (
           <p className="dim small">Pick a folder on another drive. The choice is remembered with this folder's library file.</p>
         )}
+        {problem && <p className="backup-problem small">{/inside the source/.test(problem) ? "That folder is inside this library, or holds it: choose a folder on another drive." : problem}</p>}
       </section>
 
       <hr className="rule" />
       <section className="row">
         <label className="check side-row" title="Leave the _deleted folder out of the backup">
-          <input type="checkbox" checked={skipTrash} disabled={running} onChange={(e) => { setSkipTrash(e.target.checked); setPlan(null); }} /> Skip trash
+          <input type="checkbox" checked={skipTrash} disabled={running} onChange={(e) => { setSkipTrash(e.target.checked); setPlan(null); setProblem(null); }} /> Skip trash
         </label>
         <label className="check side-row" title="Compare a fingerprint of every copied file with the source">
           <input type="checkbox" checked={verify} disabled={running} onChange={(e) => setVerify(e.target.checked)} /> Verify copies

@@ -1,30 +1,76 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useStore, selectCurrent, selectRating } from "../store";
+import { ActivityButton } from "../components/Activity";
+import { CastButton } from "../components/Cast";
+import { useShallow } from "zustand/react/shallow";
+import { useFind } from "../findStore";
+import { PlatformIcon } from "../components/PlatformIcon";
+import { useStore, originalOf, selectCurrent, selectRating } from "../store";
+import { VersionSwitch } from "../components/VersionSwitch";
+import { PageTurn } from "../components/PageTurn";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
-import { ArrowCounterClockwise, ArrowLeft, Books, CaretDown, CaretLeft, CaretRight, Copy, FolderOpen, GearSix, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowLeft, Books, CaretDown, Info, Tag as TagIcon, CaretLeft, CaretRight, Copy, FolderOpen, GearSix, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash, Scissors, BookOpen, UsersThree, PaintBrush, MagnifyingGlass } from "@phosphor-icons/react";
+import { useScrapbook } from "../scrapbook/store";
 import { Popover } from "../components/Popover";
+import { PluginButtons } from "../components/PluginButtons";
+import { SeriesStrip } from "../components/SeriesStrip";
+import { FacesButton, FacesPanel } from "../components/FacesInPicture";
+import { toggleFaceMode } from "../peopleStore";
+import type { MediaItem, Target } from "../lib/types";
+import { seriesCount, seriesIndex } from "../lib/series";
+import { PluginPanel } from "../components/PluginPanel";
+import { TagEditor } from "../components/TagPicker";
+import { ArtistPicker } from "../components/ArtistPicker";
+import { ArtistIcon } from "../components/ArtistIcon";
+import { artistKeyOf, useArtists } from "../artistsStore";
+import { albumKeyOf, useTags } from "../tagsStore";
+import { directionFor, usePlugins } from "../plugins/store";
+import { useFinders } from "../plugins/find";
+import { BrandHome, LABEL } from "../components/TopNav";
 import { Deco } from "../components/Deco";
 import { RatingBar } from "../components/RatingBar";
 import { EditStage } from "../components/EditStage";
 import { EditBar } from "../components/EditBar";
 import { Select } from "../components/Select";
 import { TargetBar } from "../components/TargetBar";
-import { mediaUrl, pickFolder } from "../lib/api";
-import { isTypingTarget } from "../lib/hotkeys";
-import { basename, ext, formatBytes, formatDate, tailPath } from "../lib/format";
+import { OwnFolderPicker } from "../components/OwnFolderPicker";
+import { bucketOf } from "../lib/filing";
+import { mediaUrl } from "../lib/api";
+import { notForTarget, pickLibraryFolder } from "../components/FolderBrowser";
+import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
+import { basename, ext, tailPath } from "../lib/format";
 
 export function Viewer() {
-  const s = useStore();
+  // Find's platforms, each with its own icon, as in the top bar; Back names the one Find shows.
+  const finders = useFinders((f) => f.finders);
+  const platforms = Object.values(finders);
+  const findOn = useFind((f) => f.pluginId);
+  const finderName = (findOn ? finders[findOn] : platforms[0])?.name;
+  const s = useStore(useShallow((x) => ({ addTarget: x.addTarget, albums: x.albums, closeViewer: x.closeViewer, viewerBack: x.viewerBack, albumsLoaded: x.albumsLoaded, backupOpen: x.backupOpen, busy: x.busy, driveOpen: x.driveOpen, editItems: x.editItems, editMode: x.editMode, fitMode: x.fitMode, helpOpen: x.helpOpen, hudHidden: x.hudHidden, immersive: x.immersive, index: x.index, infoOpen: x.infoOpen, lastTargetParent: x.lastTargetParent, library: x.library, loadAlbums: x.loadAlbums, moveCurrent: x.moveCurrent, next: x.next, openAlbums: x.openAlbums, openBrowse: x.openBrowse, openDupes: x.openDupes, openEdit: x.openEdit, openFiles: x.openFiles, openTags: x.openTags, pluginsOpen: x.pluginsOpen, prev: x.prev, queue: x.queue, rescan: x.rescan, root: x.root, set: x.set, setAlbumRatingByKey: x.setAlbumRatingByKey, setRating: x.setRating, setSlideshowHideUi: x.setSlideshowHideUi, setSlideshowInterval: x.setSlideshowInterval, settingsOpen: x.settingsOpen, shuffle: x.shuffle, slideshow: x.slideshow, source: x.source, surprise: x.surprise, switchTranslation: x.switchTranslation, toggleShuffle: x.toggleShuffle, toggleSlideshow: x.toggleSlideshow, trashCurrent: x.trashCurrent, trashOpen: x.trashOpen, undo: x.undo, undoStack: x.undoStack, vaultOpen: x.vaultOpen })));
   const current = useStore(selectCurrent);
   const rating = useStore(selectRating);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [cursorHidden, setCursorHidden] = useState(false);
-  const [menu, setMenu] = useState<"show" | "goto" | null>(null);
+  const [menu, setMenu] = useState<"show" | "goto" | "tags" | "artist" | null>(null);
+  // ⇧ and a key (or ⇧-click) of a target that files by the day: which folder of yours in it.
+  const [chooseIn, setChooseIn] = useState<Target | null>(null);
+  const infoShown = useStore((x) => !!x.infoItem) && !s.editMode;
+  // How many tags the item carries (an album page: its album's), kept up to date for the tag button.
+  const tagCount = useTags((t) => (current ? (t.data?.tags[current.albumKey ? albumKeyOf(current.albumKey) : current.key]?.length ?? 0) : 0));
+  // Its artists (an album page: the album's).
+  const artistsDoc = useArtists((a) => a.doc);
+  useEffect(() => void useArtists.getState().load(), [s.root]);
+  const artistKey = current ? artistKeyOf(current) : null;
+  const artistOf = artistKey ? artistsDoc?.artists[artistsDoc?.items[artistKey]?.[0] ?? ""] : undefined;
+  useEffect(() => {
+    void useTags.getState().load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.root]);
   const targets = s.library?.targets ?? [];
   const album = current?.albumKey ? s.albums.find((a) => a.key === current.albumKey) : undefined;
   const albumKey = current?.albumKey;
-  const albumRating = albumKey ? s.library?.albumRatings[albumKey] : undefined;
+  // A translated version's rating is its original's: the two are one album.
+  const albumRating = albumKey ? s.library?.albumRatings[originalOf(albumKey)] : undefined;
 
   useEffect(() => {
     if (albumKey && !s.albumsLoaded) void s.loadAlbums();
@@ -59,7 +105,7 @@ export function Viewer() {
 
   // Slideshow: images advance after the interval, videos when they end.
   const show = s.slideshow;
-  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.editMode;
+  const modalOpen = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.pluginsOpen || s.editMode;
   useEffect(() => {
     if (!show.playing || !current || modalOpen) return;
     if (current.kind === "video") return; // handled by onEnded
@@ -72,7 +118,9 @@ export function Viewer() {
     if (albumKey) s.setAlbumRatingByKey(albumKey, r);
     else s.setRating(current, r);
   };
-  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen;
+  const anyModal = s.settingsOpen || s.trashOpen || s.helpOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.pluginsOpen;
+  usePlugins((ps) => ps.directions); // re-render when a plugin changes reading direction
+  const rtl = directionFor(current?.albumKey) === "rtl";
   const [videoDuration, setVideoDuration] = useState(0);
   useEffect(() => {
     // Duration for the trim sliders: read it from the media element when a video is current.
@@ -107,7 +155,7 @@ export function Viewer() {
   }, [s.editMode]);
 
   const addTarget = useCallback(async () => {
-    const dir = await pickFolder("Choose a target folder", s.lastTargetParent ?? s.root ?? undefined);
+    const dir = await pickLibraryFolder({ title: "Choose a target folder", start: s.lastTargetParent ?? s.root, outside: true, why: notForTarget(s.library, s.root ?? "") });
     if (dir) s.addTarget(dir);
   }, [s]);
 
@@ -121,24 +169,25 @@ export function Viewer() {
       if (key === "escape") {
         if (st.editMode) {
           st.leaveEdit();
-        } else if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen || st.vaultOpen) {
-          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false, vaultOpen: false });
+        } else if (st.settingsOpen || st.trashOpen || st.helpOpen || st.infoOpen || st.driveOpen || st.backupOpen || st.vaultOpen || st.pluginsOpen) {
+          st.set({ settingsOpen: false, trashOpen: false, helpOpen: false, infoOpen: false, driveOpen: false, backupOpen: false, vaultOpen: false, pluginsOpen: false });
+        } else if (usePlugins.getState().panelOpen) {
+          // A plugin's panel (a tool of Edit) closes first.
+          usePlugins.getState().setPanelOpen(null);
         } else if (st.slideshow.playing) {
           st.toggleSlideshow();
         } else if (st.immersive) {
           st.toggleImmersive();
         } else if (st.fullscreen) {
           void st.toggleFullscreen();
-        } else if (st.source.kind === "browse") {
-          st.openBrowse();
-        } else if (st.source.kind === "dupes") {
-          st.openDupes();
-        } else if (st.source.kind === "albums") {
-          st.openAlbums();
+        } else if (st.source.kind !== "unsorted") {
+          st.closeViewer();
         }
         return;
       }
-      if (anyModal) return;
+      if (anyModal || dialogOpen()) return;
+      // A key held down repeats; filing or trashing must not.
+      if (e.repeat && (key === "backspace" || key === "delete" || st.library?.targets.some((t) => t.hotkey.toLowerCase() === key))) return;
       if (st.editMode) {
         // In edit mode only a few keys act: T leaves, arrows are ignored (the edit targets this item).
         if (key === "t") st.leaveEdit();
@@ -152,12 +201,19 @@ export function Viewer() {
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      // Plugins can set right-to-left reading (manga): the arrows follow the page order.
+      const rtlNow = directionFor(cur?.albumKey) === "rtl";
       switch (key) {
         case "arrowright":
-          st.next();
+          if (rtlNow) st.prev();
+          else st.next();
           return;
         case "arrowleft":
-          st.prev();
+          if (rtlNow) st.next();
+          else st.prev();
+          return;
+        case "o":
+          usePlugins.getState().toggleOverlays();
           return;
         case "backspace":
         case "delete":
@@ -203,6 +259,29 @@ export function Viewer() {
         case "e":
           st.openFiles();
           return;
+        case "l":
+          st.openTags();
+          return;
+        case "k":
+          st.openScrapbook();
+          return;
+        case "p":
+          // ⇧P: the faces in this picture or video; P: People.
+          if (e.shiftKey) {
+            if (cur) toggleFaceMode();
+          } else st.openPeople();
+          return;
+        case "w":
+          // ⇧W: who made it (the key isn't typed into its search, which takes the focus); W: the artists.
+          if (e.shiftKey) {
+            e.preventDefault();
+            setMenu("artist");
+          } else st.openArtists();
+          return;
+        case "i":
+          // Info beside the picture, following it; I again closes it.
+          st.set({ infoItem: st.infoItem ? null : (cur ?? null) });
+          return;
         case "t":
           if (cur) st.openEdit([cur]);
           return;
@@ -214,9 +293,6 @@ export function Viewer() {
           return;
         case "g":
           st.set({ settingsOpen: true });
-          return;
-        case "i":
-          st.set({ infoOpen: !st.infoOpen });
           return;
         case "?":
           st.set({ helpOpen: true });
@@ -250,10 +326,12 @@ export function Viewer() {
         if (cur) (cur.albumKey ? st.setAlbumRatingByKey(cur.albumKey, r) : st.setRating(cur, r));
         return;
       }
-      const target = st.library?.targets.find((t) => t.hotkey.toLowerCase() === key);
+      // An album's page is in its album folder already: no folder to sort it into (an album moves whole, in Albums).
+      const target = cur?.albumKey ? undefined : st.library?.targets.find((t) => t.hotkey.toLowerCase() === key);
       if (target) {
         e.preventDefault();
-        void st.moveCurrent(target.id);
+        if (e.shiftKey && cur && bucketOf(target, st.library!.targets)) setChooseIn(target);
+        else void st.moveCurrent(target.id);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -265,11 +343,24 @@ export function Viewer() {
 
   return (
     <div ref={rootRef} className={`viewer ${s.hudHidden ? "hud-hidden" : ""} ${s.immersive ? "immersive" : ""} ${cursorHidden ? "cursor-hidden" : ""} ${s.editMode ? "editing" : ""}`}>
+      {chooseIn && (
+        <OwnFolderPicker
+          target={chooseIn}
+          onClose={() => setChooseIn(null)}
+          onPick={(folder) => {
+            setChooseIn(null);
+            void s.moveCurrent(chooseIn.id, folder === chooseIn.path ? undefined : folder);
+          }}
+        />
+      )}
       <div className="stage">
         {current && s.editMode ? (
           <EditStage item={current} />
         ) : current ? (
-          <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} loop={!show.playing} onEnded={() => show.playing && s.next()} />
+          <>
+            <MediaStage item={current} videoRef={videoRef} fit={s.fitMode} loop={!show.playing} onEnded={() => show.playing && s.next()} />
+            <PageTurn item={current} index={s.index} fit={s.fitMode} />
+          </>
         ) : (
           <div className="fitbox">
           <div className="stage-empty panel">
@@ -296,41 +387,22 @@ export function Viewer() {
         {upcoming.map((i) => (
           <img key={i.primary} src={mediaUrl(i)} alt="" className="preload" />
         ))}
-        {s.infoOpen && current && (
-          <div className="info panel mono">
-            <div className="label">File</div>
-            {current.files.map((f) => (
-              <div key={f}>{basename(f)}</div>
-            ))}
-            <div className="label">Folder</div>
-            <div>{current.dir || "/"}</div>
-            <div className="label">Size</div>
-            <div>{formatBytes(current.size)}</div>
-            <div className="label">Modified</div>
-            <div>{formatDate(current.modified)}</div>
-            <div className="label">Key</div>
-            <div className="faint">{current.key}</div>
-          </div>
-        )}
       </div>
 
       <div className="hud hud-top">
         <div className="hud-left">
-          <span className="brand">MEDIA SORTER</span>
+          <BrandHome current="viewer" />
           {s.source.kind === "unsorted" && (
             <span className="faint mono hud-root" title={s.root ?? ""}>
               {s.root ? tailPath(s.root, 2) : ""}
             </span>
           )}
           {s.source.kind !== "unsorted" && (
-            <button
-              className="btn sm accent2"
-              onClick={s.source.kind === "browse" ? s.openBrowse : s.source.kind === "albums" ? s.openAlbums : s.openDupes}
-              title={`Back to ${s.source.kind === "browse" ? "Browse" : s.source.kind === "albums" ? "Albums" : "Duplicates"} (Esc)`}
-            >
+            <button className="btn sm accent2" onClick={s.closeViewer} title={`Back to ${s.viewerBack === "find" ? (finderName ?? LABEL.find) : (LABEL[s.viewerBack] ?? "Browse")} (Esc)`}>
               <ArrowLeft /> <kbd className="kbd">Esc</kbd>
             </button>
           )}
+          {current?.albumKey && <VersionSwitch albumKey={current.albumKey} />}
         </div>
         <div className="hud-center">
           {current && (
@@ -341,14 +413,19 @@ export function Viewer() {
               {!album && current.albumKey && <span className="badge accent">ALBUM</span>}
               {current.hasRaw && current.kind !== "raw" && <span className="badge">+RAW</span>}
               {current.hasVideo && current.kind !== "video" && <span className="badge">+VID</span>}
+              <SeriesBadge item={current} />
               <span className="dim mono hud-dir ellipsis" title={current.dir || "/"}>{current.dir || "/"}</span>
             </div>
           )}
         </div>
         <div className="hud-right">
+          <ActivityButton />
           <span className="mono counter" title="Position in the current queue">
             {s.queue.length ? s.index + 1 : 0} of {s.queue.length}
           </span>
+
+          {/* On a phone or tablet nearby. */}
+          <CastButton />
 
           {/* Slideshow: play/pause, with a menu for interval, HUD hiding, shuffle and surprise. */}
           <span className="btn-group">
@@ -384,6 +461,62 @@ export function Viewer() {
             </Popover>
           </span>
 
+          <PluginButtons location="viewer.toolbar" compact context={() => ({ item: useStore.getState().queue[useStore.getState().index] })} />
+          <PluginPanel />
+          <FacesPanel videoRef={videoRef} />
+          {rtl && (
+            <span className="badge accent2" title="Right-to-left reading set by a plugin: ← goes forward">
+              RTL
+            </span>
+          )}
+
+          {current && (
+            <button className={`btn sm ${infoShown ? "active" : "ghost"}`} onClick={() => s.set({ infoItem: infoShown ? null : current })} title="Everything known about it (I)">
+              <Info />
+            </button>
+          )}
+          {/* Tags on the current item. */}
+          {current && (
+            <Popover
+              open={menu === "tags"}
+              onClose={() => setMenu(null)}
+              width={320}
+              trigger={
+                <button className={`btn sm ${menu === "tags" ? "active" : "ghost"}`} onClick={() => setMenu(menu === "tags" ? null : "tags")} title={tagCount ? `${tagCount} tag${tagCount === 1 ? "" : "s"} on this item` : "Tags on this item"}>
+                  <TagIcon />
+                  {tagCount > 0 && <span className="mono small">{tagCount}</span>}
+                </button>
+              }
+            >
+              <div className="pop-title">Tags on {current.name}</div>
+              <TagEditor keys={[current.key]} />
+            </Popover>
+          )}
+          {/* Who is in it: its faces on the picture, named here (a video's each at its moment). */}
+          {current && <FacesButton item={current} />}
+          {/* Who made it (an album page: the album). */}
+          {current && artistKey && (
+            <Popover
+              open={menu === "artist"}
+              onClose={() => setMenu(null)}
+              width={280}
+              trigger={
+                <button className={`btn sm viewer-artist ${menu === "artist" ? "active" : "ghost"}`} onClick={() => setMenu(menu === "artist" ? null : "artist")} title={artistOf ? `By ${artistOf.name} (⇧W)` : "Who made it (⇧W)"}>
+                  {/* Only their icon: a name would push the bar onto two lines. */}
+                  {artistOf ? <ArtistIcon artist={artistOf} size={18} /> : <PaintBrush />}
+                </button>
+              }
+            >
+              <div className="pop-title">Artist of {current.albumKey ? (album?.name ?? "this album") : current.name}</div>
+              <ArtistPicker keys={[artistKey]} />
+            </Popover>
+          )}
+          {current && (current.kind === "image" || current.kind === "raw") && (
+            <button className="btn sm ghost" onClick={() => void useScrapbook.getState().openStudio({ item: current })} title="Make a sticker: cut its subjects out for Scrapbook">
+              <Scissors />
+            </button>
+          )}
+
           {/* Go to: the list screens. */}
           <Popover
             open={menu === "goto"}
@@ -409,6 +542,36 @@ export function Viewer() {
               <button className="btn sm ghost" onClick={s.openFiles}>
                 <FolderOpen /> Files <kbd className="kbd">E</kbd>
               </button>
+              <button className="btn sm ghost" onClick={s.openTags}>
+                <TagIcon /> Tags <kbd className="kbd">L</kbd>
+              </button>
+              <button className="btn sm ghost" onClick={() => useStore.getState().openPeople()}>
+                <UsersThree /> People <kbd className="kbd">P</kbd>
+              </button>
+              <button className="btn sm ghost" onClick={() => useStore.getState().openArtists()}>
+                <PaintBrush /> Artists <kbd className="kbd">W</kbd>
+              </button>
+              <button className="btn sm ghost" onClick={() => useStore.getState().openScrapbook()}>
+                <BookOpen /> Scrapbook <kbd className="kbd">K</kbd>
+              </button>
+              {platforms.length ? (
+                platforms.map((p) => (
+                  <button
+                    key={p.pluginId}
+                    className="btn sm ghost"
+                    onClick={() => {
+                      useFind.getState().choose(p.pluginId);
+                      useStore.getState().openFind();
+                    }}
+                  >
+                    <PlatformIcon pluginId={p.pluginId} url={p.icon} /> {p.name}
+                  </button>
+                ))
+              ) : (
+                <button className="btn sm ghost" onClick={() => useStore.getState().openFind()}>
+                  <MagnifyingGlass /> Find
+                </button>
+              )}
             </div>
           </Popover>
 
@@ -421,6 +584,7 @@ export function Viewer() {
         </div>
       </div>
 
+      <SeriesStrip />
       {s.editMode && current ? (
         <EditBar item={current} items={s.editItems.length ? s.editItems : [current]} videoDuration={videoDuration} />
       ) : (
@@ -440,16 +604,35 @@ export function Viewer() {
             <button className="btn ghost" onClick={() => current && s.openEdit([current])} disabled={!current || s.busy} title="Edit: rotate, flip, crop, resize, trim, convert (T)">
               <PencilSimple /> Edit <kbd className="kbd">T</kbd>
             </button>
-            <button className="btn danger" onClick={() => void s.trashCurrent()} disabled={!current || s.busy} title="Delete (⌫)">
+            <button className="btn danger" data-own-sound onClick={() => void s.trashCurrent()} disabled={!current || s.busy} title="Delete (⌫)">
               <Trash /> Delete <kbd className="kbd">⌫</kbd>
             </button>
           </div>
         </div>
-        <div className="hud-row">
-          <TargetBar targets={targets} onMove={(id) => void s.moveCurrent(id)} onAdd={() => void addTarget()} disabled={!current || s.busy} />
-        </div>
+        {/* Sorting into folders, but not an album's pages: the album is in its album folder already. */}
+        {!current?.albumKey && (
+          <div className="hud-row">
+            <TargetBar targets={targets} onMove={(id) => void s.moveCurrent(id)} onChoose={(t) => setChooseIn(t)} onAdd={() => void addTarget()} disabled={!current || s.busy} />
+          </div>
+        )}
       </div>
       )}
     </div>
+  );
+}
+
+/** The picture on show is one of a series: which of it (kept together, in a row), and how many. */
+function SeriesBadge({ item }: { item: MediaItem }) {
+  const series = useStore((s) => seriesIndex(s.library?.series).get(item.key));
+  const queue = useStore((s) => s.queue);
+  const together = useStore((s) => s.seriesTogether);
+  const trashDir = useStore((s) => s.library?.trashDir);
+  if (!series) return null;
+  const inQueue = queue.filter((q) => series.includes(q.key));
+  const at = inQueue.findIndex((q) => q.key === item.key);
+  return (
+    <span className="badge accent" title={together ? "One of a series kept together: a target key files all of it" : "One of a series (kept apart: Settings, Look and reading)"}>
+      SERIES {together && inQueue.length > 1 ? `${at + 1}/${inQueue.length}` : `· ${seriesCount(series, trashDir)}`}
+    </span>
   );
 }

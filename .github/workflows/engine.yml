@@ -1,0 +1,49 @@
+# The local engine (engine/): lints and unit tests on all three platforms, when it changes. Its
+# dependencies (Koharu, ONNX Runtime, wasmtime) take a long time to build, so this doesn't run on
+# every push to the app.
+name: Engine
+
+on:
+  push:
+    paths: ["engine/**", ".github/workflows/engine.yml"]
+  pull_request:
+    paths: ["engine/**", ".github/workflows/engine.yml"]
+  workflow_dispatch:
+
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+jobs:
+  engine:
+    name: Engine (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake nasm libclang-dev libssl-dev
+      - name: Build tools (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
+      - name: libclang for bindgen
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then echo "LIBCLANG_PATH=/Library/Developer/CommandLineTools/usr/lib" >> "$GITHUB_ENV"; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"; fi
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: engine -> target
+      - run: cargo clippy --all-targets -- -D warnings
+        working-directory: engine
+      - run: cargo test
+        working-directory: engine

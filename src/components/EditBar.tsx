@@ -5,6 +5,7 @@ import { describe, isIdentity, LOSSY, useEdit } from "../editStore";
 import type { EditTools, MediaItem } from "../lib/types";
 import { ArrowClockwise, ArrowCounterClockwise, ArrowsHorizontal, ArrowsVertical, Check, Crop, FloppyDisk, Scissors, SpeakerSlash, Warning, X } from "@phosphor-icons/react";
 import { Popover } from "./Popover";
+import { usePlugins } from "../plugins/store";
 import { Select } from "./Select";
 import { resultSize } from "../editStore";
 
@@ -12,7 +13,7 @@ const IMAGE_TARGETS: [string, string][] = [["jpg", "JPEG"], ["png", "PNG"], ["we
 const VIDEO_TARGETS: [string, string][] = [["mp4-h264", "MP4 H.264"], ["mp4-h265", "MP4 H.265"], ["webm-vp9", "WebM"], ["gif", "GIF"], ["mp3", "MP3 audio"]];
 const ASPECTS: [string, number | null][] = [["Free", null], ["1:1", 1], ["4:3", 4 / 3], ["3:2", 3 / 2], ["16:9", 16 / 9], ["9:16", 9 / 16]];
 
-/** Bottom bar in edit mode: the controls, a summary of pending edits, save as copy / overwrite / cancel. */
+/** Bottom bar in edit mode: the controls, a summary of pending edits, cancel / save as copy / overwrite. */
 export function EditBar({ item, items, videoDuration }: { item: MediaItem; items: MediaItem[]; videoDuration: number }) {
   const s = useStore();
   const e = useEdit();
@@ -43,6 +44,9 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
   const targets = isVideo ? VIDEO_TARGETS : IMAGE_TARGETS;
   const needsFfmpeg = isVideo || (item.kind !== "raw" && !/\.(jpe?g|png|webp|gif|bmp|tiff?)$/i.test(item.primary));
   const ffmpegMissing = needsFfmpeg && tools !== null && !tools.ffmpeg;
+
+  // Editing closes a plugin's panel: one tool at a time.
+  useEffect(() => usePlugins.getState().setPanelOpen(null), []);
 
   useEffect(() => {
     api.editTools().then(setTools).catch(() => setTools({ ffmpeg: null, ffprobe: null, version: null, encoders: [] }));
@@ -280,11 +284,11 @@ export function EditBar({ item, items, videoDuration }: { item: MediaItem; items
         <button className="btn ghost" disabled={busy} onClick={s.leaveEdit}>
           <X /> Cancel <kbd className="kbd">Esc</kbd>
         </button>
-        <button className="btn" disabled={busy || isIdentity(p) || ffmpegMissing} onClick={() => void save(true)} title="Replace the original (it goes to the trash, the rating carries over)">
-          Overwrite
+        <button className="btn" disabled={busy || isIdentity(p) || ffmpegMissing} onClick={() => void save(false)} title="Keep the original and save the result next to it; Info says which it was made from">
+          Save as copy
         </button>
-        <button className="btn primary" disabled={busy || isIdentity(p) || ffmpegMissing} onClick={() => void save(false)} title="Keep the original and save the result next to it">
-          <FloppyDisk /> Save as copy
+        <button className="btn primary" disabled={busy || isIdentity(p) || ffmpegMissing} onClick={() => void save(true)} title="The result takes the original's place (the rating carries over); the original is kept, and Revert in Info brings it back">
+          <FloppyDisk /> Overwrite
         </button>
       </div>
     </div>

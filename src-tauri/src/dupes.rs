@@ -19,6 +19,10 @@ use std::path::Path;
 pub struct ImageHash {
     /// 64-bit hashes as 16 hex chars (JSON numbers cannot hold 64 bits).
     pub phash: String,
+    /// pHash of each quarter of the picture (top-left, top-right, bottom-left, bottom-right): a local
+    /// edit (a part painted over, a watermark) changes one or two of them and leaves the rest alike.
+    #[serde(default)]
+    pub quads: Vec<String>,
     pub dhash: String,
     pub width: u32,
     pub height: u32,
@@ -82,7 +86,12 @@ pub fn image_hash_bytes(bytes: &[u8], is_raw: bool) -> Result<ImageHash, String>
 
 fn hash_image(img: &DynamicImage) -> ImageHash {
     let (width, height) = img.dimensions();
-    ImageHash { phash: format!("{:016x}", phash(img)), dhash: format!("{:016x}", dhash(img)), width, height }
+    // One downscale of the picture, every hash from that: the hashes read 32 px and less, and a
+    // 256 px copy keeps everything they look at while a 12-megapixel resize is done once, not five times.
+    let img = if width.max(height) > 256 { img.resize(256, 256, FilterType::Triangle) } else { img.clone() };
+    let (w, h) = (img.width(), img.height());
+    let quads = [(0, 0), (w / 2, 0), (0, h / 2), (w / 2, h / 2)].iter().map(|&(x, y)| format!("{:016x}", phash(&img.crop_imm(x, y, w - w / 2, h - h / 2)))).collect();
+    ImageHash { phash: format!("{:016x}", phash(&img)), quads, dhash: format!("{:016x}", dhash(&img)), width, height }
 }
 
 /// pHash: 32x32 grayscale -> DCT -> top-left 8x8 (minus DC) compared to median.
@@ -195,6 +204,37 @@ mod tests {
         assert_ne!(file_fingerprint(&p1).unwrap(), file_fingerprint(&p3).unwrap());
         for p in [p1, p2, p3] {
             let _ = std::fs::remove_file(p);
+        }
+    }
+
+    /// A look at real pairs: `MS_PROBE_PAIRS="a.png=b.png;c.jpg=d.jpg" cargo test probe_pairs -- --ignored --nocapture`
+    /// prints each pair's pHash and dHash distances, for choosing the sensitivity thresholds.
+    #[test]
+    #[ignore]
+    fn probe_pairs() {
+        let Ok(list) = std::env::var("MS_PROBE_PAIRS") else { return };
+        for pair in list.split(';').filter(|p| !p.is_empty()) {
+            let (a, b) = pair.split_once('=').expect("a=b");
+            let (ha, hb) = (image_hash(Path::new(a), false).unwrap(), image_hash(Path::new(b), false).unwrap());
+            let d = |x: &str, y: &str| (u64::from_str_radix(x, 16).unwrap() ^ u64::from_str_radix(y, 16).unwrap()).count_ones();
+            let q: Vec<u32> = ha.quads.iter().zip(&hb.quads).map(|(x, y)| d(x, y)).collect();
+            println!("PAIR {:28} phash {:2} dhash {:2} quads {:?}", Path::new(a).file_name().unwrap().to_string_lossy(), d(&ha.phash, &hb.phash), d(&ha.dhash, &hb.dhash), q);
+        }
+    }
+
+    /// Distances between every two of the files in `MS_PROBE_FILES` (`;`-separated): what unrelated pictures score.
+    #[test]
+    #[ignore]
+    fn probe_distinct() {
+        let Ok(list) = std::env::var("MS_PROBE_FILES") else { return };
+        let files: Vec<&str> = list.split(';').filter(|p| !p.is_empty()).collect();
+        let hashes: Vec<ImageHash> = files.iter().map(|f| image_hash(Path::new(f), false).unwrap()).collect();
+        let d = |x: &str, y: &str| (u64::from_str_radix(x, 16).unwrap() ^ u64::from_str_radix(y, 16).unwrap()).count_ones();
+        for i in 0..files.len() {
+            for j in i + 1..files.len() {
+                let q: Vec<u32> = hashes[i].quads.iter().zip(&hashes[j].quads).map(|(x, y)| d(x, y)).collect();
+                println!("DISTINCT phash {:2} dhash {:2} quads {:?}", d(&hashes[i].phash, &hashes[j].phash), d(&hashes[i].dhash, &hashes[j].dhash), q);
+            }
         }
     }
 }

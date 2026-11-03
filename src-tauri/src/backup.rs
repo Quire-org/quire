@@ -53,7 +53,10 @@ fn walk(root: &Path, skip_trash: Option<&Path>) -> Vec<FileEntry> {
         .into_iter()
         .filter_entry(|e| {
             let n = e.file_name().to_string_lossy();
-            if e.depth() > 0 && (n == ".Spotlight-V100" || n == ".fseventsd" || n == ".Trashes" || n == ".DS_Store" || n.ends_with(".tmp")) {
+            // The system's own (macOS's index, journal, trash, folder settings and AppleDouble files on
+            // drives it can't tag; Windows' recycle bin and volume information), and half-written saves.
+            const SYSTEM: &[&str] = &[".Spotlight-V100", ".fseventsd", ".Trashes", ".DS_Store", ".TemporaryItems", ".DocumentRevisions-V100", "$RECYCLE.BIN", "System Volume Information"];
+            if e.depth() > 0 && (SYSTEM.contains(&n.as_ref()) || n.starts_with("._") || n.ends_with(".tmp")) {
                 return false;
             }
             !matches!(skip_trash, Some(t) if e.path() == t)
@@ -148,18 +151,17 @@ fn copy_file(src: &Path, dst: &Path) -> Result<(), String> {
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
     }
-    let tmp = dst.with_extension(format!("{}.mediasorter-part", dst.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default()));
+    let tmp = dst.with_extension(format!("{}.quire-part", dst.extension().map(|e| e.to_string_lossy().into_owned()).unwrap_or_default()));
     fs::copy(src, &tmp).map_err(|e| format!("copy {}: {e}", src.display()))?;
-    if let Ok(m) = fs::metadata(src) {
-        if let Ok(t) = m.modified() {
+    if let Ok(m) = fs::metadata(src)
+        && let Ok(t) = m.modified() {
             let f = fs::File::options().write(true).open(&tmp).map_err(|e| e.to_string())?;
             let _ = f.set_modified(t);
         }
-    }
     fs::rename(&tmp, dst).map_err(|e| format!("finish {}: {e}", dst.display()))
 }
 
-pub fn run(src: &Path, dest: &Path, plan: &Plan, mirror: bool, verify: bool, mut progress: impl FnMut(Progress)) -> Outcome {
+pub fn run(src: &Path, dest: &Path, plan: &Plan, mirror: bool, verify: bool, ctl: &crate::jobctl::Control, mut progress: impl FnMut(Progress)) -> Outcome {
     BACKUP_CANCEL.store(false, Ordering::SeqCst);
     let start = Instant::now();
     let mut out = Outcome { copied: 0, updated: 0, moved: 0, deleted: 0, bytes: 0, millis: 0, verified: 0, errors: vec![], cancelled: false };
@@ -173,7 +175,8 @@ pub fn run(src: &Path, dest: &Path, plan: &Plan, mirror: bool, verify: bool, mut
             progress(Progress { stage: stage.into(), done_files, total_files, done_bytes, total_bytes, current: current.into(), errors });
         }
     };
-    let cancelled = || BACKUP_CANCEL.load(Ordering::SeqCst);
+    // Between files: waits while Activity has it paused; stops on Cancel or Activity's Stop.
+    let cancelled = || BACKUP_CANCEL.load(Ordering::SeqCst) || !ctl.go_on();
 
     let _ = fs::create_dir_all(dest);
     for (from, to) in &plan.moves {
@@ -291,7 +294,15 @@ mod tests {
         assert_eq!(p.source_files, 3);
         assert_eq!(p.bytes_to_copy, 2);
 
-        let out = run(&src, &dst, &p, true, true, |_| {});
+        // Stopped from Activity before it starts: nothing is touched.
+        let job = crate::jobctl::register("backup-test-stop");
+        crate::jobctl::stop("backup-test-stop");
+        let stopped = run(&src, &dst, &p, true, true, &job.ctl, |_| {});
+        assert!(stopped.cancelled);
+        assert_eq!((stopped.copied, stopped.updated, stopped.moved, stopped.deleted), (0, 0, 0, 0));
+        assert!(dst.join("DCIM/gone.jpg").exists());
+
+        let out = run(&src, &dst, &p, true, true, &crate::jobctl::Control::default(), |_| {});
         assert!(out.errors.is_empty(), "{:?}", out.errors);
         assert_eq!((out.copied, out.updated, out.moved, out.deleted, out.verified), (0, 1, 1, 1, 1));
         assert_eq!(fs::read(dst.join("DCIM/b.jpg")).unwrap(), b"bb");
@@ -304,6 +315,23 @@ mod tests {
         let p2 = plan(&src, &dst, Some(&src.join("_deleted"))).unwrap();
         assert_eq!(p2.unchanged, 3);
         assert!(p2.copy.is_empty() && p2.update.is_empty() && p2.moves.is_empty() && p2.extra.is_empty());
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn leaves_out_the_systems_own_files_and_keeps_the_librarys_hidden_ones() {
+        let base = std::env::temp_dir().join(format!("ms-backup-system-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let (src, dest) = (base.join("src"), base.join("dest"));
+        for f in ["a.jpg", "._a.jpg", ".DS_Store", ".TemporaryItems/x", "$RECYCLE.BIN/y", "System Volume Information/z", ".quire.tags.json", ".vault/index.enc"] {
+            let p = src.join(f);
+            fs::create_dir_all(p.parent().unwrap()).unwrap();
+            fs::write(&p, b"x").unwrap();
+        }
+        fs::create_dir_all(&dest).unwrap();
+        let mut copied: Vec<String> = plan(&src, &dest, None).unwrap().copy.into_iter().map(|f| f.rel).collect();
+        copied.sort();
+        assert_eq!(copied, [".quire.tags.json", ".vault/index.enc", "a.jpg"]);
         let _ = fs::remove_dir_all(&base);
     }
 

@@ -4,8 +4,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
-use walkdir::WalkDir;
 
 pub const IMAGE_EXTS: &[&str] = &[
     "jpg", "jpeg", "png", "heic", "heif", "webp", "gif", "bmp", "tif", "tiff", "avif",
@@ -102,12 +100,6 @@ pub fn rel_key(root: &Path, p: &Path) -> String {
     }
 }
 
-fn is_hidden(p: &Path) -> bool {
-    p.file_name()
-        .map(|n| n.to_string_lossy().starts_with('.'))
-        .unwrap_or(false)
-}
-
 /// Rank used to decide which file of a group is displayed: a developed image
 /// beats a video (live photo) which beats a RAW file.
 fn display_rank(kind: MediaKind) -> u8 {
@@ -120,39 +112,8 @@ fn display_rank(kind: MediaKind) -> u8 {
 
 /// Walk `dir` for plain files on disk (hidden entries and excluded dirs skipped).
 pub fn walk_files(dir: &Path, exclude: &[PathBuf]) -> Vec<FileRef> {
-    let walker = WalkDir::new(dir)
-        .follow_links(false)
-        .into_iter()
-        .filter_entry(|e| {
-            let p = e.path();
-            if p == dir {
-                return true;
-            }
-            if is_hidden(p) {
-                return false;
-            }
-            if e.file_type().is_dir() && exclude.iter().any(|x| x == p) {
-                return false;
-            }
-            true
-        });
-
-    walker
-        .filter_map(Result::ok)
-        .filter(|e| e.file_type().is_file())
-        .filter_map(|e| {
-            let m = e.metadata().ok()?;
-            let modified = m.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
-            Some(FileRef { path: e.into_path(), size: m.len(), modified })
-        })
-        .collect()
-}
-
-/// Scan `dir` recursively on disk. `exclude` holds absolute directories that
-/// are skipped entirely (the trash folder, target folders inside the root).
-#[allow(dead_code)]
-pub fn scan(root: &Path, dir: &Path, exclude: &[PathBuf]) -> Vec<MediaItem> {
-    build_items(root, dir, walk_files(dir, exclude))
+    // Remembered between scans; see listing.rs.
+    crate::listing::walk(dir, exclude)
 }
 
 /// Group files (RAW + JPEG, live photos, sidecars) into items. Paths are
@@ -213,7 +174,7 @@ mod tests {
     use std::fs;
 
     fn tmp(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("mediasorter-test-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("quire-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d
@@ -233,7 +194,7 @@ mod tests {
         fs::create_dir_all(root.join(".hidden")).unwrap();
         fs::write(root.join(".hidden/h.jpg"), b"x").unwrap();
 
-        let items = scan(&root, &root, &[keep.clone()]);
+        let items = crate::fsx::Ctx::new(&root, None).scan(&root, std::slice::from_ref(&keep));
         let mut names: Vec<_> = items.iter().map(|i| i.name.as_str()).collect();
         names.sort();
         assert_eq!(names, vec!["a", "b", "c", "e"]);

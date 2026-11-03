@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Media Sorter",
+  "productName": "Quire",
   "version": "0.1.0",
-  "identifier": "app.media-sorter",
+  "identifier": "app.quire",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,18 +12,18 @@
   "app": {
     "windows": [
       {
-        "title": "Media Sorter",
+        "title": "Quire",
         "width": 1400,
         "height": 900,
         "minWidth": 900,
         "minHeight": 600,
         "theme": "Dark",
         "backgroundColor": "#07080c",
-        "dragDropEnabled": true
+        "dragDropEnabled": false
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost vault: http://vault.localhost blob: data:; media-src 'self' asset: http://asset.localhost vault: http://vault.localhost blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost vault: http://vault.localhost",
+      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost vault: http://vault.localhost thumb: http://thumb.localhost blob: data:; media-src 'self' asset: http://asset.localhost vault: http://vault.localhost blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost vault: http://vault.localhost; frame-src msplugin: http://msplugin.localhost",
       "assetProtocol": {
         "enable": true,
         "scope": {
@@ -37,6 +37,8 @@
   },
   "bundle": {
     "active": true,
+    "externalBin": ["binaries/quire-engine"],
+    "resources": ["binaries/*pdfium*"],
     "targets": [
       "app",
       "deb",
@@ -49,6 +51,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "hardenedRuntime": false
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU3MEY2RkVEN0M5NTFDREEKUldUYUhKVjg3VzhQVjUyOXB6c09XTWRmZVRzcENVS3hJYnVNSlQzcFJwWERCaThOZlZBZ2phY0QK",
+      "requireSignedVersion": true
+    }
   }
 }

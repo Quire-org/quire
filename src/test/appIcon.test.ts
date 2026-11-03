@@ -5,7 +5,7 @@ vi.mock("../lib/api", () => ({ api: { setAppIcon: vi.fn(async () => {}) } }));
 import { fillIcon, ICON_SLOTS } from "../lib/appIcon";
 
 describe("app icon template", () => {
-  const colors = { bg: "#111111", ink: "#eeeeee", dim: "#555555", dot: "#8ab4ff" };
+  const colors = { bg: "#111111", ink: "#eeeeee" };
 
   it("fills every slot and leaves no placeholder behind", () => {
     const svg = fillIcon(colors);
@@ -19,6 +19,6 @@ describe("app icon template", () => {
   });
 
   it("maps slots to theme variables that every theme defines", () => {
-    expect(Object.values(ICON_SLOTS)).toEqual(["--bg-2", "--accent", "--fg-faint", "--accent-2"]);
+    expect(Object.values(ICON_SLOTS)).toEqual(["--bg-2", "--accent"]);
   });
 });

@@ -1,12 +1,22 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { inFloating, useFloating } from "./floating";
+import { useOpenSound } from "../lib/sounds";
 
-/** Small anchored panel that opens above its trigger (used in the bottom bar). Closes on outside click or Escape. */
+/**
+ * A small panel opened from a button: below it, or above when there is more room there (see
+ * useFloating), over everything. Closes on a click outside it (a list opened from inside it counts as
+ * inside) or Escape.
+ */
 export function Popover({ open, onClose, trigger, children, width = 300 }: { open: boolean; onClose: () => void; trigger: ReactNode; children: ReactNode; width?: number }) {
   const ref = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  useFloating(ref, pop, open, { gap: 8 });
+  useOpenSound(open);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node) && !inFloating(e.target)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -27,11 +37,13 @@ export function Popover({ open, onClose, trigger, children, width = 300 }: { ope
   return (
     <div className="pop-anchor" ref={ref}>
       {trigger}
-      {open && (
-        <div className="pop panel" style={{ width }}>
-          {children}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div ref={pop} className="pop panel" style={{ width }}>
+            {children}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

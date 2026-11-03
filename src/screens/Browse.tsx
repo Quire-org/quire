@@ -1,24 +1,37 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent, useDeferredValue } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { TopNav, SideToggle } from "../components/TopNav";
+import { PluginButtons } from "../components/PluginButtons";
 import { api, pickFolder } from "../lib/api";
-import { ArrowsClockwise, PencilSimple, Play, Selection, Sparkle, Trash } from "@phosphor-icons/react";
-import { useStore } from "../store";
-import { useDupes } from "../dupesStore";
+import { ArrowCounterClockwise, ArrowsClockwise, Info, MagnifyingGlass, Stack, PaintBrush, PencilSimple, Play, Scissors, Selection, Sparkle, Tag as TagIcon, Trash } from "@phosphor-icons/react";
+import { findSources } from "../findSource";
+import { useFinders } from "../plugins/find";
+import { useScrapbook } from "../scrapbook/store";
+import { useScrollMemory } from "../lib/scrollMemory";
+import { Popover } from "../components/Popover";
+import { ContextMenu, type MenuItem } from "../components/ContextMenu";
+import { TagEditor } from "../components/TagPicker";
+import { ArtistPicker } from "../components/ArtistPicker";
+import { useTags } from "../tagsStore";
+import { useStore, type BrowseFilters } from "../store";
+import { revertAll, useVersions } from "../versionsStore";
+import { seriesIndex, stacks } from "../lib/series";
+import { FiltersButton, FiltersPanel, type Filter } from "../components/Filters";
+import { NO_FILTER, filterPictures, useFilterData, usePictureFilterSections, type PictureFilter } from "../components/PictureFilters";
 import { Thumb } from "../components/Thumb";
-import { FolderPicker } from "../components/FolderPicker";
 import { Deco } from "../components/Deco";
-import { isTypingTarget } from "../lib/hotkeys";
-import { formatBytes, shuffled } from "../lib/format";
-import { cacheValid } from "../lib/dupes";
+import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
+import { formatBytes, shuffled, naturalCompare } from "../lib/format";
 import type { MediaItem } from "../lib/types";
+import { tileShapes } from "../lib/tileShapes";
 
-type LocationSel = "all" | "unsorted" | "recent" | "unseen" | string;
-type KindSel = "all" | "image" | "raw" | "video";
 type SortSel = "name" | "date" | "rating" | "size";
 type Layout = "masonry" | "grid";
 
 const GAP = 10;
-const DEFAULTS_RESET = { location: "all", kind: "all", folders: null, query: "", sortBy: "name", desc: false, minRating: 0, unratedOnly: false, random: false } as const;
+/** Every filter off (the search, order and layout stay). */
+const FILTERS_OFF: Partial<BrowseFilters> = { location: "all", kind: "all", folders: null, minRating: 0, unratedOnly: false, tagged: "all", tags: [], tagsMode: "or", tagsOut: [], tagsOutMode: "or", artists: [], people: [] };
+const DEFAULTS_RESET: Partial<BrowseFilters> = { ...FILTERS_OFF, query: "", sortBy: "name", desc: false, random: false };
 const META_H = 30; // caption row under each tile, must match .thumb-meta
 const OVERSCAN = 900;
 
@@ -28,34 +41,59 @@ const OVERSCAN = 900;
  * and name. Album folders are kept out; they have their own screen.
  */
 export function Browse() {
-  const s = useStore();
-  const sigCache = useDupes((d) => d.cache);
-  const loadCache = useDupes((d) => d.loadCache);
+  const s = useStore(useShallow((x) => ({ allItems: x.allItems, allStale: x.allStale, backupOpen: x.backupOpen, browseFilters: x.browseFilters, busy: x.busy, driveOpen: x.driveOpen, library: x.library, loadAll: x.loadAll, leaveSeries: x.leaveSeries, loading: x.loading, makeSeries: x.makeSeries, moveItem: x.moveItem, openAlbums: x.openAlbums, openDupes: x.openDupes, openEdit: x.openEdit, openFiles: x.openFiles, openSortQueue: x.openSortQueue, openTags: x.openTags, openViewer: x.openViewer, pluginsOpen: x.pluginsOpen, root: x.root, seriesTogether: x.seriesTogether, set: x.set, setBrowseFilters: x.setBrowseFilters, setRating: x.setRating, settingsOpen: x.settingsOpen, sideCollapsed: x.sideCollapsed, surprise: x.surprise, toast: x.toast, toggleChrome: x.toggleChrome, trashItem: x.trashItem, trashOpen: x.trashOpen, undo: x.undo, vault: x.vault, vaultOpen: x.vaultOpen, viewed: x.viewed })));
   const targets = s.library?.targets ?? [];
   const f = s.browseFilters;
   const setF = s.setBrowseFilters;
-  const { location, kind, query, sortBy, desc, minRating, unratedOnly, random, zoom, layout } = f;
+  const { location, kind, query, sortBy, desc, minRating, unratedOnly, random, zoom, layout, tagged = "all", tags: tagsSel = [], tagsMode = "or", tagsOut = [], tagsOutMode = "or", artists: artistsSel = [], people: peopleSel = [] } = f;
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    void useTags.getState().load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.root]);
   const folders = useMemo(() => (f.folders ? new Set(f.folders) : null), [f.folders]);
-  const setLocation = (v: LocationSel) => setF({ location: v });
-  const setKind = (v: KindSel) => setF({ kind: v });
-  const setFolders = (v: Set<string> | null) => setF({ folders: v ? [...v] : null });
   const setQuery = (v: string) => setF({ query: v });
-  const setMinRating = (v: number) => setF({ minRating: v });
-  const setUnratedOnly = (v: boolean) => setF({ unratedOnly: v });
+  // Typing stays instant; filtering the whole library follows a beat behind.
+  const searchQuery = useDeferredValue(query);
   const setZoom = (v: number) => setF({ zoom: v });
   const setLayout = (v: Layout) => setF({ layout: v });
-  const [seed, setSeed] = useState(0);
+  const seed = useStore((st) => st.browseSeed);
+  const setSeed = () => useStore.getState().reshuffleBrowse();
   const toggleRandom = () => {
     setF({ random: !useStore.getState().browseFilters.random });
-    setSeed((x) => x + 1);
+    setSeed();
   };
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
+  const [tagMenu, setTagMenu] = useState(false);
+  const [artistMenu, setArtistMenu] = useState(false);
+  const [ctx, setCtx] = useState<{ at: { x: number; y: number }; items: MenuItem[] } | null>(null);
+  /** Right-click on a tile: it, or the selection it is part of. */
+  // Platforms in Find that can look a picture up (Find source).
+  const lookups = useFinders(useShallow((f) => Object.values(f.finders).filter((x) => x.lookup)));
+  const tileMenu = (e: MouseEvent, it: MediaItem) => {
+    e.preventDefault();
+    const group = selected.has(it.key) ? selectedItems : [it];
+    const keys = group.map((g) => g.key);
+    const many = group.length > 1;
+    setCtx({
+      at: { x: e.clientX, y: e.clientY },
+      items: [
+        { label: <><Info /> Info</>, onClick: () => s.set({ infoItem: it }) },
+        ...(it.kind === "image" || it.kind === "raw" ? [{ label: <><Scissors /> Make a sticker…</>, onClick: () => void useScrapbook.getState().openStudio({ item: it }) }] : []),
+        ...(lookups.length && group.some((g) => g.kind === "image") ? [{ label: <><MagnifyingGlass /> Find source{many ? `s of ${group.length}` : ""} on {lookups.map((f) => f.name).join(" and ")}</>, onClick: () => void findSources(group) }] : []),
+        { content: <><span className="label">Tags{many ? ` on ${group.length}` : ""}</span><TagEditor keys={keys} /></> },
+        { separator: true },
+        ...targets.map((t) => ({ label: <>Move to {t.name}</>, onClick: () => void (many ? moveSelected(t.id) : s.moveItem(it, t.id)) })),
+        { separator: true },
+        { label: <><Trash /> Trash{many ? ` ${group.length}` : ""}</>, danger: true, onClick: () => void (many ? trashSelected() : s.trashItem(it)) },
+      ],
+    });
+  };
   const anchor = useRef<number | null>(null);
 
   useEffect(() => {
     void s.loadAll();
-    void loadCache();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.root, s.allStale]);
 
@@ -64,35 +102,19 @@ export function Browse() {
   const viewed = s.viewed;
   const targetName = useMemo(() => Object.fromEntries(targets.map((t) => [t.id, t.name])), [targets]);
 
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: all.length, unsorted: 0, recent: 0, unseen: 0 };
-    for (const i of all) {
-      if (i.targetId) c[i.targetId] = (c[i.targetId] ?? 0) + 1;
-      else c.unsorted++;
-      if (viewed[i.key]) c.recent++;
-      else c.unseen++;
-    }
-    return c;
-  }, [all, viewed]);
 
+  // Narrowed as everywhere pictures are (PictureFilters), then in the order asked for.
+  const picked = useMemo<PictureFilter>(() => ({ ...NO_FILTER, location, kind, folders: f.folders, query: searchQuery, minRating, unratedOnly, tagged, tags: tagsSel, tagsMode, tagsOut, tagsOutMode, artists: artistsSel, people: peopleSel }), [location, kind, f.folders, searchQuery, minRating, unratedOnly, tagged, tagsSel, tagsMode, tagsOut, tagsOutMode, artistsSel, peopleSel]);
+  const filterData = useFilterData(picked);
+  // A rating or a view is a reason to put the list in order again only when it is ordered by them.
+  const ratingsForSort = sortBy === "rating" ? ratings : null;
+  const viewedForSort = location === "recent" ? viewed : null;
   const items = useMemo(() => {
-    let list: MediaItem[] = all;
-    if (location === "unsorted") list = list.filter((i) => !i.targetId);
-    else if (location === "recent") list = list.filter((i) => viewed[i.key]);
-    else if (location === "unseen") list = list.filter((i) => !viewed[i.key]);
-    else if (location !== "all") list = list.filter((i) => i.targetId === location);
-    if (kind !== "all") list = list.filter((i) => i.kind === kind);
-    if (folders) list = list.filter((i) => folders.has(i.dir));
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter((i) => i.name.toLowerCase().includes(q) || i.dir.toLowerCase().includes(q));
-    }
-    if (unratedOnly) list = list.filter((i) => ratings[i.key] == null);
-    else if (minRating > 0) list = list.filter((i) => (ratings[i.key] ?? 0) >= minRating);
-    if (random) return shuffled(list);
+    const list = filterPictures(all, picked, filterData);
+    if (random) return shuffled(list, seed);
     if (location === "recent") return list.slice().sort((a, b) => (viewed[b.key] ?? 0) - (viewed[a.key] ?? 0));
     const cmp: Record<SortSel, (a: MediaItem, b: MediaItem) => number> = {
-      name: (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }),
+      name: (a, b) => naturalCompare(a.name, b.name),
       date: (a, b) => a.modified - b.modified,
       size: (a, b) => a.size - b.size,
       rating: (a, b) => (ratings[a.key] ?? 0) - (ratings[b.key] ?? 0) || a.name.localeCompare(b.name),
@@ -100,7 +122,10 @@ export function Browse() {
     const out = list.slice().sort(cmp[sortBy]);
     return desc ? out.reverse() : out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, location, kind, folders, query, ratings, viewed, minRating, unratedOnly, random, seed, sortBy, desc]);
+  }, [all, picked, filterData, random, seed, sortBy, desc, ratingsForSort, viewedForSort]);
+
+  // The filters, as every screen shows them: a section each in the panel, chips for what is on.
+  const filters: Filter[] = usePictureFilterSections({ ...picked, query }, setF, all);
 
   // Drop selections that are no longer in the list (moved, trashed, filtered out).
   useEffect(() => {
@@ -111,10 +136,14 @@ export function Browse() {
   }, [items, selected]);
 
   const totalBytes = useMemo(() => items.reduce((a, i) => a + i.size, 0), [items]);
-  const scannedCount = useMemo(() => items.filter((i) => cacheValid(sigCache[i.key], i) && !sigCache[i.key].error).length, [items, sigCache]);
+
+  // Series kept together are one tile, the rest of each behind its first picture; opened, all of them in a row.
+  const seriesOf = useMemo(() => seriesIndex(s.library?.series), [s.library?.series]);
+  const tiles = useMemo(() => (s.seriesTogether ? stacks(items, seriesOf) : items.map((item) => ({ item, members: [item] }))), [items, seriesOf, s.seriesTogether]);
 
   /* ---------- layout ---------- */
-  const aspects = useRef(new Map<string, number>());
+  // Kept past the screen (tileShapes): back from the viewer, the mosaic is as it was.
+  const aspects = useMemo(() => ({ current: tileShapes(s.root) }), [s.root]);
   const [aspectVersion, bumpAspects] = useReducer((x: number) => x + 1, 0);
   const aspectRaf = useRef(0);
   const onAspect = useCallback((key: string, ratio: number) => {
@@ -124,9 +153,10 @@ export function Browse() {
       aspectRaf.current = 0;
       bumpAspects();
     });
-  }, []);
+  }, [aspects]);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
+  useScrollMemory(`browse:${location}:${kind}:${query}:${sortBy}:${desc}:${random}:${minRating}:${unratedOnly}:${tagged}:${[...(folders ?? [])].join(",")}`, scrollerRef, true);
   const [gridW, setGridW] = useState(0);
   const [viewport, setViewport] = useState({ top: 0, h: 0 });
   useEffect(() => {
@@ -155,7 +185,7 @@ export function Browse() {
     const cols = Math.max(1, Math.floor((gridW + GAP) / (zoom + GAP)));
     const colW = (gridW - GAP * (cols - 1)) / cols;
     const heights = new Array<number>(cols).fill(0);
-    const pos = items.map((it) => {
+    const pos = tiles.map(({ item: it }) => {
       const ratio = layout === "grid" ? 4 / 3 : (aspects.current.get(it.key) ?? 4 / 3);
       const h = colW / ratio + META_H;
       let c = 0;
@@ -166,30 +196,36 @@ export function Browse() {
     });
     return { pos, total: Math.max(0, ...heights), colW };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, gridW, zoom, layout, aspectVersion]);
+  }, [tiles, gridW, zoom, layout, aspectVersion, aspects]);
 
   /* ---------- selection ---------- */
-  const open = (i: number) => s.openViewer(items, i, { kind: "browse" });
-  const toggle = (key: string) =>
-    setSelected((sel) => {
-      const next = new Set(sel);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  /** The tile at `i` in the viewer, with everything shown in order (a series whole). */
+  const open = (i: number) => {
+    const queue = tiles.flatMap((t) => t.members);
+    s.openViewer(queue, Math.max(0, queue.indexOf(tiles[i].item)), { kind: "browse" });
+  };
   const onTileClick = (i: number, e: MouseEvent) => {
-    const key = items[i].key;
+    // A series' tile selects all of it.
+    const keys = tiles[i].members.map((m) => m.key);
     if (e.shiftKey && anchor.current != null) {
       const [a, b] = [Math.min(anchor.current, i), Math.max(anchor.current, i)];
       setSelected((sel) => {
         const next = new Set(sel);
-        for (let k = a; k <= b; k++) next.add(items[k].key);
+        for (let k = a; k <= b; k++) for (const m of tiles[k].members) next.add(m.key);
         return next;
       });
       return;
     }
     if (e.metaKey || e.ctrlKey || selectMode || selected.size > 0) {
-      toggle(key);
+      setSelected((sel) => {
+        const next = new Set(sel);
+        const on = !keys.every((k) => next.has(k));
+        for (const k of keys) {
+          if (on) next.add(k);
+          else next.delete(k);
+        }
+        return next;
+      });
       anchor.current = i;
       return;
     }
@@ -197,6 +233,19 @@ export function Browse() {
     open(i);
   };
   const selectedItems = useMemo(() => items.filter((i) => selected.has(i.key)), [items, selected]);
+  // A few pictures alike made a series, or a series' pictures taken out of it.
+  const seriesAction = useMemo(() => {
+    const pictures = selectedItems.filter((i) => i.kind === "image" || i.kind === "raw");
+    const inOne = selectedItems.filter((i) => seriesOf.has(i.key));
+    if (inOne.length && inOne.length === selectedItems.length && new Set(inOne.map((i) => seriesOf.get(i.key))).size === 1 && seriesOf.get(inOne[0].key)!.length === inOne.length)
+      return { label: "Split series", title: "These are no series: each picture on its own again", run: () => s.leaveSeries(inOne.map((i) => i.key)) };
+    if (pictures.length >= 2 && pictures.length === selectedItems.length)
+      return { label: "Make series", title: "Keep these together as a series: one tile here, and whole in Sort (one key files all of it)", run: () => s.makeSeries(pictures.map((i) => i.key)) };
+    return null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItems, seriesOf]);
+  // Revert shows once anything here has been overwritten by an edit or a plugin.
+  const hasVersions = useVersions((v) => Object.keys(v.links).length > 0);
   const rateSelected = (r: number | null) => {
     for (const it of selectedItems) s.setRating(it, r);
     s.toast(r == null ? `Cleared ${selectedItems.length} ratings` : `Rated ${selectedItems.length} items ${r}`, "ok");
@@ -214,8 +263,8 @@ export function Browse() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return;
-      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen) return;
+      if (isTypingTarget(e.target) || dialogOpen()) return;
+      if (s.settingsOpen || s.trashOpen || s.driveOpen || s.backupOpen || s.vaultOpen || s.pluginsOpen) return;
       const key = e.key.toLowerCase();
       if ((e.metaKey || e.ctrlKey) && key === "a") {
         e.preventDefault();
@@ -248,6 +297,10 @@ export function Browse() {
       if (key === "s") toggleRandom();
       if (key === "g") s.set({ settingsOpen: true });
       if (key === "e") s.openFiles();
+      if (key === "l") s.openTags();
+      if (key === "k") useStore.getState().openScrapbook();
+      if (key === "p") useStore.getState().openPeople();
+      if (key === "w") useStore.getState().openArtists();
       if (key === "h") s.toggleChrome();
       if (key === "enter" && items.length) open(0);
     };
@@ -268,48 +321,7 @@ export function Browse() {
     <div className="browse">
       <aside className="browse-side panel">
         <input className="input" placeholder="Search name or folder…" value={query} onChange={(e) => setQuery(e.target.value)} />
-
-        <div className="label">Location</div>
-        <div className="side-list">
-          <button className={chip(location === "all")} onClick={() => setLocation("all")}>
-            Everything <span className="faint mono">{counts.all}</span>
-          </button>
-          <button className={chip(location === "unsorted")} onClick={() => setLocation("unsorted")}>
-            Unsorted <span className="faint mono">{counts.unsorted}</span>
-          </button>
-          {targets.map((t) => (
-            <button key={t.id} className={chip(location === t.id)} onClick={() => setLocation(t.id)}>
-              {t.name} <span className="faint mono">{counts[t.id] ?? 0}</span>
-            </button>
-          ))}
-          <button className={chip(location === "recent")} onClick={() => setLocation("recent")} title="What you looked at, newest first">
-            Recently viewed <span className="faint mono">{counts.recent}</span>
-          </button>
-          <button className={chip(location === "unseen")} onClick={() => setLocation("unseen")} title="Never opened in the viewer">
-            Never viewed <span className="faint mono">{counts.unseen}</span>
-          </button>
-        </div>
-
-        <div className="label">Folders</div>
-        <FolderPicker items={all} selected={folders} onChange={setFolders} />
-
-        <div className="label">Type</div>
-        <div className="chips">
-          {(["all", "image", "raw", "video"] as KindSel[]).map((k) => (
-            <button key={k} className={chip(kind === k)} onClick={() => setKind(k)}>
-              {k === "all" ? "All" : k === "image" ? "Photos" : k === "raw" ? "RAW" : "Videos"}
-            </button>
-          ))}
-        </div>
-
-        <div className="label">Rating</div>
-        <div className="side-row">
-          <input type="range" min={0} max={10} value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} disabled={unratedOnly} />
-          <span className="mono">{unratedOnly ? "—" : minRating === 0 ? "any" : `≥ ${minRating}`}</span>
-        </div>
-        <label className="side-row check">
-          <input type="checkbox" checked={unratedOnly} onChange={(e) => setUnratedOnly(e.target.checked)} /> Unrated only
-        </label>
+        <FiltersButton filters={filters} open={filtersOpen} onToggle={() => setFiltersOpen(!filtersOpen)} onClear={() => setF({ ...FILTERS_OFF })} />
 
         <div className="label">Order</div>
         <div className="chips">
@@ -326,7 +338,7 @@ export function Browse() {
             className={chip(random)}
             onClick={() => {
               setF({ random: true });
-              setSeed((x) => x + 1);
+              setSeed();
             }}
           >
             Random <kbd className="kbd">S</kbd>
@@ -355,12 +367,14 @@ export function Browse() {
         <button className="btn sm" onClick={() => void s.surprise()} title="A random item you haven't seen lately">
           <Sparkle /> Surprise me <kbd className="kbd">R</kbd>
         </button>
-        <button className="btn sm ghost" onClick={() => setF({ ...DEFAULTS_RESET })} title="Reset all filters">
-          <ArrowsClockwise /> Reset filters
+        <button className="btn sm ghost" onClick={() => setF({ ...DEFAULTS_RESET })} title="The search, the filters and the order as they start">
+          <ArrowsClockwise /> Reset all
         </button>
         <Deco kind="mug" className="deco-side" />
       </aside>
 
+      {filtersOpen && <FiltersPanel filters={filters} onClose={() => setFiltersOpen(false)} onClear={() => setF({ ...FILTERS_OFF })} />}
+      <ContextMenu at={ctx?.at ?? null} items={ctx?.items ?? []} onClose={() => setCtx(null)} />
       <main className="browse-main">
         {selected.size > 0 ? (
           <div className="browse-head selection-bar">
@@ -385,9 +399,46 @@ export function Browse() {
                 </button>
               ))}
             </span>
+            <Popover
+              open={tagMenu}
+              onClose={() => setTagMenu(false)}
+              width={320}
+              trigger={
+                <button className="btn sm" onClick={() => setTagMenu(!tagMenu)} title="Tags on the selection">
+                  <TagIcon /> Tag…
+                </button>
+              }
+            >
+              <div className="pop-title">Tags on {selected.size} selected</div>
+              <TagEditor keys={[...selected]} />
+            </Popover>
+            <Popover
+              open={artistMenu}
+              onClose={() => setArtistMenu(false)}
+              width={280}
+              trigger={
+                <button className="btn sm" onClick={() => setArtistMenu(!artistMenu)} title="Who made the selection">
+                  <PaintBrush /> Artist…
+                </button>
+              }
+            >
+              <div className="pop-title">Artist of {selected.size} selected</div>
+              <ArtistPicker keys={[...selected]} />
+            </Popover>
+            <PluginButtons location="browse.selection" context={() => ({ items: selectedItems })} />
             <button className="btn sm" disabled={s.busy} onClick={() => s.openEdit(selectedItems)} title="Edit the selection: rotate, flip, crop, resize, convert (T)">
               <PencilSimple /> Edit
             </button>
+            {seriesAction && (
+              <button className="btn sm" onClick={seriesAction.run} title={seriesAction.title}>
+                <Stack /> {seriesAction.label}
+              </button>
+            )}
+            {hasVersions && (
+              <button className="btn sm" disabled={s.busy} onClick={() => void revertAll(selectedItems)} title="Put back the originals kept for the selected pictures that were overwritten; each version goes to the trash">
+                <ArrowCounterClockwise /> Revert
+              </button>
+            )}
             <button className="btn sm danger" disabled={s.busy} onClick={() => void trashSelected()}>
               <Trash /> Trash <kbd className="kbd">⌫</kbd>
             </button>
@@ -419,7 +470,6 @@ export function Browse() {
           <div className="browse-head">
             <span className="mono dim grow">
               {s.loading ? s.loading : `${items.length} of ${all.length} items · ${formatBytes(totalBytes)}`}
-              {scannedCount > 0 && <span className="faint"> · {scannedCount} fingerprinted ✓</span>}
             </span>
             <button className={chip(selectMode)} onClick={() => setSelectMode((m) => !m)} title="Click selects tiles instead of opening them (⌘-click and ⇧-click always select)">
               <Selection /> {selectMode ? "Selecting" : "Select"}
@@ -429,11 +479,26 @@ export function Browse() {
         <div className="scroller" ref={scrollerRef} onScroll={onScroll}>
           <div className="masonry" style={{ height: total }}>
             {gridW > 0 &&
-              items.map((it, i) => {
+              tiles.map(({ item: it, members }, i) => {
                 const p = pos[i];
                 if (p.y + p.h < minY || p.y > maxY) return null;
                 return (
-                  <div key={it.primary} className="mtile" style={{ transform: `translate(${p.x}px, ${p.y}px)`, width: colW }}>
+                  <div key={it.primary} className={`mtile ${members.length > 1 ? "stacked" : ""}`} style={{ transform: `translate(${p.x}px, ${p.y}px)`, width: colW }} onContextMenu={(e) => tileMenu(e, it)}>
+                    {members.length > 1 && (
+                      <span className="tile-stack mono" title={`A series of ${members.length}: opened, all of it in a row`}>
+                        <Stack /> {members.length}
+                      </span>
+                    )}
+                    <button
+                      className="tile-info"
+                      title="Everything known about this file"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        s.set({ infoItem: it });
+                      }}
+                    >
+                      <Info />
+                    </button>
                     <Thumb
                       item={it}
                       eager
@@ -441,8 +506,7 @@ export function Browse() {
                       onAspect={layout === "masonry" ? onAspect : undefined}
                       rating={ratings[it.key]}
                       label={it.targetId ? targetName[it.targetId] : undefined}
-                      scanned={cacheValid(sigCache[it.key], it) && !sigCache[it.key].error}
-                      selected={selected.has(it.key)}
+                      selected={members.every((m) => selected.has(m.key))}
                       onClick={(e) => onTileClick(i, e)}
                     />
                   </div>

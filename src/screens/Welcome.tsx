@@ -16,13 +16,13 @@ export function Welcome() {
     <div className="welcome">
       <div className="welcome-card panel">
         <Deco kind="plant" className="deco-corner" />
-        <div className="label">Media Sorter // v0.1</div>
-        <h1 className="brand glitch" data-text="MEDIA SORTER">
-          MEDIA SORTER
+        <div className="label">Quire // v0.1</div>
+        <h1 className="brand glitch" data-text="QUIRE">
+          QUIRE
         </h1>
         <p className="dim">
           Point it at any folder: an SD card, an external drive or a folder on this machine. Ratings and target
-          folders are stored in a single <span className="mono">.mediasorter.json</span> next to your files;
+          folders are stored in a single <span className="mono">.quire.json</span> next to your files;
           nothing is kept inside the app.
         </p>
         {loading ? (

@@ -1,0 +1,128 @@
+# A release: when a tag like v0.2.0 is pushed, the app is bundled for macOS (Apple silicon and
+# Intel), Windows and Linux, with the engine beside it and pdfium among its resources, and the
+# bundles are attached to a draft GitHub release to look over and publish. The tag should match the
+# version in src-tauri/tauri.conf.json, and its message is the release's notes (what the app shows
+# when it offers the update). See docs/releases.md.
+#
+# With the update key among the repository's secrets, each bundle is signed with it and a
+# latest.json goes beside them: installed copies find the release through it once it is published.
+# With the signing certificate there too, the macOS app is signed with it, so macOS knows each new
+# version as the same app (its Keychain items and permissions stay with it). Without them, the
+# bundles are made as before, unsigned.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+  HAS_UPDATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+  HAS_MAC_CERT: ${{ secrets.MACOS_CERTIFICATE != '' }}
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: Bundle (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Apple silicon builds the cipher's vector code (NEON): it encrypts faster, and the
+          # cipher's own test checks it writes what every build before it wrote.
+          - os: macos-latest
+            bundles: app,dmg
+            rustflags: --cfg chacha20_force_neon
+          - os: macos-15-intel
+            bundles: app,dmg
+          - os: ubuntu-22.04
+            bundles: deb,appimage
+          - os: windows-latest
+            bundles: nsis
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release notes, from the tag's message
+        id: notes
+        shell: bash
+        run: |
+          body=""
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            git fetch --depth=1 origin "+refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+            body="$(git tag -l --format='%(contents)' "$GITHUB_REF_NAME")"
+          fi
+          [ -n "${body//[[:space:]]/}" ] || body="A new version of Quire."
+          { echo "body<<NOTES_END"; echo "$body"; echo "NOTES_END"; } >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Tauri's and the engine's Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev file cmake nasm libclang-dev
+      - name: Build tools (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
+      - name: libclang for bindgen
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then echo "LIBCLANG_PATH=/Library/Developer/CommandLineTools/usr/lib" >> "$GITHUB_ENV"; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"; fi
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+            engine -> target
+      - run: npm ci
+      - name: pdfium (draws PDF albums' pages)
+        run: npm run pdfium
+      - name: The local engine
+        run: npm run engine
+      - name: The vault's cipher, as this build makes it
+        if: matrix.rustflags != ''
+        run: cargo test -p quire-crypto
+        working-directory: src-tauri
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+      # Tauri's own import takes only certificates macOS already trusts; a self-signed one is put in
+      # a keychain of the build's own here, and Tauri signs with it by its fingerprint.
+      - name: The signing certificate (macOS)
+        if: runner.os == 'macOS' && env.HAS_MAC_CERT == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"
+          kp="$(openssl rand -base64 24)"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$kp" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$kp" "$kc"
+          security import "$RUNNER_TEMP/signing.p12" -k "$kc" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$kp" "$kc" > /dev/null
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/signing.p12"
+          id="$(security find-identity -p codesigning "$kc" | awk '/^ *[0-9]+\) [0-9A-F]{40}/ {print $2; exit}')"
+          [ -n "$id" ] || { echo "The certificate holds no code-signing identity."; exit 1; }
+          echo "APPLE_SIGNING_IDENTITY=$id" >> "$GITHUB_ENV"
+      - name: Bundle and attach to a draft release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUSTFLAGS: ${{ matrix.rustflags }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: Quire ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: true
+          prerelease: false
+          args: --bundles ${{ matrix.bundles }}${{ env.HAS_UPDATE_KEY == 'true' && ' --config src-tauri/tauri.updater.conf.json' || '' }}

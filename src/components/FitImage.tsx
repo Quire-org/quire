@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { ZoomBox } from "./ZoomBox";
+import { PluginOverlay } from "./PluginOverlay";
+import { AreaPicker } from "./AreaPicker";
+import { FaceLayer } from "./FacesInPicture";
 
 export type FitMode = "fit" | "fill";
 export interface Natural {
@@ -34,7 +37,7 @@ export function useFitSize(el: HTMLElement | null, natural: Natural | null, mode
 }
 
 /** An image fitted (or filling) its parent box, portrait or landscape. `zoomable` adds the click-to-loupe. */
-export function FitImage({ src, mode = "fit", className = "", alt = "", onError, blurBackdrop, zoomable }: { src: string; mode?: FitMode; className?: string; alt?: string; onError?: () => void; blurBackdrop?: boolean; zoomable?: boolean }) {
+export function FitImage({ src, mode = "fit", className = "", alt = "", onError, blurBackdrop, zoomable, overlayKey }: { src: string; mode?: FitMode; className?: string; alt?: string; onError?: () => void; blurBackdrop?: boolean; zoomable?: boolean; overlayKey?: string }) {
   const [el, setEl] = useState<HTMLDivElement | null>(null);
   const [natural, setNatural] = useState<Natural | null>(null);
   useEffect(() => setNatural(null), [src]);
@@ -56,7 +59,16 @@ export function FitImage({ src, mode = "fit", className = "", alt = "", onError,
       {blurBackdrop && <img className="fit-backdrop" src={src} alt="" aria-hidden draggable={false} />}
       {zoomable ? (
         <ZoomBox fitted={size} natural={natural}>
-          {img}
+          {overlayKey ? (
+            <div className="overlay-host" style={size ?? undefined}>
+              {img}
+              <PluginOverlay itemKey={overlayKey} />
+              <AreaPicker itemKey={overlayKey} />
+              <FaceLayer itemKey={overlayKey} />
+            </div>
+          ) : (
+            img
+          )}
         </ZoomBox>
       ) : (
         img

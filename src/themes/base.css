@@ -12,6 +12,9 @@
   --fg-faint: #5c6270;
   --accent: #8ab4ff;
   --accent-fg: #0b0c10;
+  /* The accent as the colour of text or an icon on the page's ground (a theme whose accent is too
+     light for that, by day say, gives a deeper one). */
+  --accent-text: var(--accent);
   --accent-2: #7ee8fa;
   --danger: #ff5c7a;
   --ok: #7cf59b;
@@ -264,7 +267,7 @@ html.show-keys .btn .kbd,
   color: var(--fg-dim);
 }
 .badge.accent {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 .badge.accent2 {
