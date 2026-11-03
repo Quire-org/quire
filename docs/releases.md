@@ -1,8 +1,9 @@
 # Releases and updates
 
 A release is a pushed tag. `.github/workflows/release.yml` bundles the app for macOS (Apple silicon
-and Intel), Windows and Linux and attaches the bundles to a **draft** GitHub release. Nothing reaches
-installed copies until that draft is published.
+only: ONNX Runtime, under the engine, isn't built for Intel Macs), Windows and Linux and attaches
+the bundles to a **draft** GitHub release. Nothing reaches installed copies until that draft is
+published.
 
 ## Making one
 
@@ -79,6 +80,10 @@ openssl req -x509 -newkey rsa:3072 -sha256 -days 3650 -nodes -keyout key.pem -ou
 openssl pkcs12 -export -inkey key.pem -in cert.pem -out codesign.p12 -name "Quire"
 rm key.pem
 ```
+
+macOS's own `openssl` seals the `.p12` the older way, which macOS's `security` reads; OpenSSL 3
+seals it a newer way it can't. The release seals the certificate the older way again before using
+it, so either works.
 
 The macOS build runs without the hardened runtime: that is for Apple's notarization, which a
 self-signed certificate can't have, and with it macOS would refuse the PDF library the app loads.

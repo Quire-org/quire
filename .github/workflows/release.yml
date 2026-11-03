@@ -1,5 +1,5 @@
-# A release: when a tag like v0.2.0 is pushed, the app is bundled for macOS (Apple silicon and
-# Intel), Windows and Linux, with the engine beside it and pdfium among its resources, and the
+# A release: when a tag like v0.2.0 is pushed, the app is bundled for macOS (Apple silicon),
+# Windows and Linux, with the engine beside it and pdfium among its resources, and the
 # bundles are attached to a draft GitHub release to look over and publish. The tag should match the
 # version in src-tauri/tauri.conf.json, and its message is the release's notes (what the app shows
 # when it offers the update). See docs/releases.md.
@@ -36,8 +36,7 @@ jobs:
           - os: macos-latest
             bundles: app,dmg
             rustflags: --cfg chacha20_force_neon
-          - os: macos-15-intel
-            bundles: app,dmg
+          # No Intel Mac build: ONNX Runtime, under the engine, isn't built for Intel Macs.
           # 24.04, not older: the engine's ONNX Runtime needs glibc 2.38 or newer, so the Linux app
           # runs on Ubuntu 24.04, Debian 13, Fedora 39 and later.
           - os: ubuntu-24.04
@@ -103,7 +102,13 @@ jobs:
         run: |
           kc="$RUNNER_TEMP/signing.keychain-db"
           kp="$(openssl rand -base64 24)"
-          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          # macOS's `security` reads only PKCS#12's older encryption, which OpenSSL 3 no longer
+          # writes by default: the certificate is sealed that way again, whichever way it came.
+          ossl="$(brew --prefix openssl@3)/bin/openssl"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/given.p12"
+          "$ossl" pkcs12 -legacy -in "$RUNNER_TEMP/given.p12" -passin env:MACOS_CERTIFICATE_PASSWORD -nodes -out "$RUNNER_TEMP/signing.pem"
+          "$ossl" pkcs12 -export -legacy -in "$RUNNER_TEMP/signing.pem" -passout env:MACOS_CERTIFICATE_PASSWORD -out "$RUNNER_TEMP/signing.p12"
+          rm "$RUNNER_TEMP/given.p12" "$RUNNER_TEMP/signing.pem"
           security create-keychain -p "$kp" "$kc"
           security set-keychain-settings -lut 21600 "$kc"
           security unlock-keychain -p "$kp" "$kc"
