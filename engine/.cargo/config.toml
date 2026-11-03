@@ -1,0 +1,6 @@
+# Windows: ONNX Runtime comes built against the dynamic C runtime (/MD), as Rust links it, but
+# esaxx-rs (under the tokenizers Koharu uses) asks for the static one (/MT), and MSVC won't link the
+# two together. cc adds these flags after its own, and the later /MD wins.
+[env]
+CXXFLAGS_x86_64_pc_windows_msvc = "/MD"
+CXXFLAGS_aarch64_pc_windows_msvc = "/MD"

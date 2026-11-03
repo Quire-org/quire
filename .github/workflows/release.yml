@@ -38,7 +38,9 @@ jobs:
             rustflags: --cfg chacha20_force_neon
           - os: macos-15-intel
             bundles: app,dmg
-          - os: ubuntu-22.04
+          # 24.04, not older: the engine's ONNX Runtime needs glibc 2.38 or newer, so the Linux app
+          # runs on Ubuntu 24.04, Debian 13, Fedora 39 and later.
+          - os: ubuntu-24.04
             bundles: deb,appimage
           - os: windows-latest
             bundles: nsis
