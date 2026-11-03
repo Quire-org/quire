@@ -1931,7 +1931,8 @@ struct Held {
     _lock: fs::File,
 }
 
-/// Who holds a library, as the lock file says: written there by the copy that took it.
+/// Who holds a library, as the note beside its lock file says: written by the copy that took it. Not
+/// in the lock file itself, which Windows lets no one else read while it is locked.
 struct Holder {
     pid: u32,
     dev: bool,
@@ -1943,14 +1944,11 @@ impl Holder {
         let since = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
         Holder { pid: std::process::id(), dev: cfg!(debug_assertions), since }
     }
-    fn write(&self, mut f: &fs::File) {
-        use std::io::{Seek, Write};
-        let _ = f.set_len(0).and_then(|_| f.rewind()).and_then(|_| write!(f, "{}\n{}\n{}\n", self.pid, if self.dev { "dev" } else { "release" }, self.since));
+    fn write(&self, note: &Path) {
+        let _ = fs::write(note, format!("{}\n{}\n{}\n", self.pid, if self.dev { "dev" } else { "release" }, self.since));
     }
-    fn read(mut f: &fs::File) -> Option<Self> {
-        use std::io::Read;
-        let mut text = String::new();
-        f.read_to_string(&mut text).ok()?;
+    fn read(note: &Path) -> Option<Self> {
+        let text = fs::read_to_string(note).ok()?;
         let mut lines = text.lines();
         Some(Holder { pid: lines.next()?.parse().ok()?, dev: lines.next()? == "dev", since: lines.next()?.parse().ok()? })
     }
@@ -2016,12 +2014,13 @@ fn take_claim(held: &mut Option<Held>, root: &Path, dir: &Path) -> Result<(), St
     }
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!("{name}.lock"));
+    let note = dir.join(format!("{name}.holder"));
     let open = || fs::OpenOptions::new().create(true).truncate(false).read(true).write(true).open(&path).map_err(|e| e.to_string());
     let mut f = open()?;
     match f.try_lock() {
         Ok(()) => {}
         Err(fs::TryLockError::WouldBlock) => {
-            let holder = Holder::read(&f);
+            let holder = Holder::read(&note);
             match holder {
                 Some(h) if !h.running() => {
                     // Replaced only while it is still the file found locked (another copy taking it
@@ -2036,7 +2035,7 @@ fn take_claim(held: &mut Option<Held>, root: &Path, dir: &Path) -> Result<(), St
                     }
                     f = open()?;
                     if let Err(e) = f.try_lock() {
-                        return Err(match (e, Holder::read(&f)) {
+                        return Err(match (e, Holder::read(&note)) {
                             (fs::TryLockError::WouldBlock, Some(h)) => h.refusal(),
                             _ => "This library was just opened by another copy of Quire: close it there first.".into(),
                         });
@@ -2048,7 +2047,7 @@ fn take_claim(held: &mut Option<Held>, root: &Path, dir: &Path) -> Result<(), St
         }
         Err(fs::TryLockError::Error(e)) => eprintln!("[claim] can't lock {}: {e}", dir.display()),
     }
-    Holder::now().write(&f);
+    Holder::now().write(&note);
     *held = Some(Held { name, _lock: f });
     Ok(())
 }
@@ -5942,16 +5941,17 @@ mod claim_tests {
         let _ = fs::remove_dir_all(&base);
     }
 
+    // Windows lets a lock go with the process that held it, and no copy there is stuck quitting.
+    #[cfg(unix)]
     #[test]
     fn a_copy_stuck_quitting_or_gone_doesnt_keep_the_library_shut() {
         let (base, lib, _, dir) = dirs("stuck");
         let mut stuck = None;
         take_claim(&mut stuck, &lib, &dir).unwrap();
-        // That copy's lock is still held (as by a process that can't finish quitting), but the file
+        // That copy's lock is still held (as by a process that can't finish quitting), but its note
         // names a process that is no longer running.
         let name = &stuck.as_ref().unwrap().name;
-        let f = fs::OpenOptions::new().write(true).open(dir.join(format!("{name}.lock"))).unwrap();
-        Holder { pid: 2_000_000_000, dev: false, since: 0 }.write(&f);
+        Holder { pid: 2_000_000_000, dev: false, since: 0 }.write(&dir.join(format!("{name}.holder")));
         let mut here = None;
         take_claim(&mut here, &lib, &dir).unwrap();
         // It is held again, by this copy: a third copy is still turned away.

@@ -149,12 +149,23 @@ pub(crate) fn session(path: &Path) -> Result<Session> {
     // default; the switch stays for other models. ONNX Runtime would otherwise pick a device itself,
     // which on a Mac is always Core ML: every model compiled for the Neural Engine first, which takes
     // minutes for these (out of process, so the engine looked idle while the app waited on it).
-    let mut builder = if std::env::var_os("MS_COREML").is_some() {
-        builder.with_execution_providers([ort::ep::CoreML::default().build()]).map_err(|e| anyhow!("{e}"))?
+    let mut builder = if cfg!(target_os = "macos") && std::env::var_os("MS_COREML").is_some() {
+        with_core_ml(builder)?
     } else {
         builder.with_auto_device(ort::session::builder::AutoDevicePolicy::PreferCPU).map_err(|e| anyhow!("{e}"))?
     };
     builder.commit_from_file(path).map_err(|e| anyhow!("could not load {}: {e}", path.display()))
+}
+
+/// Core ML for a session: ONNX Runtime comes built with it on macOS alone.
+#[cfg(target_os = "macos")]
+fn with_core_ml(builder: ort::session::builder::SessionBuilder) -> Result<ort::session::builder::SessionBuilder> {
+    builder.with_execution_providers([ort::ep::CoreML::default().build()]).map_err(|e| anyhow!("{e}"))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn with_core_ml(builder: ort::session::builder::SessionBuilder) -> Result<ort::session::builder::SessionBuilder> {
+    Ok(builder)
 }
 
 /// The output by one of these names (the first that is there), else the first; as numbers.

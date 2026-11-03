@@ -42,8 +42,15 @@ pub fn write_atomic(p: &Path, bytes: &[u8]) -> Result<(), String> {
     let tmp = p.with_file_name(format!("{name}.{}.{}.tmp", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
     // Written and brought to the disk before it takes the file's place: a drive pulled or power
     // gone right after leaves the old file whole, never an empty new one (exFAT and FAT drives can
-    // rename before the data has landed).
-    if let Err(e) = fs::write(&tmp, bytes).and_then(|()| fs::File::open(&tmp)?.sync_all()) {
+    // rename before the data has landed). Through the one handle that wrote it: Windows brings a
+    // file to the disk only through a handle that may write it.
+    let written = (|| {
+        use std::io::Write;
+        let mut f = fs::File::create(&tmp)?;
+        f.write_all(bytes)?;
+        f.sync_all()
+    })();
+    if let Err(e) = written {
         let _ = fs::remove_file(&tmp);
         return Err(format!("write {}: {e}", tmp.display()));
     }

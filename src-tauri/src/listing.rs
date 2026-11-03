@@ -135,7 +135,7 @@ mod tests {
     use super::*;
 
     fn names(files: &[FileRef], root: &Path) -> Vec<String> {
-        let mut v: Vec<String> = files.iter().map(|f| f.path.strip_prefix(root).unwrap().to_string_lossy().into_owned()).collect();
+        let mut v: Vec<String> = files.iter().map(|f| f.path.strip_prefix(root).unwrap().to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/")).collect();
         v.sort();
         v
     }
