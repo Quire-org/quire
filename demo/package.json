@@ -8,8 +8,9 @@
     "video": "node render.mjs video",
     "stills": "node render.mjs stills",
     "loop": "node loop.mjs",
+    "web": "node web.mjs",
     "studio": "node render.mjs studio",
-    "all": "npm run capture && npm run video && npm run stills && npm run loop"
+    "all": "npm run capture && npm run video && npm run stills && npm run loop && npm run web"
   },
   "dependencies": {
     "@remotion/cli": "4.0.537",

@@ -6,6 +6,7 @@ let mockTags: unknown = null;
  * HTTP server rooted at the fake volume (see docs/development.md, "Browser preview").
  */
 import type { Library, MediaItem } from "../lib/types";
+import { emptyDoc, presetBlocks } from "../home/board";
 import { MOCK_WHO, mockPicture } from "./mockPictures.js";
 
 /**
@@ -14,9 +15,16 @@ import { MOCK_WHO, mockPicture } from "./mockPictures.js";
  * favourites rated: for the screenshots and the demo video (demo/). Its pictures come from the
  * file server as they are.
  */
-const DEMO = new URLSearchParams(location.search).has("demo");
+/** The web demo: a build of the app made with VITE_DEMO (demo/web.mjs), the example library's files beside it. */
+const WEB = !!import.meta.env.VITE_DEMO;
+const DEMO = WEB || new URLSearchParams(location.search).has("demo");
 const ROOT = DEMO ? "/Volumes/Pictures" : "/mock/testvol";
-const FILES_BASE = "http://localhost:8787/";
+const FILES_BASE = WEB ? `${import.meta.env.BASE_URL}files/` : "http://localhost:8787/";
+// The web demo opens in the look of the README's screenshots, until the visitor picks another.
+if (WEB && !localStorage.getItem("quire.theme")) {
+  localStorage.setItem("quire.theme", "midnight");
+  localStorage.setItem("quire.mode", "dark");
+}
 const demoFiles: string[] = DEMO ? await fetch(`${FILES_BASE}__demo/index.json`).then((r) => r.json()) : [];
 
 interface Entry {
@@ -141,7 +149,9 @@ const mockMarked: { id: number; key: string; kind: "photo" | "drawn"; bbox: [num
 /** `?mock&e2e`: a library with tags, people and an artist already, for the end-to-end tests. */
 const E2E = new URLSearchParams(location.search).has("e2e");
 /** The Home's board kept with the library, in the mock: for the end-to-end tests, a library that opens on Sort (as their scenes start there), its board still to make. */
-let mockHome: unknown = E2E ? { version: 1, blocks: [], folders: { mode: "all", list: [] }, opensOn: "sort" } : null;
+/** The demo's Home: the Gallery preset, its slideshow from the photos and its one picture from the art, so each shows a whole picture. */
+const demoHome = () => ({ ...emptyDoc(), blocks: presetBlocks("gallery").map((b) => (b.type === "slideshow" ? { ...b, filter: { folders: ["Photos"] } } : b.type === "picture" ? { ...b, filter: { folders: ["Artworks"] } } : b)) });
+let mockHome: unknown = E2E ? { version: 1, blocks: [], folders: { mode: "all", list: [] }, opensOn: "sort" } : DEMO ? demoHome() : null;
 /** The library's artists, and files kept with the library (artists' icons), in the mock. */
 let mockArtists: unknown = null;
 const mockBlobs = new Map<string, ArrayBuffer>();

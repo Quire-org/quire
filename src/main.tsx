@@ -37,8 +37,9 @@ import App from "./App";
 import { applyLook, loadModeId, loadThemeId } from "./themes";
 
 async function bootstrap() {
-  // `?mock` on the Vite dev server runs the UI in a plain browser (see docs/development.md).
-  if (import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) {
+  // `?mock` on the Vite dev server runs the UI in a plain browser (see docs/development.md); the web
+  // demo, a build made with VITE_DEMO (demo/web.mjs), always does, on the example library.
+  if ((import.meta.env.DEV && new URLSearchParams(location.search).has("mock")) || import.meta.env.VITE_DEMO) {
     await import("./dev/mock");
   }
   applyLook(loadThemeId(), loadModeId());

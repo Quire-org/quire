@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/Quire-org/quire/releases/latest">Download</a> ·
+  <a href="https://quire-org.github.io/quire/demo/">Try it</a> ·
   <a href="docs/guide.md">Guide</a> ·
   <a href="docs/plugins.md">Plugins</a> ·
   <a href="docs/development.md">Develop</a>
@@ -22,8 +23,11 @@
 <p align="center">
   <img src="https://quire-org.github.io/quire/quire-demo.webp" width="840" alt="Quire's Home, a picture rated and filed with two keys, and the library browsed and filtered by a tag">
   <br>
-  <a href="https://quire-org.github.io/quire/quire-demo.mp4">Watch the whole demo (33 seconds)</a>
+  <a href="https://quire-org.github.io/quire/quire-demo.mp4">Watch the whole demo (33 seconds)</a> ·
+  <a href="https://quire-org.github.io/quire/demo/">Try it in your browser</a>
 </p>
+
+<p align="center"><sub>The browser demo runs on a library of example pictures; nothing you do there is saved, and tags and faces, which need Quire's local engine, aren't found there.</sub></p>
 
 Quire keeps a large collection of pictures and videos in order where it already lives: an SD card,
 an external drive or any folder. You go through what's new full screen, rating and filing each

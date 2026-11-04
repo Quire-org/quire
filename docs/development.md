@@ -57,13 +57,13 @@ checking and naming a group of faces, the Find basket), checks each screen for a
 spilling out of its box, cut off, laid over something else or past the window
 (`e2e/overflow.js`), and leaves a screenshot of each in `e2e/out` to look over.
 
-## Screenshots and the demo video
+## Screenshots, the demo video and the web demo
 
-The README's screenshots, its looping clip and the demo video come from the browser preview's demo
-mode: `?mock&demo` shows the example library (`examples/library`, openly licensed: see its
-`CREDITS.md`) in place of the made-up test volume, set up as `npm run example` sets it up. The
-`Demo` workflow (`.github/workflows/demo.yml`) makes them when a release is published, or when run
-by hand, and publishes them with GitHub Pages at <https://quire-org.github.io/quire/>, where the
+The README's screenshots, its looping clip, the demo video and the web demo come from the browser
+preview's demo mode: `?mock&demo` shows the example library (`examples/library`, openly licensed:
+see its `CREDITS.md`) in place of the made-up test volume, set up as `npm run example` sets it up.
+The `Demo` workflow (`.github/workflows/demo.yml`) makes them when a release is published, or when
+run by hand, and publishes them with GitHub Pages at <https://quire-org.github.io/quire/>, where the
 README shows them; nothing of them is kept in the repository. The tooling is in `demo/`, with
 packages of its own, and runs the same way here:
 
@@ -79,6 +79,9 @@ npm run all        # capture, then render into out/site what the workflow publis
   `out/site/quire-demo.mp4`.
 - `npm run stills` renders the screenshots into `out/site/screenshots`.
 - `npm run loop` makes the README's looping clip, `out/site/quire-demo.webp` (needs ffmpeg).
+- `npm run web` builds the web demo into `out/site/demo` (<https://quire-org.github.io/quire/demo/>):
+  the app built for a plain browser with `VITE_DEMO`, so it always runs on the mock in its demo
+  mode, with the example library's pictures beside it. Nothing done there is saved.
 - `npm run studio` opens Remotion's studio, to watch the video while changing it.
 
 Remotion is free for individuals and small teams; a larger company needs its company licence.
@@ -113,7 +116,7 @@ src/
   plugins/     Plugin bridge: sdk.js (runs in the plugin frame), host.ts (permission checks)
   dev/mock.ts  Browser-only Tauri bridge mock
 docs/plugins.md    Plugin API reference
-demo/              Screenshots and the demo video (above)
+demo/              Screenshots, the demo video and the web demo (above)
 ```
 
 ## Themes
