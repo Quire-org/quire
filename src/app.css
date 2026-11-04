@@ -707,12 +707,14 @@
   white-space: nowrap;
   max-width: 260px;
 }
-/* The web demo's note beside the library's path: quiet, but there on every screen. */
+/* The web demo's note beside the library's path: in the theme's accent, on every screen. */
 .hud-demo {
   font-size: 11px;
-  padding: 1px 7px;
-  border: 1px solid var(--border);
+  font-weight: 600;
+  padding: 2px 8px;
   border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-fg);
   white-space: nowrap;
 }
 .item-name {

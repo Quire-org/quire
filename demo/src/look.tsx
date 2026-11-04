@@ -1,7 +1,6 @@
-import React from "react";
+import React, { createContext, useContext } from "react";
 import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { loadFont } from "@remotion/google-fonts/Inter";
-import scenes from "../public/scenes.json";
 
 /** Inter, the same wherever the video is rendered (a Mac, or Linux in CI). */
 export const FONT = loadFont("normal", { weights: ["400", "500", "600"], subsets: ["latin"] }).fontFamily;
@@ -21,11 +20,21 @@ export interface Frame {
   /** Where the screen's grid scrolls, in window pixels. */
   grid?: { x: number; y: number; w: number; h: number } | null;
 }
-export const frame = (id: string): Frame => {
-  const f = (scenes.frames as Frame[]).find((x) => x.id === id);
-  if (!f) throw new Error(`No frame "${id}": run npm run capture`);
-  return f;
-};
+/** The capture's frames (its public/scenes.json), as the renderer was given them. */
+export interface Scenes {
+  scale: number;
+  frames: Frame[];
+}
+export const ScenesContext = createContext<Scenes>({ scale: 2, frames: [] });
+/** A frame of the capture, by its id. */
+export function useFrames(): (id: string) => Frame {
+  const { frames } = useContext(ScenesContext);
+  return (id) => {
+    const f = frames.find((x) => x.id === id);
+    if (!f) throw new Error(`No frame "${id}": capture first`);
+    return f;
+  };
+}
 
 /** The ground everything stands on: a deep blue-black with a soft light from the top left. */
 export function Backdrop({ children }: { children?: React.ReactNode }) {

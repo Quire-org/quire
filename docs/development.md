@@ -73,8 +73,10 @@ npm install
 npm run all        # capture, then render into out/site what the workflow publishes
 ```
 
-- `npm run capture` walks through the preview in Chrome with Playwright (`capture.mjs`) and keeps
-  each step as a frame, with the key pressed or the click that led to it (`public/scenes`).
+- `npm run capture` walks through the preview in Chrome with Playwright (`capture.mjs`, on the
+  helpers in `kit.mjs`) and keeps each step as a frame, with the key pressed or the click that led
+  to it (`public/scenes`). `script.json` says how the frames make the video: its title and end,
+  each part's caption, frames, zoom and scrolling, the screenshots and the loop.
 - `npm run video` renders the video with [Remotion](https://www.remotion.dev) (`src/`):
   `out/site/quire-demo.mp4`.
 - `npm run stills` renders the screenshots into `out/site/screenshots`.
@@ -83,6 +85,12 @@ npm run all        # capture, then render into out/site what the workflow publis
   the app built for a plain browser with `VITE_DEMO`, so it always runs on the mock in its demo
   mode, with the example library's pictures beside it. Nothing done there is saved.
 - `npm run studio` opens Remotion's studio, to watch the video while changing it.
+
+A plugin's repository can make its own the same way: a capture on `kit.mjs` (from a checkout of
+Quire beside the plugin, where the preview's file server finds it by its id; `?mock&demo&find=<id>`
+runs a Find plugin against the made-up site in its `test/fake-site.js`) and a `script.json`, then
+`node render.mjs video --work <its demo folder>` (and `stills`, and `loop.mjs --work`) in Quire's
+`demo/`, which write into that folder's `out/site`.
 
 Remotion is free for individuals and small teams; a larger company needs its company licence.
 

@@ -1,19 +1,24 @@
-// The README's looping clip, out/site/quire-demo.webp (Home, Sort and Browse, from the rendered
-// video), and the site's front page, which sends a visitor on to the repository. Needs ffmpeg.
+// A demo's looping clip for its README, <work>/out/site/<name>-demo.webp (the part of the rendered
+// video its script.json's `loop` names), and the site's front page, which sends a visitor on to the
+// repository. <work> is this folder, or another demo's with `--work <folder>`. Needs ffmpeg.
 // `npm run loop` (after `npm run video`).
 import { spawnSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const site = join(here, "out", "site");
-const video = join(site, "quire-demo.mp4");
+const flag = process.argv.indexOf("--work");
+const work = flag >= 0 ? resolve(process.argv[flag + 1]) : here;
+const script = JSON.parse(readFileSync(join(work, "script.json"), "utf8"));
+const site = join(work, "out", "site");
+const video = join(site, `${script.name}-demo.mp4`);
 if (!existsSync(video)) {
-  console.error("out/site/quire-demo.mp4 is missing: npm run video first");
+  console.error(`${video} is missing: render the video first`);
   process.exit(1);
 }
-const r = spawnSync(process.env.FFMPEG ?? "ffmpeg", ["-v", "error", "-y", "-ss", "2.6", "-t", "14.2", "-i", video, "-vf", "fps=12,scale=840:-1:flags=lanczos", "-c:v", "libwebp_anim", "-q:v", "62", "-loop", "0", "-an", join(site, "quire-demo.webp")], { stdio: "inherit" });
+const { from, length } = script.loop;
+const r = spawnSync(process.env.FFMPEG ?? "ffmpeg", ["-v", "error", "-y", "-ss", String(from), "-t", String(length), "-i", video, "-vf", "fps=12,scale=840:-1:flags=lanczos", "-c:v", "libwebp_anim", "-q:v", "62", "-loop", "0", "-an", join(site, `${script.name}-demo.webp`)], { stdio: "inherit" });
 if (r.status !== 0) process.exit(r.status ?? 1);
-writeFileSync(join(site, "index.html"), '<!doctype html><meta charset="utf-8"><title>Quire</title><meta http-equiv="refresh" content="0; url=https://github.com/Quire-org/quire"><a href="https://github.com/Quire-org/quire">Quire on GitHub</a>\n');
-console.log("out/site/quire-demo.webp, out/site/index.html");
+writeFileSync(join(site, "index.html"), `<!doctype html><meta charset="utf-8"><title>${script.title.title}</title><meta http-equiv="refresh" content="0; url=${script.repository}"><a href="${script.repository}">${script.title.title} on GitHub</a>\n`);
+console.log(`${site}/${script.name}-demo.webp, index.html`);

@@ -121,7 +121,7 @@ describe("showing on another device", () => {
     const again = mount();
     await act(async () => again.root.render(createElement(CastHost)));
     await act(async () => useCast.setState({ info: { urls: [{ iface: "en0", url: "https://10.4.0.7:51000/abc/" }], fingerprint: "4F 2A" }, panel: true }));
-    expect(document.querySelector(".cast")!.textContent).toContain("join your iPhone's hotspot");
+    expect(document.querySelector(".cast")!.textContent).toContain("join your phone's hotspot");
     again.root.unmount();
     useCast.setState({ info: null, panel: false });
   });

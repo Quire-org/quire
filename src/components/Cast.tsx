@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { thisComputer } from "../lib/platform";
 import { create } from "zustand";
 import qrcode from "qrcode-generator";
 import { DeviceMobile, Prohibit, ShieldCheck, Stop, Warning } from "@phosphor-icons/react";
@@ -34,7 +35,7 @@ export interface CastDevice {
 interface CastStore {
   info: CastInfo | null;
   devices: CastDevice[];
-  /** Devices may go back and forth (else they only follow the Mac). */
+  /** Devices may go back and forth (else they only follow this computer). */
   remote: boolean;
   panel: boolean;
   start(): Promise<void>;
@@ -232,10 +233,10 @@ function Qr({ text }: { text: string }) {
 }
 
 const hostOf = (u: CastUrl) => u.url.split("/")[2].split(":")[0];
-/** On an iPhone's Personal Hotspot (it always hands out 172.20.10.x), or this Mac's own shared connection: only your devices are on it. */
+/** On an iPhone's Personal Hotspot (it always hands out 172.20.10.x), or this computer's own shared connection: only your devices are on it. */
 const yours = (u: CastUrl) => hostOf(u).startsWith("172.20.10.") || /^(bridge|ap)/.test(u.iface);
 const rank = (u: CastUrl) => (yours(u) ? 0 : /^en/.test(u.iface) ? 1 : 2);
-const label = (u: CastUrl) => (hostOf(u).startsWith("172.20.10.") ? "an iPhone's hotspot" : /^bridge/.test(u.iface) ? "this Mac's shared connection" : u.iface === "en0" ? "Wi-Fi" : u.iface);
+const label = (u: CastUrl) => (hostOf(u).startsWith("172.20.10.") ? "an iPhone's hotspot" : /^bridge/.test(u.iface) ? `${thisComputer}'s shared connection` : u.iface === "en0" ? "Wi-Fi" : u.iface);
 
 export function CastPanel() {
   const c = useCast();
@@ -251,7 +252,7 @@ export function CastPanel() {
             <div>What the viewer shows, on a phone or tablet nearby, in its browser: scan a code, allow it here, done.</div>
             <ul className="cast-safe small">
               <li>
-                <ShieldCheck /> Only devices on this Mac's network, over an encrypted connection, and only those you allow here.
+                <ShieldCheck /> Only devices on {thisComputer}'s network, over an encrypted connection, and only those you allow here.
               </li>
               <li>
                 <ShieldCheck /> Only what is shown now: a picture at screen size, never its file; a video streamed while it plays. Nothing to save on the device, and it is told to keep nothing.
@@ -264,7 +265,7 @@ export function CastPanel() {
               </li>
             </ul>
             <label className="check small">
-              <input type="checkbox" checked={c.remote} onChange={(e) => void c.setRemote(e.target.checked)} /> Devices can go back and forth (else they only follow this Mac)
+              <input type="checkbox" checked={c.remote} onChange={(e) => void c.setRemote(e.target.checked)} /> Devices can go back and forth (else they only follow {thisComputer})
             </label>
             <div className="row">
               <span className="grow" />
@@ -287,7 +288,7 @@ export function CastPanel() {
                   </div>
                 )}
                 <div className="small dim">
-                  The browser warns that the connection isn't private: this Mac made its own certificate for this session. To be sure it's this Mac, its details should show this fingerprint:
+                  The browser warns that the connection isn't private: {thisComputer} made its own certificate for this session. To be sure it's {thisComputer}, its details should show this fingerprint:
                 </div>
                 <div className="mono small cast-fp" title={c.info.fingerprint}>
                   {c.info.fingerprint.split(" ").slice(0, 8).join(" ")} …
@@ -300,7 +301,7 @@ export function CastPanel() {
               </div>
             ) : (
               <div className="small cast-warn">
-                <Warning /> Anyone on {url ? label(url) : "this network"} can try to connect; nothing is shown until you allow them here. On a shared network (an accommodation's or a café's), join your iPhone's hotspot from this Mac and show on that instead.
+                <Warning /> Anyone on {url ? label(url) : "this network"} can try to connect; nothing is shown until you allow them here. On a shared network (an accommodation's or a café's), join your phone's hotspot from {thisComputer} and show on that instead.
               </div>
             )}
             <div className="label">Devices</div>

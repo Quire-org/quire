@@ -19,6 +19,7 @@ import { steppedJob } from "./lib/jobs";
 import { PART, bucketOf, filedFolder, folderName, fromRoot, inTarget, isFilingName, ownFolderOf, partOf, targetFor, within } from "./lib/filing";
 import { invoke } from "@tauri-apps/api/core";
 import { cue } from "./lib/sounds";
+import { IS_MAC } from "./lib/platform";
 
 export type Screen = "welcome" | "home" | "viewer" | "browse" | "dupes" | "albums" | "files" | "tags" | "people" | "artists" | "find" | "activity" | "scrapbook" | "cover";
 
@@ -487,7 +488,12 @@ function driveWatch(): () => void {
   const t = setTimeout(() => {
     const s = useStore.getState();
     if (s.loading) useStore.setState({ loading: "Waiting for the drive to answer…" });
-    s.toast("The drive isn't answering: macOS is still waiting on it. If this stays, unplug the drive or restart the Mac, then check it with First Aid in Disk Utility before opening it again.", "error");
+    s.toast(
+      IS_MAC
+        ? "The drive isn't answering: macOS is still waiting on it. If this stays, unplug the drive or restart the Mac, then check it with First Aid in Disk Utility before opening it again."
+        : "The drive isn't answering: the system is still waiting on it. If this stays, unplug the drive or restart the computer, then check the drive for errors before opening it again.",
+      "error",
+    );
   }, 15_000);
   return () => clearTimeout(t);
 }

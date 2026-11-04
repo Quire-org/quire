@@ -1,0 +1,16 @@
+{
+  "name": "quire",
+  "repository": "https://github.com/Quire-org/quire",
+  "title": { "title": "Quire", "line": "A private picture library for your drives" },
+  "parts": [
+    { "caption": "A home for your pictures, arranged your way", "length": 120, "zoom": [1, 1.05], "origin": "30% 30%", "steps": [{ "frame": "home" }] },
+    { "caption": "Sort with single keys: rate 1 to 10, file into folders", "length": 170, "zoom": [1, 1.03], "steps": [{ "frame": "sort-1" }, { "frame": "sort-2", "at": 50 }, { "frame": "sort-3", "at": 108 }] },
+    { "caption": "Browse everything, narrowed by tags, people, ratings or folders", "length": 160, "scroll": { "tall": "browse-tall", "from": 12, "to": 100, "share": 0.55 }, "steps": [{ "frame": "browse" }, { "frame": "browse-tags", "at": 108 }] },
+    { "caption": "Albums and comics, read page by page", "length": 185, "steps": [{ "frame": "albums", "click": true }, { "frame": "reader-1", "at": 52 }, { "frame": "reader-2", "at": 98 }, { "frame": "reader-3", "at": 140 }] },
+    { "caption": "Tags found on your own computer, nothing sent anywhere", "length": 105, "zoom": [1, 1.08], "origin": "18% 22%", "steps": [{ "frame": "tags" }] },
+    { "caption": "Seven themes, each in light and dark", "length": 150, "steps": [{ "frame": "look-cp2077-dark" }, { "frame": "look-cozy-light", "at": 37 }, { "frame": "look-manga-light", "at": 74 }, { "frame": "look-gallery-dark", "at": 111 }] }
+  ],
+  "end": { "title": "Quire", "lines": ["Free and open source, for macOS, Windows and Linux"], "link": "github.com/Quire-org/quire" },
+  "stills": { "sort": "sort-2", "browse": "browse", "albums": "albums", "reader": "reader-1", "tags": "tags", "themes": "look-cp2077-dark" },
+  "loop": { "from": 2.6, "length": 14.2 }
+}

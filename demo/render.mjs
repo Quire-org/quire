@@ -1,43 +1,55 @@
-// Renders with Remotion into out/site, what GitHub Pages serves for the README: `node render.mjs
-// video` (quire-demo.mp4), `stills` (the screenshots, screenshots/*.jpg) or `studio` (to look at
-// it while editing). Remotion's
-// rendering doesn't load when its packages' path has a space in it, so in a checkout whose path
-// has one, it runs from a copy of this folder in the temp folder (cloned, where the disk can).
+// Renders a demo with Remotion into <work>/out/site, what GitHub Pages serves for its README:
+// `node render.mjs video` (<name>-demo.mp4), `stills` (the screenshots, screenshots/*.jpg) or
+// `studio` (to look at it while editing). <work> is this folder, or another demo's with
+// `--work <folder>` (a plugin's: its script.json and the frames its capture kept in public/).
+// Remotion's rendering doesn't load when its packages' path has a space in it, so in a checkout
+// whose path has one, it runs from a copy of this folder in the temp folder (cloned, where the
+// disk can), and so does a work folder's public/ whose path has one.
 import { spawnSync } from "node:child_process";
-import { constants, cpSync, mkdirSync, rmSync } from "node:fs";
+import { constants, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const site = join(here, "out", "site");
-let cwd = here;
-if (/\s/.test(here)) {
-  cwd = join(tmpdir(), "quire-demo");
-  rmSync(cwd, { recursive: true, force: true });
-  cpSync(here, cwd, { recursive: true, mode: constants.COPYFILE_FICLONE, filter: (p) => !p.startsWith(join(here, "out")) });
-}
+const [what, ...rest] = process.argv.slice(2);
+const flag = rest.indexOf("--work");
+const work = flag >= 0 ? resolve(rest[flag + 1]) : here;
+const site = join(work, "out", "site");
+const script = JSON.parse(readFileSync(join(work, "script.json"), "utf8"));
+const scenes = JSON.parse(readFileSync(join(work, "public", "scenes.json"), "utf8"));
+
+const clone = (from, to) => {
+  rmSync(to, { recursive: true, force: true });
+  cpSync(from, to, { recursive: true, mode: constants.COPYFILE_FICLONE, filter: (p) => !p.startsWith(join(from, "out")) });
+  return to;
+};
+const cwd = /\s/.test(here) ? clone(here, join(tmpdir(), "quire-demo")) : here;
+let pub = join(work, "public");
+if (/\s/.test(pub)) pub = work === here ? join(cwd, "public") : clone(pub, join(tmpdir(), "quire-demo-public"));
+const props = (extra = {}) => {
+  const file = join(tmpdir(), `quire-demo-props-${process.pid}.json`);
+  writeFileSync(file, JSON.stringify({ script, scenes, ...extra }));
+  return `--props=${file}`;
+};
 const remotion = (args) => {
-  const r = spawnSync(join(cwd, "node_modules", ".bin", "remotion"), args, { cwd, stdio: "inherit" });
+  const r = spawnSync(join(cwd, "node_modules", ".bin", "remotion"), [...args, `--public-dir=${pub}`], { cwd, stdio: "inherit" });
   if (r.status !== 0) process.exit(r.status ?? 1);
 };
 
-/** The screenshots: name → frame. */
-const STILLS = { sort: "sort-2", browse: "browse", albums: "albums", reader: "reader-1", tags: "tags", themes: "look-cp2077-dark" };
-
-const what = process.argv[2];
 if (what === "video") {
   mkdirSync(site, { recursive: true });
-  remotion(["render", "src/index.ts", "Demo", join(site, "quire-demo.mp4"), "--codec=h264", "--crf=26", "--x264-preset=slow", "--log=warn"]);
+  remotion(["render", "src/index.ts", "Demo", join(site, `${script.name}-demo.mp4`), props(), "--codec=h264", "--crf=26", "--x264-preset=slow", "--log=warn"]);
+  console.log(`${site}/${script.name}-demo.mp4`);
 } else if (what === "stills") {
   mkdirSync(join(site, "screenshots"), { recursive: true });
-  for (const [name, id] of Object.entries(STILLS)) {
-    remotion(["still", "src/index.ts", "Screenshot", join(site, "screenshots", `${name}.jpg`), `--props=${JSON.stringify({ id })}`, "--image-format=jpeg", "--jpeg-quality=86", "--log=warn"]);
-    console.log(`out/site/screenshots/${name}.jpg`);
+  for (const [name, id] of Object.entries(script.stills)) {
+    remotion(["still", "src/index.ts", "Screenshot", join(site, "screenshots", `${name}.jpg`), props({ id }), "--image-format=jpeg", "--jpeg-quality=86", "--log=warn"]);
+    console.log(`${site}/screenshots/${name}.jpg`);
   }
 } else if (what === "studio") {
-  remotion(["studio", "src/index.ts"]);
+  remotion(["studio", "src/index.ts", props()]);
 } else {
-  console.error("node render.mjs video | stills | studio");
+  console.error("node render.mjs video | stills | studio [--work <folder>]");
   process.exit(2);
 }
