@@ -376,7 +376,7 @@ function FindSide() {
             <>
               <div className="label">{view.section === "ranking" ? "Ranking" : view.section === "artist" ? "Works" : "Show"}</div>
               {opts.length > 4 ? (
-                <Select value={view.option} options={opts} onChange={(v) => f.open({ option: v })} />
+                <Select value={view.option} options={opts} searchable={opts.length > 12} onChange={(v) => f.open({ option: v })} />
               ) : (
                 <div className="chips">
                   {opts.map((o) => (

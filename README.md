@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="https://quire-org.github.io/quire/quire-demo.webp" width="840" alt="Quire in 24 seconds: the Home in three layouts, a picture rated and filed with two keys, the library browsed, a comic read, tags and themes">
+  <img src="https://quire-org.github.io/quire/quire-demo.webp" width="840" alt="Quire in 29 seconds: the Home in four layouts, a picture rated and filed with two keys, the library browsed, a comic read, tags and themes">
   <br>
   <a href="https://quire-org.github.io/quire/quire-demo.mp4">Watch it sharper, as a video</a> ·
   <a href="https://quire-org.github.io/quire/demo/">Try it in your browser</a>
@@ -111,24 +111,24 @@ stickers, and showing a picture on another screen on the same network.
 
 ## See it in use
 
-Four short videos, each following one way of using Quire.
+Four short videos, each following one way of using Quire. Click one to watch it with its captions at full size.
 
 <table>
   <tr>
-    <td width="50%"><a href="https://quire-org.github.io/quire/photographer-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/photographer.jpg" alt="A photo shoot culled in Sort: a picture just rated 8"></a></td>
-    <td width="50%"><a href="https://quire-org.github.io/quire/references-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/references.jpg" alt="A work from Pixiv open in Find, about to go into the basket"></a></td>
+    <td width="50%"><a href="https://quire-org.github.io/quire/photographer-demo.mp4"><img src="https://quire-org.github.io/quire/photographer-demo.webp" alt="A photo shoot culled in Sort: a picture just rated 8"></a></td>
+    <td width="50%"><a href="https://quire-org.github.io/quire/references-demo.mp4"><img src="https://quire-org.github.io/quire/references-demo.webp" alt="Drawings of hands found on Pinterest in Find, then pinned to a board"></a></td>
   </tr>
   <tr>
-    <td align="center"><b>A photo shoot</b>: culled with single keys, look-alikes kept together, duplicates weeded out, an edit taken back (21 s)</td>
-    <td align="center"><b>Collecting references</b>: Pixiv in Find, works brought in, their artist gathered, tags to look things up by (18 s)</td>
+    <td align="center"><b>A photo shoot</b>: culled with single keys, look-alikes kept together, duplicates weeded out, an edit taken back (26 s)</td>
+    <td align="center"><b>Collecting references</b>: hand studies found on Pinterest in Find, kept in the library, pinned to a board beside your drawing (23 s)</td>
   </tr>
   <tr>
-    <td><a href="https://quire-org.github.io/quire/manga-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/manga.jpg" alt="A Japanese manga page read in English, the translation over its balloons"></a></td>
-    <td><a href="https://quire-org.github.io/quire/private-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/private.jpg" alt="People: faces found on the computer, grouped by person"></a></td>
+    <td><a href="https://quire-org.github.io/quire/manga-demo.mp4"><img src="https://quire-org.github.io/quire/manga-demo.webp" alt="A Japanese manga page read in English, the translation over its balloons"></a></td>
+    <td><a href="https://quire-org.github.io/quire/private-demo.mp4"><img src="https://quire-org.github.io/quire/private-demo.webp" alt="People: faces found on the computer, grouped by person"></a></td>
   </tr>
   <tr>
-    <td align="center"><b>Reading manga</b>: albums page by page, and Japanese pages read in English with Manga Translate (16 s)</td>
-    <td align="center"><b>Private photos</b>: faces named once, the library in a vault, a picture shown on a phone (18 s)</td>
+    <td align="center"><b>Reading manga</b>: albums page by page, and Japanese pages read in English with Manga Translate (19 s)</td>
+    <td align="center"><b>Private photos</b>: faces named once, the library in a vault, a picture shown on a phone (21 s)</td>
   </tr>
 </table>
 
@@ -157,6 +157,7 @@ The official plugins, made alongside Quire:
 | --- | --- |
 | [Manga Translate](https://github.com/Quire-org/manga-translate) | Albums read as manga, right to left, and their pages translated on your own computer: over the balloons, or saved as lettered pages. |
 | [Pixiv](https://github.com/Quire-org/pixiv-find) | Pixiv in Find: your feed, bookmarks, rankings, artists and searches. Picks come into the library through Import, with where they came from. |
+| [Pinterest](https://github.com/Quire-org/pinterest-find) | Pinterest in Find: searches, public boards and their More ideas, and signed in your home feed, your boards and More like this. Picks come in through Import, with who made them. |
 
 ## Build from source
 

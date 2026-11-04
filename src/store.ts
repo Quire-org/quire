@@ -14,6 +14,7 @@ import { folderMoves, mover, rekeyRecord, type MovePair } from "./lib/moves";
 import { applyLook, loadModeId, resolveMode, watchSystemMode, type Mode, type ResolvedMode, loadThemeId } from "./themes";
 import { basename, shuffled, uid, naturalCompare, plainCompare } from "./lib/format";
 import type { Album, AlbumRename, History, ItemSource, Library, LibrarySettings, MediaItem, Target, VaultStatus } from "./lib/types";
+import type { Fix } from "./scrapbook/model";
 import { useEdit, type Pipeline } from "./editStore";
 import { steppedJob } from "./lib/jobs";
 import { PART, bucketOf, filedFolder, folderName, fromRoot, inTarget, isFilingName, ownFolderOf, partOf, targetFor, within } from "./lib/filing";
@@ -135,6 +136,10 @@ interface State {
   pageTurns: boolean;
   /** Series kept together: whole in Sort (one key files all of it) and one tile in Browse; else each picture alone. */
   seriesTogether: boolean;
+  /** A library picture put on a board: copied onto it, or pointed at (it follows the picture, and leaves a gap if the picture goes). */
+  boardPictures: "copy" | "link";
+  /** How a new photo or note on a board is held up: pinned or taped, and where; null, neither. */
+  boardFix: Fix | null;
   driveOpen: boolean;
   immersive: boolean;
   backupOpen: boolean;
@@ -183,6 +188,8 @@ interface State {
   lastTargetParent: string | null;
   /** The item whose Info is open. */
   infoItem: MediaItem | null;
+  /** A file to show in Files (its absolute path): its folder opened there, it selected. */
+  filesShow: string | null;
   /** The album whose Info is open. */
   infoAlbum: Album | null;
   /** Files moved or renamed by the Files screen: every list, the queue, ratings and tags follow the new paths. */
@@ -215,7 +222,6 @@ interface Actions {
   loadAlbums(force?: boolean): Promise<Album[]>;
   addAlbumRoot(absPath: string): void;
   removeAlbumRoot(path: string): void;
-  moveAlbum(album: Album, targetId: string): Promise<boolean>;
   /** An album in the viewer, from its first page or the page `at` (its key). */
   openAlbum(album: Album, at?: string): Promise<void>;
   /** In an album with a translated version (or in that version): read the other one, at the same page. */
@@ -226,6 +232,8 @@ interface Actions {
   setFitMode(fitMode: FitMode): void;
   setPageTurns(on: boolean): void;
   setSeriesTogether(on: boolean): void;
+  setBoardPictures(v: "copy" | "link"): void;
+  setBoardFix(v: Fix | null): void;
   /** These pictures one series (with any series they are in); in the viewer, its members come right after the one on show. */
   makeSeries(keys: string[]): void;
   /** These pictures out of their series. */
@@ -277,6 +285,8 @@ interface Actions {
   unlockVaultQuick(): Promise<boolean>;
   lockVault(): Promise<void>;
   openFiles(): void;
+  /** Files, opened at a file's folder with the file selected (a PDF's page: the PDF). */
+  showInFiles(path: string): void;
   openTags(): void;
   /** Scrapbook: the covers made, and the sticker book. */
   openScrapbook(): void;
@@ -455,6 +465,23 @@ export function takingFromLibrary(run: () => void) {
   }
 }
 
+function loadBoardFix(): Fix | null {
+  try {
+    const v = JSON.parse(localStorage.getItem("quire.boardFix") ?? "") as Fix | null;
+    return v === null || (v && (v.kind === "pin" || v.kind === "tape") && ["one", "top", "all"].includes(v.where)) ? v : { kind: "pin", where: "one" };
+  } catch {
+    return { kind: "pin", where: "one" };
+  }
+}
+
+function loadBoardPictures(): "copy" | "link" {
+  try {
+    return localStorage.getItem("quire.boardPictures") === "link" ? "link" : "copy";
+  } catch {
+    return "copy";
+  }
+}
+
 function loadSeriesTogether(): boolean {
   try {
     return localStorage.getItem("quire.seriesTogether") !== "0";
@@ -549,6 +576,8 @@ export const useStore = create<Store>((set, get) => ({
   fitMode: loadFit(),
   pageTurns: loadPageTurns(),
   seriesTogether: loadSeriesTogether(),
+  boardPictures: loadBoardPictures(),
+  boardFix: loadBoardFix(),
   driveOpen: false,
   immersive: false,
   backupOpen: false,
@@ -572,6 +601,7 @@ export const useStore = create<Store>((set, get) => ({
   browseFilters: DEFAULT_BROWSE,
   browseSeed: 1,
   infoItem: null,
+  filesShow: null,
   infoAlbum: null,
   albumFilters: DEFAULT_ALBUMS,
   loading: null,
@@ -978,27 +1008,6 @@ export const useStore = create<Store>((set, get) => ({
     void get().rescan(true);
   },
 
-
-  async moveAlbum(album, targetId) {
-    const { root, library, busy } = get();
-    const target = library?.targets.find((t) => t.id === targetId);
-    if (!root || !library || !target || busy) return false;
-    set({ busy: true });
-    try {
-      // A PDF album is one file; a folder album its folder.
-      const newPath = album.pdf ? (await api.fsMove(root, [album.path], target.path))[0] : await api.moveDir(root, album.path, target.path);
-      set({ albums: get().albums.filter((a) => a.key !== album.key), allStale: true });
-      // The album's rating, tags, language, and its pages' ratings, tags and fingerprints go with it.
-      followMoves([[album.key, storedPath(root, newPath)]]);
-      get().toast(`Album → ${target.name}`, "ok");
-      return true;
-    } catch (e) {
-      get().toast(String(e), "error");
-      return false;
-    } finally {
-      set({ busy: false });
-    }
-  },
 
   async openAlbum(album, at) {
     const { root } = get();
@@ -1425,6 +1434,11 @@ export const useStore = create<Store>((set, get) => ({
     set({ screen: "files", settingsOpen: false, trashOpen: false, immersive: false, hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
+  showInFiles(path) {
+    get().openFiles();
+    set({ filesShow: path.replace(/(\.pdf)#\d+$/i, "$1") });
+  },
+
   openTags() {
     if (get().editMode) get().leaveEdit();
     set({ screen: "tags", hudHidden: false });
@@ -1594,6 +1608,26 @@ export const useStore = create<Store>((set, get) => ({
     }
     set({ seriesTogether: on });
     get().keepSettings({ seriesTogether: on });
+  },
+
+  setBoardPictures(v) {
+    try {
+      localStorage.setItem("quire.boardPictures", v);
+    } catch {
+      /* ignore */
+    }
+    set({ boardPictures: v });
+    get().keepSettings({ boardPictures: v });
+  },
+
+  setBoardFix(v) {
+    try {
+      localStorage.setItem("quire.boardFix", JSON.stringify(v));
+    } catch {
+      /* ignore */
+    }
+    set({ boardFix: v });
+    get().keepSettings({ boardFix: v });
   },
 
   makeSeries(keys) {
@@ -2084,11 +2118,10 @@ export function followMoves(pairs: MovePair[]) {
     await useArtists.getState().load();
     if (useStore.getState().root === root) useArtists.getState().follow(move);
   }).catch(() => {});
-  // A sticker remembers the picture it was cut from.
+  // A sticker remembers the picture it was cut from, and a board the library's pictures it points at.
   void import("./scrapbook/store").then(async ({ useScrapbook }) => {
-    const lib = await useScrapbook.getState().load();
-    if (useStore.getState().root !== root || !lib.stickers.some((st) => st.source && move(st.source) != null)) return;
-    useScrapbook.getState().setStickers(lib.stickers.map((st) => (st.source && move(st.source) != null ? { ...st, source: move(st.source)! } : st)));
+    await useScrapbook.getState().load();
+    if (useStore.getState().root === root) useScrapbook.getState().follow(move);
   }).catch(() => {});
   // Where a version and its original are, for Info.
   if (root) void Promise.resolve().then(() => api.versionsFollow(root, pairs)).catch(() => {});

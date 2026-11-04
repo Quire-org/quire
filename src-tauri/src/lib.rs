@@ -2335,13 +2335,32 @@ struct LoginBack {
     cookies: std::collections::BTreeMap<String, String>,
 }
 
+/// The cookies of a window a request to `url` would carry, as `name=value; …`: its host's, and
+/// those set for a domain the host is in. (wry's `cookies_for_url` keeps only the host's own, which
+/// leaves out a site's sign-in set for all of it, `.example.com`.)
+fn cookies_for(w: &tauri::WebviewWindow, url: &tauri::Url) -> String {
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    let https = url.scheme() == "https";
+    w.cookies()
+        .unwrap_or_default()
+        .iter()
+        .filter(|c| {
+            let Some(domain) = c.domain() else { return false };
+            let domain = domain.trim_start_matches('.').to_ascii_lowercase();
+            (host == domain || host.ends_with(&format!(".{domain}"))) && (https || !c.secure().unwrap_or(false))
+        })
+        .map(|c| format!("{}={}", c.name(), c.value()))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 /// A platform's sign-in page in a window of its own, for a plugin granted `login:<host>`. Gives the
 /// address it went to that starts with one of `until` (where the platform sends the sign-in back),
 /// or nothing when the window is closed first. With `cookies` (addresses on hosts the plugin may
 /// reach), the window's cookies for them come back too, read just before it closes: the website's own
 /// sign-in, for a plugin that also asks the website. The window keeps nothing on this computer.
 #[tauri::command]
-async fn plugin_login(app: tauri::AppHandle, id: String, url: String, until: Vec<String>, title: String, cookies: Option<Vec<String>>) -> Result<Option<LoginBack>, String> {
+async fn plugin_login(app: tauri::AppHandle, id: String, url: String, until: Vec<String>, title: String, cookies: Option<Vec<String>>, load: Option<bool>) -> Result<Option<LoginBack>, String> {
     let reg = registry(&app)?;
     let granted = reg.effective_permissions(&id);
     let url = plugins::login_allowed(&granted, &url)?;
@@ -2355,6 +2374,14 @@ async fn plugin_login(app: tauri::AppHandle, id: String, url: String, until: Vec
     }
     let (tx, rx) = std::sync::mpsc::channel::<Option<String>>();
     let back = tx.clone();
+    // With `load`, the page it ends on loads first: a site that stores its sign-in as it goes on to
+    // that page has it stored by then, wherever a redirect takes it (another of the site's domains).
+    // Otherwise it ends as it is asked for (an address that mustn't load: a callback whose code is for
+    // the plugin, or an app's own scheme).
+    let load = load.unwrap_or(false);
+    let reached = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let on_the_way = reached.clone();
+    let loaded = tx.clone();
     let window = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::External(url))
         .title(format!("Sign in to {}", title.chars().take(40).collect::<String>()))
         .inner_size(520.0, 760.0)
@@ -2364,8 +2391,17 @@ async fn plugin_login(app: tauri::AppHandle, id: String, url: String, until: Vec
             if !until.iter().any(|p| at.starts_with(p.as_str())) {
                 return true;
             }
+            if load {
+                on_the_way.store(true, std::sync::atomic::Ordering::SeqCst);
+                return true;
+            }
             let _ = back.send(Some(at.to_string()));
             false
+        })
+        .on_page_load(move |_, page| {
+            if page.event() == tauri::webview::PageLoadEvent::Finished && reached.load(std::sync::atomic::Ordering::SeqCst) {
+                let _ = loaded.send(Some(page.url().to_string()));
+            }
         })
         .build()
         .map_err(|e| format!("could not open the sign-in window: {e}"))?;
@@ -2380,8 +2416,7 @@ async fn plugin_login(app: tauri::AppHandle, id: String, url: String, until: Vec
         let mut cookies = std::collections::BTreeMap::new();
         if let Some(w) = app.get_webview_window(&label) {
             for (address, u) in keep {
-                let jar = w.cookies_for_url(u).unwrap_or_default();
-                let line = jar.iter().map(|c| format!("{}={}", c.name(), c.value())).collect::<Vec<_>>().join("; ");
+                let line = cookies_for(&w, &u);
                 if !line.is_empty() {
                     cookies.insert(address, line);
                 }
@@ -2487,9 +2522,9 @@ async fn plugin_check(app: tauri::AppHandle, id: String, url: String, name: Stri
                 break;
             }
             let Some(w) = app.get_webview_window(&label) else { break };
-            let jar = w.cookies_for_url(url.clone()).unwrap_or_default();
-            if !jar.is_empty() {
-                last = Some(jar.iter().map(|c| format!("{}={}", c.name(), c.value())).collect::<Vec<_>>().join("; "));
+            let line = cookies_for(&w, &url);
+            if !line.is_empty() {
+                last = Some(line);
             }
             if finished {
                 break;

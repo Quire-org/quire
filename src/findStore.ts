@@ -149,6 +149,22 @@ let serial = 0;
 const signedOutError = (e: unknown) => /sign in/i.test(String(e));
 
 /** Whether Find can show the platform: signed in, or it can be browsed without (or has no accounts at all). */
+/** Whether a section or a search was asked for since the platform was chosen (else it is on its first). */
+let picked = false;
+
+/**
+ * A platform on its first section while none was asked for, as its sections are now (a platform may
+ * offer others once signed in, a home feed first, say), and on it too when the one shown is gone.
+ */
+function firstSection() {
+  const s = useFind.getState();
+  const f = s.pluginId ? useFinders.getState().finders[s.pluginId] : null;
+  if (!f?.sections.length || s.view.section === BASKET || s.view.section === "artist") return;
+  const first = f.sections[0];
+  if (s.view.section === first.id || (picked && f.sections.some((x) => x.id === s.view.section))) return;
+  useFind.setState({ view: { ...s.view, section: first.id, query: "", option: first.options[0]?.value ?? "", author: null, tag: null }, items: [] });
+}
+
 export const canBrowse = (account: FindAccount | null, pluginId: string | null) => {
   const f = pluginId ? useFinders.getState().finders[pluginId] : undefined;
   return account?.signedIn === true || (!!account && !!f && (f.accounts === false || f.signIn?.optional === true));
@@ -224,6 +240,7 @@ export const useFind = create<FindState>((set, get) => ({
     const f = useFinders.getState().finders[pluginId];
     if (!f) return;
     serial++;
+    picked = false;
     set({ pluginId, account: null, accountFor: null, items: [], artists: [], artist: null, next: null, title: null, total: null, error: null, loading: false, picks: [], view: { section: f.sections[0].id, query: "", option: f.sections[0].options[0]?.value ?? "", author: null, tag: null } });
     void get().refreshAccount();
   },
@@ -241,6 +258,7 @@ export const useFind = create<FindState>((set, get) => ({
       const account = await finder.account(pluginId);
       if (get().accountFor !== forWhat) return;
       set({ account });
+      firstSection();
       if (canBrowse(account, pluginId) && !get().items.length) get().open({});
     } catch (e) {
       if (get().accountFor === forWhat) set({ account: { signedIn: false }, error: String(e) });
@@ -253,6 +271,7 @@ export const useFind = create<FindState>((set, get) => ({
     try {
       const account = await finder.signIn(pluginId, fields);
       set({ account, error: null });
+      firstSection();
       if (account.signedIn) get().open({});
       return account.signedIn;
     } catch (e) {
@@ -293,6 +312,7 @@ export const useFind = create<FindState>((set, get) => ({
     serial++;
     const account = await finder.signOut(pluginId).catch(() => ({ signedIn: false }));
     set({ account, items: [], artists: [], artist: null, next: null, title: null, total: null, loading: false, error: null });
+    firstSection();
     if (canBrowse(account, pluginId)) get().open({});
   },
 
@@ -386,6 +406,8 @@ export const useFind = create<FindState>((set, get) => ({
   },
 
   open(patch) {
+    // A section or a search asked for: the platform stays on it as its sections change.
+    if (patch.section !== undefined || patch.query !== undefined || patch.author !== undefined) picked = true;
     const view = { ...get().view, ...patch };
     // A section's options start at its first unless one was given.
     if (patch.section && patch.option === undefined) {
@@ -660,16 +682,18 @@ async function credit(platform: string, item: FindItem, found: MediaItem[]): Pro
   const unnoted = found.filter((it) => !hasWork(lib?.sources?.[it.key], { platform, id: item.id }));
   if (unnoted.length) useStore.getState().addSources(unnoted.map((it) => [it.key, { platform, id: item.id, url: item.url ?? "", title: item.title, author: item.author, tags: item.tags, date: item.date, adult: item.adult, ...(item.language ? { language: item.language } : {}), added: Date.now() }]));
   if (!item.author?.id) return undefined;
+  // The maker where they are: on the work's platform, or another its plugin knows them by.
+  const on = item.author.platform ?? platform;
   const { useArtists, linkedArtist, artistKeyOf } = await import("./artistsStore");
   const doc = await useArtists.getState().load();
   if (!doc) return undefined;
   const keys = [...new Set(found.map(artistKeyOf))];
-  const linked = linkedArtist(doc, platform, item.author.id);
+  const linked = linkedArtist(doc, on, item.author.id);
   const already = linked ? keys.filter((k) => doc.items[k]?.includes(linked.id)).length : 0;
   const others = keys.filter((k) => doc.items[k]?.length && !(linked && doc.items[k].includes(linked.id))).length;
   const open = keys.filter((k) => !doc.items[k]?.length);
   if (!open.length) return linked ? { id: linked.id, name: linked.name, given: [], already, others } : undefined;
-  const id = await useArtists.getState().accept({ key: `${platform}:${item.author.id}`, platform, authorId: item.author.id, name: item.author.name, account: item.author.account, items: open, artist: linked });
+  const id = await useArtists.getState().accept({ key: `${on}:${item.author.id}`, platform: on, authorId: item.author.id, name: item.author.name, account: item.author.account, url: item.author.url ?? null, items: open, artist: linked });
   const artist = id ? useArtists.getState().doc?.artists[id] : null;
   return artist ? { id: artist.id, name: artist.name, given: open, already, others } : undefined;
 }

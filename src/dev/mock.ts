@@ -236,6 +236,8 @@ let mockArtists: unknown = null;
 const mockBlobs = new Map<string, ArrayBuffer>();
 /** Find's state kept with the library (the basket), in the mock. */
 let mockFindState: unknown = null;
+/** The scrapbook (covers, boards, stickers) kept with the library, in the mock: a board's own window reads it. */
+let mockScrapbook: unknown = null;
 /** What plugins keep with the library, in the mock: `id:key` → value. */
 const mockLibraryStore: Record<string, unknown> = {};
 const pluginIdOf = (source: string) => source.replace(/\/+$/, "").split("/").pop()!.replace(/\.git$/, "");
@@ -244,6 +246,20 @@ async function mockManifest(source: string) {
   const r = await fetch(`${FILES_BASE}__plugin/${id}/plugin.json`);
   if (!r.ok) throw `no plugin.json in ${source}`;
   return r.json() as Promise<Record<string, unknown>>;
+}
+
+const ICON_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" };
+/** A plugin's logo as the backend gives it: plugin.json's `icon`, read from its folder, as a `data:` picture. */
+async function mockIcon(id: string, manifest: Record<string, unknown>): Promise<string | null> {
+  const rel = typeof manifest.icon === "string" ? manifest.icon : "";
+  const type = ICON_TYPES[rel.split(".").pop()?.toLowerCase() ?? ""];
+  if (!type) return null;
+  const r = await fetch(`${FILES_BASE}__plugin/${id}/${rel}`).catch(() => null);
+  if (!r?.ok) return null;
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  let text = "";
+  for (const b of bytes) text += String.fromCharCode(b);
+  return `data:${type};base64,${btoa(text)}`;
 }
 
 /**
@@ -256,6 +272,8 @@ interface FakeSite {
   fetch: (url: string, body: string | null) => { status: number; headers: Record<string, string>; body: string; bodyBase64: null } | null;
   image: (url: string) => Promise<ArrayBuffer>;
   signIn: (url: string) => string;
+  /** The cookies its sign-in leaves, when it says (else a made-up session cookie). */
+  cookies?: string;
   examples: { work: { id: string; url: string }; artist: { id: string; account: string; url: string } };
 }
 const FIND_PLUGIN = new URLSearchParams(location.search).get("find") || null;
@@ -792,8 +810,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         const manifest = await mockManifest(FIND_PLUGIN).catch(() => null);
         if (manifest) mockPlugins.set(FIND_PLUGIN, { id: FIND_PLUGIN, manifest, state: { enabled: true, allowVault: false, granted: manifest.permissions as string[], source: `../${FIND_PLUGIN}`, linked: `../${FIND_PLUGIN}`, github: null, commit: null, installedAt: Date.now() }, storage: {}, settings: {} });
       }
-      // As the backend reads a manifest: what it leaves out, empty.
-      return [...mockPlugins.values()].map((p) => ({ id: p.id, manifest: { permissions: [], settings: [], models: [], ...(p.manifest as object) }, state: p.state, dir: p.state.linked ?? `/mock/app-data/plugins/installed/${p.id}`, error: null }));
+      // As the backend reads a manifest: what it leaves out, empty; its logo from its folder.
+      return Promise.all(
+        [...mockPlugins.values()].map(async (p) => ({ id: p.id, manifest: { permissions: [], settings: [], models: [], ...(p.manifest as object) }, state: p.state, dir: p.state.linked ?? `/mock/app-data/plugins/installed/${p.id}`, error: null, icon: await mockIcon(p.id, p.manifest) })),
+      );
     case "plugin_inspect": {
       const source = String(args.source);
       const github = source.includes("github.com");
@@ -865,9 +885,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       // The made-up reader signs in after a moment.
       await new Promise((r) => setTimeout(r, 1200));
       {
-        const url = (await fakeSite)?.signIn(String(args.url)) ?? null;
+        const site = await fakeSite;
+        const url = site?.signIn(String(args.url)) ?? null;
         // A website sign-in for each address whose cookies were asked for.
-        return url && { url, cookies: Object.fromEntries(((args.cookies as string[]) ?? []).map((c) => [c, "session=made-up"])) };
+        return url && { url, cookies: Object.fromEntries(((args.cookies as string[]) ?? []).map((c) => [c, site?.cookies ?? "session=made-up"])) };
       }
     case "plugin_login_close":
       return null;
@@ -966,6 +987,14 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const site = await fakeSite;
       if (!site) throw "mock: no network";
       mockBlobs.set(String(args.name), await site.image(String(args.url)));
+      return null;
+    case "scrapbook_load":
+      return mockScrapbook;
+    case "scrapbook_save":
+      mockScrapbook = args.data;
+      return null;
+    case "scrapbook_blob_put":
+      mockBlobs.set(String(args.name), Uint8Array.from(atob(String(args.dataBase64)), (c) => c.charCodeAt(0)).buffer);
       return null;
     case "scrapbook_blob": {
       const b = mockBlobs.get(String(args.name));

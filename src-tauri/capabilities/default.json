@@ -1,8 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for the main window, and a board's window of its own (Scrapbook)",
+  "windows": [
+    "main",
+    "board-*"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-set-fullscreen",
@@ -10,6 +13,9 @@
     "core:window:allow-set-title",
     "core:window:allow-destroy",
     "opener:default",
-    "dialog:default"
+    "dialog:default",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-focus"
   ]
 }

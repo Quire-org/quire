@@ -105,10 +105,18 @@ export function Files() {
     }
   };
 
+  /** The folder whose entries are listed now (the one asked for may still be loading). */
+  const [listed, setListed] = useState<string | null>(null);
+  // Only the folder asked for last is listed: an earlier one answering late is left out.
+  const asked = useRef("");
   const load = useCallback(async () => {
     if (!root) return;
+    asked.current = dir;
     try {
-      setEntries(await api.listDir(root, dir));
+      const got = await api.listDir(root, dir);
+      if (asked.current !== dir) return;
+      setEntries(got);
+      setListed(dir);
     } catch (e) {
       s.toast(String(e), "error");
     }
@@ -120,6 +128,22 @@ export function Files() {
     setSelected(new Set());
     anchor.current = null;
   }, [load]);
+
+  // A file shown here from elsewhere (Show in Files): its folder opened, the file selected and scrolled to.
+  const show = useStore((x) => x.filesShow);
+  const showIn = show && root ? show.slice(0, show.lastIndexOf("/")) || root : null;
+  useEffect(() => {
+    if (showIn) setDir(showIn);
+  }, [showIn]);
+  useEffect(() => {
+    if (!show || listed !== showIn) return;
+    useStore.setState({ filesShow: null });
+    if (!entries.some((x) => x.path === show)) return s.toast(`${show.split("/").pop()} isn't in its folder any more`, "error");
+    setSelected(new Set([show]));
+    anchor.current = { path: show, base: new Set() };
+    requestAnimationFrame(() => document.querySelector(`[data-path="${CSS.escape(show)}"]`)?.scrollIntoView({ block: "center" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show, showIn, listed, entries]);
 
   // Files dropped from the desktop come in through the web drop event (the window's own drop
   // handling is off, or in-page drags never fire on macOS): their bytes are read here and written

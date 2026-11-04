@@ -144,7 +144,7 @@ export const api = {
   pluginLibrarySet: (id: string, root: string, key: string, value: unknown) => invoke<void>("plugin_library_set", { id, root, key, value }),
   /** A platform's sign-in page in its own window; the address it ended on (one of `until`), or null when closed. */
   /** The sign-in window: where it ended, and the cookies asked for (addresses on the plugin's hosts), or null when closed. */
-  pluginLogin: (id: string, url: string, until: string[], title: string, cookies: string[]) => invoke<{ url: string; cookies: Record<string, string> } | null>("plugin_login", { id, url, until, title, cookies }),
+  pluginLogin: (id: string, url: string, until: string[], title: string, cookies: string[], load: boolean) => invoke<{ url: string; cookies: Record<string, string> } | null>("plugin_login", { id, url, until, title, cookies, load }),
   pluginLoginClose: (id: string) => invoke<void>("plugin_login_close", { id }),
   /** An image for Find, fetched with the headers its platform wants. */
   findImage: (id: string, url: string, headers: Record<string, string>) => invoke<ArrayBuffer>("find_image", { id, url, headers }),

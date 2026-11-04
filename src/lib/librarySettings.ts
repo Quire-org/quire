@@ -24,6 +24,8 @@ export function settingsHere(): LibrarySettings {
     slideshow: { interval: s.slideshow.interval, hideUi: s.slideshow.hideUi },
     pageTurns: s.pageTurns,
     seriesTogether: s.seriesTogether,
+    boardPictures: s.boardPictures,
+    boardFix: s.boardFix,
     fit: s.fitMode,
     online: online.settings,
     connected: online.settings.keep ? online.connected : undefined,
@@ -49,6 +51,8 @@ export function adoptSettings() {
     }
     if (kept.pageTurns !== undefined && kept.pageTurns !== s.pageTurns) s.setPageTurns(kept.pageTurns);
     if (kept.seriesTogether !== undefined && kept.seriesTogether !== s.seriesTogether) s.setSeriesTogether(kept.seriesTogether);
+    if (kept.boardPictures && kept.boardPictures !== s.boardPictures) s.setBoardPictures(kept.boardPictures);
+    if (kept.boardFix !== undefined && JSON.stringify(kept.boardFix) !== JSON.stringify(s.boardFix)) s.setBoardFix(kept.boardFix);
     if (kept.fit && kept.fit !== s.fitMode) s.setFitMode(kept.fit);
     if (kept.online) useOnline.getState().take(kept.online, kept.connected);
     if (kept.updates) useUpdates.getState().setAuto(kept.updates.auto);

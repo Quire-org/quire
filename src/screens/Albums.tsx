@@ -34,7 +34,6 @@ import type { Album, AlbumRename, ItemSource } from "../lib/types";
 import { versionPairs } from "../lib/versions";
 import { VersionsReview } from "../components/VersionsReview";
 import { FitImage } from "../components/FitImage";
-import { Deco } from "../components/Deco";
 import { steppedJob } from "../lib/jobs";
 import { ask } from "../components/Confirm";
 
@@ -413,17 +412,22 @@ export function Albums() {
   const firstRow = Math.max(0, Math.floor(gridView.top / stride) - OVERSCAN);
   const lastRow = Math.min(rows, Math.ceil((gridView.top + gridView.h) / stride) + OVERSCAN);
   const shown = albums.slice(firstRow * cols, lastRow * cols);
-  // The row height from a card in view (one off screen only has its reserved size), before the frame
-  // paints: a change of the tile size or the width changes it, and the rows with it.
+  // The row height from a card on show (each is laid out: only the rows near the view are there),
+  // before the frame paints, once cards are there and as the tile size or the width changes. Not as
+  // the rows shown change: a new height changes which rows those are, which mustn't measure again
+  // (that fed itself until React gave up). A height only going back to the one before it, at the
+  // same size and columns, isn't taken either: that is a measurement flipping, not a change.
+  const measured = useRef({ at: "", before: 0 });
+  const hasCards = shown.length > 0;
   useLayoutEffect(() => {
-    const el = gridRef.current;
-    if (!el || !shown.length) return;
-    const cards = el.querySelectorAll<HTMLElement>(".album-card");
-    const inView = Math.min(cards.length - 1, Math.max(0, (Math.floor(gridView.top / stride) - firstRow) * cols));
-    const h = cards[inView]?.offsetHeight;
-    if (h && Math.abs(h - rowH) > 1) setRowH(h);
+    const h = gridRef.current?.querySelector<HTMLElement>(".album-card")?.offsetHeight;
+    if (!h || Math.abs(h - rowH) <= 1) return;
+    const at = `${zoom}:${cols}`;
+    if (measured.current.at === at && Math.abs(h - measured.current.before) <= 1) return;
+    measured.current = { at, before: rowH };
+    setRowH(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown.length, cols, zoom, gridView.w]);
+  }, [hasCards, cols, zoom, gridView.w]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -547,7 +551,6 @@ export function Albums() {
         </button>
         <p className="dim small">Open an album to rate it as a whole.</p>
 
-        <Deco kind="sprout" className="deco-side" />
         <button className="btn sm ghost advanced-btn" onClick={() => setAdvanced(true)}>
           <SlidersHorizontal /> Advanced…
         </button>
@@ -745,8 +748,7 @@ export function Albums() {
 }
 
 const AlbumCard = memo(function AlbumCard({ album, onMenu }: { album: Album; onMenu: (e: React.MouseEvent, a: Album) => void }) {
-  const s = useStore(useShallow((x) => ({ busy: x.busy, library: x.library, moveAlbum: x.moveAlbum, openAlbum: x.openAlbum })));
-  const targets = s.library?.targets ?? [];
+  const s = useStore(useShallow((x) => ({ library: x.library, openAlbum: x.openAlbum })));
   const rating = s.library?.albumRatings[album.key];
   const [cover, setCover] = useState<string | null>(null);
   // The cover loads once the card comes near the screen, not all of them at once when the grid opens.
@@ -814,15 +816,11 @@ const AlbumCard = memo(function AlbumCard({ album, onMenu }: { album: Album; onM
             <Star /> {rating}
           </span>
         )}
+        {/* Open, and no sort folders: an album stays in its album folder. */}
         <div className="album-actions" onClick={(e) => e.stopPropagation()}>
           <button className="btn sm" onClick={() => void s.openAlbum(album)}>
             Open
           </button>
-          {targets.map((t) => (
-            <button key={t.id} className="btn sm primary" disabled={s.busy} onClick={() => void s.moveAlbum(album, t.id)} title={`Move the whole folder to ${t.path}`}>
-              <span className="ellipsis">{t.name}</span>
-            </button>
-          ))}
         </div>
       </div>
       <div className="album-foot">

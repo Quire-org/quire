@@ -14,9 +14,10 @@ import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
 import { useTags } from "../tagsStore";
 import { usePeople } from "../peopleStore";
 import { useArtists } from "../artistsStore";
-import { COLS, GROUPS, KINDS, NARROW_COLS, PRESETS, canMosaic, move, narrow, readingOrder, resize, type Block, type BlockFilter, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, MINE, GALLERY_KINDS } from "../home/board";
+import { COLS, GROUPS, KINDS, NARROW_COLS, PRESETS, RANDOM_BOARD, canMosaic, move, narrow, readingOrder, resize, type Block, type BlockFilter, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, MINE, GALLERY_KINDS } from "../home/board";
 import { useHome } from "../home/store";
-import { actionOf, BlockBody, defaultSearches, defaultShortcuts, shuffles, useBlockTitle, usePool, useSalt, useSharedPanels, useShortcutOptions } from "../home/blocks";
+import { actionOf, BlockBody, canShuffle, defaultSearches, defaultShortcuts, useBlockTitle, useBoards, usePool, useSalt, useSharedPanels, useShortcutOptions } from "../home/blocks";
+import { NewBoardAsked } from "../components/NewBoard";
 import { useFind } from "../findStore";
 import { useFinders } from "../plugins/find";
 import { PlatformIcon } from "../components/PlatformIcon";
@@ -67,6 +68,7 @@ export function Home() {
         {arranging && picked && <BlockPanel block={picked} />}
         {arranging && pickedSticker && <StickerPanel sticker={pickedSticker} />}
       </div>
+      <NewBoardAsked />
     </div>
   );
 }
@@ -213,7 +215,7 @@ function BlockFrame({ block, number, arranging, canArrange, selected, onGrab, on
   const title = useBlockTitle(block);
   const [salt, reshuffle] = useSalt(block);
   const act = actionOf(block);
-  const tools = !arranging && shuffles[block.type] && (
+  const tools = !arranging && canShuffle(block) && (
     <button className="btn sm ghost" onClick={reshuffle} title="Others">
       <Shuffle />
     </button>
@@ -584,12 +586,30 @@ function BlockSettings({ block, title, onDone }: { block: Block; title: string; 
         </div>
       )}
       {block.type === "jumpin" && <JumpInSettings block={block} />}
+      {block.type === "board" && <BoardSettings block={block} />}
       {block.type === "shared" && <SharedSettings block={block} />}
       <div className="row">
         <button className="btn sm danger" onClick={() => (onDone(), h.removeBlock(block.id))}>
           <Trash /> Take it off
         </button>
       </div>
+    </div>
+  );
+}
+
+/** A board: which one it shows. */
+function BoardSettings({ block }: { block: Block }) {
+  const boards = useBoards();
+  if (!boards.length) return <span className="dim small">No boards yet: make one in the Scrapbook (Boards), or with the Boards block.</span>;
+  return (
+    <div className="home-field">
+      <span className="label">Shows</span>
+      <Select
+        searchable={boards.length > 8}
+        value={block.board ?? ""}
+        onChange={(v) => useHome.getState().updateBlock(block.id, { board: v || undefined })}
+        options={[{ value: "", label: "The board last changed" }, { value: RANDOM_BOARD, label: "A random one, new each time" }, ...boards.map((b) => ({ value: b.id, label: b.name || "Board" }))]}
+      />
     </div>
   );
 }

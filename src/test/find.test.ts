@@ -250,9 +250,12 @@ describe("signing in and the library's store", () => {
     await expect(dispatch(p, "login.open", { url: "https://app-api.example.org/login", until: [] })).rejects.toThrow(/needs `until`/);
     const back = await dispatch(p, "login.open", { url: "https://app-api.example.org/login", until: ["https://app-api.example.org/callback"], name: "Demo" });
     expect(back).toBe("https://app-api.example.org/callback?code=abc");
-    expect(calls.login[0]).toEqual(["demo", "https://app-api.example.org/login", ["https://app-api.example.org/callback"], "Demo", []]);
+    // It ends as the callback is asked for, unless the plugin wants that page loaded first.
+    expect(calls.login[0]).toEqual(["demo", "https://app-api.example.org/login", ["https://app-api.example.org/callback"], "Demo", [], false]);
     expect(useFinders.getState().login).toBeNull();
     expect(calls.closed).toEqual(["demo"]);
+    await dispatch(p, "login.open", { url: "https://app-api.example.org/login", until: ["https://app-api.example.org/callback"], load: true });
+    expect((calls.login[1] as unknown[])[5]).toBe(true);
   });
 
   it("gives the sign-in window's cookies for the plugin's own hosts, when asked", async () => {

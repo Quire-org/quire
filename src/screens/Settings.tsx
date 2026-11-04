@@ -22,6 +22,7 @@ import { Trash } from "./Trash";
 import { Drive } from "./Drive";
 import { Backup } from "./Backup";
 import { VaultDialog } from "./VaultDialog";
+import { FIX_PLACES, type Fix } from "../scrapbook/model";
 import { PluginsDialog } from "./PluginsDialog";
 import { LocalModels } from "./LocalModels";
 import { Updates } from "./Updates";
@@ -403,6 +404,23 @@ function ViewingPage() {
           title="Keep series together"
           info="A series is a few pictures alike that you keep all of: a burst, glasses on and off, an artist's variations. Together, it is one tile in Browse, comes up whole in Sort and the viewer, and one target key files all of it. Apart, each picture comes on its own. Sort suggests series as you go, and Duplicates can keep a group as one."
           toggle={{ on: s.seriesTogether, label: s.seriesTogether ? "Together" : "Apart", onChange: (on) => s.setSeriesTogether(on) }}
+        />
+        <OptionRow
+          title="Pictures on boards"
+          info="A picture of the library put on a Scrapbook board. A copy stays on the board whatever becomes of the picture, so you can keep only the board; pointing at the picture takes no room, follows it when it moves, and leaves a gap if it goes."
+          toggle={{ on: s.boardPictures === "copy", label: s.boardPictures === "copy" ? "Keep a copy" : "Point at it", onChange: (on) => s.setBoardPictures(on ? "copy" : "link") }}
+        />
+        <OptionRow
+          title="Held up on boards"
+          info="How a new photo or note on a Scrapbook board is held up: pinned or taped, and where. Each one can be changed on its own afterwards."
+          control={
+            <Select
+              compact
+              value={s.boardFix ? `${s.boardFix.kind}:${s.boardFix.where}` : "none"}
+              options={[{ value: "none", label: "Neither" }, ...(["pin", "tape"] as const).flatMap((kind) => FIX_PLACES.map((p) => ({ value: `${kind}:${p.id}`, label: `${kind === "pin" ? "Pinned" : "Taped"} · ${p.name.toLowerCase()}` })))]}
+              onChange={(v) => s.setBoardFix(v === "none" ? null : { kind: v.split(":")[0] as Fix["kind"], where: v.split(":")[1] as Fix["where"] })}
+            />
+          }
         />
       </section>
     </>

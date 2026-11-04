@@ -88,9 +88,11 @@ npm run all        # capture, then render into out/site what the workflow publis
 
 - `npm run workflows` makes the workflow videos the README links to, one per folder in
   `workflows/` (a capture and a `script.json` each, on the same kit), into `out/site` beside
-  Quire's own with a screenshot each; `npm run workflows -- manga` makes only that one. Two of them
-  show official plugins, which the Demo workflow clones beside the checkout, where the preview's
-  file server finds a plugin by its id. A capture can set the demo mode's hooks before the app
+  Quire's own with a screenshot and a card-sized looping clip each (`<name>-demo.webp`, what the
+  README's cards show: an animated picture plays by itself there, where a video can't);
+  `npm run workflows -- manga` makes only that one. Two of them show official plugins, which the
+  Demo workflow clones beside the checkout, where the preview's file server finds a plugin by its id
+  (and the pictures its made-up site brings). A capture can set the demo mode's hooks before the app
   loads (`init`): `__demoFiles` adds files served from elsewhere on the file server (the manga
   video's album is an official plugin's test pages) and `__demoEngine` answers the engine's runs (there
   with the run recorded beside each page). The faces in the demo mode are the ones Quire's face

@@ -63,6 +63,15 @@ describe("artists suggested by what came in from Find", () => {
     expect(suggestionsFor(doc, { "a/1.png": src("7", "Kaze") }, null)).toEqual([]);
   });
 
+  it("suggests a maker known on another platform than the work's as theirs there, linked by their page", async () => {
+    const pinned = (n: string): ItemSource => ({ ...src("", ""), platform: "pinboard-site", id: "p" + n, author: { id: "inkpot", name: "Inkpot", account: "Inkpot", platform: "sketchsite", url: "https://sketch.example.net/Inkpot" } });
+    const [s] = suggestionsFor(useArtists.getState().doc!, { "r/1.png": pinned("1"), "r/2.png": pinned("2") }, null);
+    expect(s).toMatchObject({ key: "sketchsite:inkpot", platform: "sketchsite", authorId: "inkpot", url: "https://sketch.example.net/Inkpot", items: ["r/1.png", "r/2.png"] });
+    // No plugin offers that platform: the artist is made and linked, with nothing to fill in from.
+    const id = await useArtists.getState().accept(s);
+    expect(useArtists.getState().doc!.artists[id!].links).toEqual([{ platform: "sketchsite", id: "inkpot", account: "Inkpot", url: "https://sketch.example.net/Inkpot" }]);
+  });
+
   it("can link an account to one of the library's artists instead: their pictures theirs, filled in only with what they lack", async () => {
     const { useFinders, finder } = await import("../plugins/find");
     useFinders.setState({ finders: { "other-find": { pluginId: "other-find", name: "Other", platform: "other", imageHeaders: {}, sections: [] } } } as never);

@@ -11,6 +11,7 @@ import { MediaStage, SPEEDS } from "../components/MediaStage";
 import { ArrowCounterClockwise, ArrowLeft, Books, CaretDown, Info, Tag as TagIcon, CaretLeft, CaretRight, Copy, FolderOpen, GearSix, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash, Scissors, BookOpen, UsersThree, PaintBrush, MagnifyingGlass } from "@phosphor-icons/react";
 import { useScrapbook } from "../scrapbook/store";
 import { Popover } from "../components/Popover";
+import { ContextMenu } from "../components/ContextMenu";
 import { PluginButtons } from "../components/PluginButtons";
 import { SeriesStrip } from "../components/SeriesStrip";
 import { FacesButton, FacesPanel } from "../components/FacesInPicture";
@@ -45,13 +46,19 @@ export function Viewer() {
   const platforms = Object.values(finders);
   const findOn = useFind((f) => f.pluginId);
   const finderName = (findOn ? finders[findOn] : platforms[0])?.name;
-  const s = useStore(useShallow((x) => ({ addTarget: x.addTarget, albums: x.albums, closeViewer: x.closeViewer, viewerBack: x.viewerBack, albumsLoaded: x.albumsLoaded, backupOpen: x.backupOpen, busy: x.busy, driveOpen: x.driveOpen, editItems: x.editItems, editMode: x.editMode, fitMode: x.fitMode, helpOpen: x.helpOpen, hudHidden: x.hudHidden, immersive: x.immersive, index: x.index, infoOpen: x.infoOpen, lastTargetParent: x.lastTargetParent, library: x.library, loadAlbums: x.loadAlbums, moveCurrent: x.moveCurrent, next: x.next, openAlbums: x.openAlbums, openBrowse: x.openBrowse, openDupes: x.openDupes, openEdit: x.openEdit, openFiles: x.openFiles, openTags: x.openTags, pluginsOpen: x.pluginsOpen, prev: x.prev, queue: x.queue, rescan: x.rescan, root: x.root, set: x.set, setAlbumRatingByKey: x.setAlbumRatingByKey, setRating: x.setRating, setSlideshowHideUi: x.setSlideshowHideUi, setSlideshowInterval: x.setSlideshowInterval, settingsOpen: x.settingsOpen, shuffle: x.shuffle, slideshow: x.slideshow, source: x.source, surprise: x.surprise, switchTranslation: x.switchTranslation, toggleShuffle: x.toggleShuffle, toggleSlideshow: x.toggleSlideshow, trashCurrent: x.trashCurrent, trashOpen: x.trashOpen, undo: x.undo, undoStack: x.undoStack, vaultOpen: x.vaultOpen })));
+  const s = useStore(useShallow((x) => ({ addTarget: x.addTarget, albums: x.albums, closeViewer: x.closeViewer, viewerBack: x.viewerBack, albumsLoaded: x.albumsLoaded, backupOpen: x.backupOpen, busy: x.busy, driveOpen: x.driveOpen, editItems: x.editItems, editMode: x.editMode, fitMode: x.fitMode, helpOpen: x.helpOpen, hudHidden: x.hudHidden, immersive: x.immersive, index: x.index, infoOpen: x.infoOpen, lastTargetParent: x.lastTargetParent, library: x.library, loadAlbums: x.loadAlbums, moveCurrent: x.moveCurrent, next: x.next, openAlbums: x.openAlbums, openBrowse: x.openBrowse, openDupes: x.openDupes, openEdit: x.openEdit, openFiles: x.openFiles, openTags: x.openTags, pluginsOpen: x.pluginsOpen, showInFiles: x.showInFiles, prev: x.prev, queue: x.queue, rescan: x.rescan, root: x.root, set: x.set, setAlbumRatingByKey: x.setAlbumRatingByKey, setRating: x.setRating, setSlideshowHideUi: x.setSlideshowHideUi, setSlideshowInterval: x.setSlideshowInterval, settingsOpen: x.settingsOpen, shuffle: x.shuffle, slideshow: x.slideshow, source: x.source, surprise: x.surprise, switchTranslation: x.switchTranslation, toggleShuffle: x.toggleShuffle, toggleSlideshow: x.toggleSlideshow, trashCurrent: x.trashCurrent, trashOpen: x.trashOpen, undo: x.undo, undoStack: x.undoStack, vaultOpen: x.vaultOpen })));
   const current = useStore(selectCurrent);
   const rating = useStore(selectRating);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [cursorHidden, setCursorHidden] = useState(false);
   const [menu, setMenu] = useState<"show" | "goto" | "tags" | "artist" | null>(null);
+  // Right-click on the file's name or its folder: where it is, in Files.
+  const [pathMenu, setPathMenu] = useState<{ x: number; y: number } | null>(null);
+  const onPathMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setPathMenu({ x: e.clientX, y: e.clientY });
+  };
   // ⇧ and a key (or ⇧-click) of a target that files by the day: which folder of yours in it.
   const [chooseIn, setChooseIn] = useState<Target | null>(null);
   const infoShown = useStore((x) => !!x.infoItem) && !s.editMode;
@@ -407,14 +414,19 @@ export function Viewer() {
         <div className="hud-center">
           {current && (
             <div className="hud-center-inner">
-              <span className="mono item-name" title={basename(current.primary)}>{basename(current.primary)}</span>
+              <span className="mono item-name" title={`${basename(current.primary)} (right-click: Show in Files)`} onContextMenu={onPathMenu}>
+                {basename(current.primary)}
+              </span>
               <span className="badge accent2">{ext(current.primary)}</span>
               {album && <span className="badge accent">ALBUM · {album.name}</span>}
               {!album && current.albumKey && <span className="badge accent">ALBUM</span>}
               {current.hasRaw && current.kind !== "raw" && <span className="badge">+RAW</span>}
               {current.hasVideo && current.kind !== "video" && <span className="badge">+VID</span>}
               <SeriesBadge item={current} />
-              <span className="dim mono hud-dir ellipsis" title={current.dir || "/"}>{current.dir || "/"}</span>
+              <span className="dim mono hud-dir ellipsis" title={`${current.dir || "/"} (right-click: Show in Files)`} onContextMenu={onPathMenu}>
+                {current.dir || "/"}
+              </span>
+              <ContextMenu at={pathMenu} items={[{ label: <><FolderOpen /> Show in Files</>, onClick: () => s.showInFiles(current.primary) }]} onClose={() => setPathMenu(null)} />
             </div>
           )}
         </div>

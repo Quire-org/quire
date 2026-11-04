@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Copy, HardDrive, Play, PushPin, PuzzlePiece, Tray } from "@phosphor-icons/react";
+import { AppWindow, ArrowRight, Copy, HardDrive, Play, Plus, PushPin, PuzzlePiece, Tray } from "@phosphor-icons/react";
 import { albumPages, useStore } from "../store";
 import { api, canThumb, mediaUrl, thumbUrl } from "../lib/api";
 import { formatAgo, formatBytes } from "../lib/format";
@@ -19,13 +19,17 @@ import { suggestionsFor, useArtists } from "../artistsStore";
 import { nameOf, useTags } from "../tagsStore";
 import { lookAlikes, pairKey, seriesIndex } from "../lib/series";
 import { useCoverUrl } from "../scrapbook/pictures";
+import { useScrapbook } from "../scrapbook/store";
+import { openBoardWindow } from "../scrapbook/boardWindow";
+import { pageOf, type ScrapDoc } from "../scrapbook/model";
+import { askNewBoard } from "../components/NewBoard";
 import { useActivity } from "../lib/activity";
 import { JobRow } from "../components/Activity";
 import { PlatformIcon } from "../components/PlatformIcon";
 import { SCREENS } from "../components/TopNav";
 import { filterPictures, useFilterData, type PictureFilter } from "../components/PictureFilters";
 import { FaceCrop } from "../screens/People";
-import { DEFAULT_SHORTCUTS, KINDS, SHORTCUT_SCREENS, canMosaic, justify, nearestDay, onThisDay, pick, shownOnHome, today, type Block, type BlockType } from "./board";
+import { DEFAULT_SHORTCUTS, KINDS, RANDOM_BOARD, SHORTCUT_SCREENS, boardStrip, canMosaic, justify, nearestDay, onThisDay, pickStable, shownOnHome, today, type Block, type BlockType } from "./board";
 import { themes } from "../themes";
 import { ModePicker, ThemeSwatch } from "../components/ThemeSwatch";
 import { useHome } from "./store";
@@ -711,7 +715,7 @@ function OnThisDayBlock({ block, salt }: { block: Block; salt: number }) {
     // pictures waiting to sort, which their own block shows.
     const waiting = new Set(unsorted.map((i) => i.key));
     const rest = base.filter((i) => !waiting.has(i.key));
-    return { list: pick(rest.length ? rest : base, 60, salt), said: "Nothing from earlier years: a random handful", newest: true };
+    return { list: pickStable(rest.length ? rest : base, 60, salt), said: "Nothing from earlier years: a random handful", newest: true };
   }, [base, unsorted, salt]);
   if (!list.length) return <NoPictures />;
   return (
@@ -731,11 +735,12 @@ export function useSalt(block: Block): [number, () => void] {
 }
 
 /** A header button: a new pick. */
-export const shuffles: Partial<Record<BlockType, boolean>> = { random: true, unseen: true, favourites: true };
+const shuffles: Partial<Record<BlockType, boolean>> = { random: true, unseen: true, favourites: true };
+export const canShuffle = (block: Block) => !!shuffles[block.type] || (block.type === "board" && block.board === RANDOM_BOARD);
 
 function RandomBlock({ block, salt }: { block: Block; salt: number }) {
   const base = useFiltered(block);
-  const list = useMemo(() => pick(base, 60, salt), [base, salt]);
+  const list = useMemo(() => pickStable(base, 60, salt), [base, salt]);
   return list.length ? <Pics items={list} /> : <NoPictures />;
 }
 
@@ -744,7 +749,7 @@ function FavouritesBlock({ block, salt }: { block: Block; salt: number }) {
   const base = useFiltered(block, { minRating: 8 });
   const ratings = useStore((s) => s.library?.ratings);
   const min = block.filter?.minRating || 8;
-  const list = useMemo(() => pick(base, 60, salt), [base, salt]);
+  const list = useMemo(() => pickStable(base, 60, salt), [base, salt]);
   return list.length ? <Pics items={list} labelOf={(i) => String(ratings?.[i.key] ?? "")} /> : <Quiet action={<Go label="Rate in Browse" to={() => useStore.getState().openBrowse()} />}>Nothing rated {min} or more yet.</Quiet>;
 }
 
@@ -754,7 +759,7 @@ function UnseenBlock({ block, salt }: { block: Block; salt: number }) {
   const viewed = useStore((s) => s.viewed);
   const list = useMemo(() => {
     const before = Date.now() - YEAR;
-    return pick(
+    return pickStable(
       base.filter((i) => (viewed[i.key] ?? 0) < before),
       60,
       salt,
@@ -772,7 +777,7 @@ function SourceBlock({ block }: { block: Block }) {
 
 function SlideshowBlock({ block, salt }: { block: Block; salt: number }) {
   const base = useFiltered(block);
-  const list = useMemo(() => pick(base, 80, salt), [base, salt]);
+  const list = useMemo(() => pickStable(base, 80, salt), [base, salt]);
   const [at, setAt] = useState(0);
   const root = useStore((s) => s.root);
   useEffect(() => {
@@ -806,7 +811,7 @@ function PictureBlock({ block, salt }: { block: Block; salt: number }) {
   const items = useItemMap();
   const root = useStore((s) => s.root);
   const pinned = block.pinned ? items.get(block.pinned) : undefined;
-  const item = pinned ?? pick(base, 1, today() + salt)[0];
+  const item = pinned ?? pickStable(base, 1, today() + salt)[0];
   if (!item) return <NoPictures />;
   const src = root && canThumb(item) ? thumbUrl(root, item, 1024) : mediaUrl(item);
   return (
@@ -863,6 +868,104 @@ function ScrapbookBlock() {
         <CoverTile key={a.key} album={a} />
       ))}
     </div>
+  );
+}
+
+/** The library's boards, the last changed first. */
+export function useBoards(): ScrapDoc[] {
+  const books = useScrapbook((x) => x.lib?.books);
+  const root = useStore((s) => s.root);
+  useEffect(() => void useScrapbook.getState().load(), [root]);
+  return useMemo(() => Object.values(books ?? {}).filter((b) => b.kind === "board").sort((a, b) => b.updated - a.updated), [books]);
+}
+
+const openBoard = (board: ScrapDoc) => void useScrapbook.getState().open({ kind: "board", id: board.id, name: board.name || "Board" });
+
+/** The board each board block shows now (its key opens it). */
+const shownBoards = new Map<string, string>();
+
+/** The board a block shows: the one picked, a random one, or the one last changed (also when the one picked has gone). */
+function boardOf(block: Block, boards: ScrapDoc[], salt: number): ScrapDoc | null {
+  const picked = block.board && block.board !== RANDOM_BOARD ? boards.find((b) => b.id === block.board) : undefined;
+  if (picked) return picked;
+  if (block.board === RANDOM_BOARD) return pickStable(boards.map((b) => ({ key: b.id, b })), 1, salt)[0]?.b ?? null;
+  return boards[0] ?? null;
+}
+
+const NoBoards = () => (
+  <Quiet
+    action={
+      <button className="btn" onClick={askNewBoard}>
+        <Plus /> New board
+      </button>
+    }
+  >
+    No boards yet: pages of your own in the Scrapbook, for references, notes and arrows.
+  </Quiet>
+);
+
+function BoardBlock({ block, salt }: { block: Block; salt: number }) {
+  const boards = useBoards();
+  const board = boardOf(block, boards, salt);
+  const url = useCoverUrl(board?.id);
+  if (board) shownBoards.set(block.id, board.id);
+  if (!board) return <NoBoards />;
+  const name = board.name || "Board";
+  return (
+    <div className="home-one-wrap">
+      <button className="home-one home-board" onClick={() => openBoard(board)} title={`${name}: work on it`}>
+        {url ? <img src={url} alt="" draggable={false} /> : <span className="dim small">{name}: nothing on it yet</span>}
+      </button>
+      {/* Its name, unless the block is named after it already. */}
+      {block.board !== board.id && <span className="home-pic-label">{name}</span>}
+      <button className="btn sm home-pin" onClick={() => void openBoardWindow(board)} title="In its own window, which can stay above your other apps">
+        <AppWindow /> Own window
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Boards each whole in its own shape, all the same height (or width, one above another in a tall
+ * block), the last changed first, after a button for a new one: as many as fit at a fair size (see
+ * `boardStrip`).
+ */
+function BoardsBlock() {
+  const boards = useBoards();
+  const [ref, box] = useBox<HTMLDivElement>();
+  const W = box.w || 480;
+  const H = box.h || 160;
+  const tall = W < H * 1.2;
+  // The button for a new one: a strip across the top of a tall block, a narrow tile in a wide one.
+  const add = tall ? 34 : Math.round(Math.min(110, Math.max(72, W * 0.16)));
+  // Each board's width over its height (a very thin one shown a little less so, trimmed).
+  const shapes = boards.slice(0, 24).map((b) => {
+    const page = pageOf(b);
+    return Math.min(3, Math.max(0.4, page.w / page.h));
+  });
+  const { n, depth } = boardStrip(tall ? shapes.map((a) => 1 / a) : shapes, (tall ? H : W) - add - 8, tall ? W : H);
+  return (
+    <div ref={ref} className={`home-boards ${tall ? "tall" : ""}`}>
+      <button className="home-board-new" style={tall ? { height: add } : { width: add }} onClick={askNewBoard} title="Start a new board">
+        <Plus />
+        <span>New board</span>
+      </button>
+      {boards.slice(0, n).map((board, i) => (
+        <BoardTile key={board.id} board={board} width={tall ? depth : depth * shapes[i]} height={tall ? depth / shapes[i] : depth} />
+      ))}
+      {!boards.length && <span className="dim small home-boards-none">No boards yet: pages of your own, for references, notes and arrows.</span>}
+    </div>
+  );
+}
+
+function BoardTile({ board, width, height }: { board: ScrapDoc; width: number; height: number }) {
+  const url = useCoverUrl(board.id);
+  const name = board.name || "Board";
+  return (
+    <button className="home-board-tile" style={{ width, height }} onClick={() => openBoard(board)} title={`${name}: work on it`}>
+      {url ? <img src={url} alt="" draggable={false} /> : <span className="home-reading-ph" />}
+      <span className="home-pic-label">{name}</span>
+    </button>
   );
 }
 
@@ -1055,6 +1158,10 @@ function Body({ block, salt }: { block: Block; salt: number }) {
       return <PictureBlock block={block} salt={salt} />;
     case "scrapbook":
       return <ScrapbookBlock />;
+    case "board":
+      return <BoardBlock block={block} salt={salt} />;
+    case "boards":
+      return <BoardsBlock />;
     case "activity":
       return <ActivityBlock />;
     case "drive":
@@ -1111,6 +1218,12 @@ export function actionOf(block: Block): (() => void) | null {
     }
     case "scrapbook":
       return s.openAlbums;
+    case "board": {
+      const shown = useScrapbook.getState().lib?.books[shownBoards.get(block.id) ?? ""];
+      return shown ? () => openBoard(shown) : s.openScrapbook;
+    }
+    case "boards":
+      return askNewBoard;
     case "drive":
       return () => s.set({ driveOpen: true });
     case "backup":
@@ -1134,7 +1247,10 @@ export function useBlockTitle(block: Block): string {
   const people = usePeople((p) => p.doc?.people);
   const artists = useArtists((a) => a.doc?.artists);
   const albums = useStore((s) => s.albums);
+  // A board picked by name: named after it.
+  const board = useScrapbook((x) => (block.type === "board" && block.board ? x.lib?.books[block.board]?.name : undefined));
   if (block.title) return block.title;
+  if (board) return board;
   // Pictures chosen by one thing: named after it.
   const f = block.filter ?? {};
   if (block.type === "source") {

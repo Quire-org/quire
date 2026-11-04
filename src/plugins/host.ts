@@ -505,7 +505,7 @@ export async function dispatch(p: PluginInfo, method: string, args: Record<strin
       // Cookies only for addresses the plugin may contact anyway: then the answer is { url, cookies }.
       const cookies = (Array.isArray(a.cookies) ? a.cookies : []).filter((u): u is string => typeof u === "string").slice(0, 4);
       for (const c of cookies) if (!canFetch(p, c)) throw new Error(`not allowed to keep cookies for ${c}`);
-      const back = await openLogin(p, url, until, typeof a.name === "string" && a.name.trim() ? a.name.slice(0, 40) : (p.manifest?.name ?? p.id), cookies);
+      const back = await openLogin(p, url, until, typeof a.name === "string" && a.name.trim() ? a.name.slice(0, 40) : (p.manifest?.name ?? p.id), cookies, a.load === true);
       return cookies.length ? back : (back?.url ?? null);
     }
 

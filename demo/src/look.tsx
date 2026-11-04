@@ -9,7 +9,7 @@ export const DIM = "rgba(232, 234, 240, 0.62)";
 export const ACCENT = "#8fb4ff";
 
 /** How much slower than its script's frames a video plays: every timing in it is stretched by this. */
-export const PACE = 1.15;
+export const PACE = 1.38;
 /** The moment, in the script's frames (the video's frame, slowed by PACE). */
 export const useTime = () => useCurrentFrame() / PACE;
 /** A number of the script's frames, as the video's. */

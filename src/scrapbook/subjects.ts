@@ -280,26 +280,39 @@ function blur(a: Uint8ClampedArray, w: number, h: number, r: number): Uint8Clamp
 
 /** The piece's alpha as tuned: the edge grown or shrunk, softened, then what was painted kept or erased. */
 export function tuned(p: Piece, t: Tune): Uint8ClampedArray {
+  return withDabs(tunedEdge(p, t.edge, t.soft), p.w, p.h, t.dabs);
+}
+
+/**
+ * The piece's alpha with its edge grown or shrunk and softened, before any painting: the slow part of
+ * tuning, kept by the fine-tune while a stroke is painted over it (the piece's own alpha when neither).
+ */
+export function tunedEdge(p: Piece, edge: number, soft: number): Uint8ClampedArray {
   const { w, h } = p;
   let a = p.alpha;
-  if (t.edge !== 0) {
+  if (edge !== 0) {
     const inside = new Uint8Array(w * h);
     for (let i = 0; i < w * h; i++) inside[i] = a[i] >= 128 ? 1 : 0;
     const out = new Uint8ClampedArray(w * h);
-    if (t.edge > 0) {
+    if (edge > 0) {
       const d = distanceTo(inside, w, h);
-      for (let i = 0; i < w * h; i++) out[i] = d[i] <= t.edge ? 255 : a[i];
+      for (let i = 0; i < w * h; i++) out[i] = d[i] <= edge ? 255 : a[i];
     } else {
       const outside = new Uint8Array(w * h);
       for (let i = 0; i < w * h; i++) outside[i] = inside[i] ? 0 : 1;
       const d = distanceTo(outside, w, h);
-      for (let i = 0; i < w * h; i++) out[i] = d[i] > -t.edge ? a[i] : 0;
+      for (let i = 0; i < w * h; i++) out[i] = d[i] > -edge ? a[i] : 0;
     }
     a = out;
   }
-  if (t.soft > 0) a = blur(blur(a, w, h, Math.round(t.soft)), w, h, Math.round(t.soft));
-  else if (a === p.alpha) a = new Uint8ClampedArray(a);
-  for (const dab of t.dabs) {
+  if (soft > 0) a = blur(blur(a, w, h, Math.round(soft)), w, h, Math.round(soft));
+  return a;
+}
+
+/** What was painted, kept or erased, over an alpha: a copy (the alpha itself is left as it is). */
+export function withDabs(alpha: Uint8ClampedArray, w: number, h: number, dabs: Dab[]): Uint8ClampedArray {
+  const a = new Uint8ClampedArray(alpha);
+  for (const dab of dabs) {
     const r2 = dab.r * dab.r;
     for (let y = Math.max(0, Math.floor(dab.y - dab.r)); y <= Math.min(h - 1, Math.ceil(dab.y + dab.r)); y++)
       for (let x = Math.max(0, Math.floor(dab.x - dab.r)); x <= Math.min(w - 1, Math.ceil(dab.x + dab.r)); x++)

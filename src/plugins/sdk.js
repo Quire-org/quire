@@ -385,10 +385,11 @@
     login: {
       /**
        * A platform's sign-in page in a window of its own (needs login:<host>): spec { url, until, name?,
-       * cookies? }, `until` the addresses the platform sends the sign-in back to. Gives the address it
-       * ended on (or what the user pasted, signing in with their browser instead), or null when they
+       * cookies?, load? }, `until` the addresses the platform sends the sign-in back to. Gives the address
+       * it ended on (or what the user pasted, signing in with their browser instead), or null when they
        * closed it; with `cookies` (addresses on network: hosts), { url, cookies } with the window's
-       * cookies for each.
+       * cookies for each. It ends as one of `until` is asked for, before it loads (a callback whose code
+       * is the plugin's); with `load`, once it has loaded (a site that stores its sign-in on the way).
        */
       open: function (spec) {
         return call("login.open", spec || {});

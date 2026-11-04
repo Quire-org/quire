@@ -1,5 +1,6 @@
 // The workflow videos: each folder in workflows/ is a demo of its own (a capture.mjs on kit.mjs and a
-// script.json), rendered into this demo's site beside Quire's own video, with its screenshots.
+// script.json), rendered into this demo's site beside Quire's own video, with its screenshots and a
+// card-sized looping clip (which plays by itself in the README, where a video can't).
 // `npm run workflows` makes them all; `npm run workflows -- <name>…` only those.
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
@@ -19,4 +20,5 @@ for (const name of names) {
   run(join(work, "capture.mjs"));
   run("render.mjs", "video", "--work", work, "--site", join(here, "out", "site"));
   run("render.mjs", "stills", "--work", work, "--site", join(here, "out", "site"));
+  run("loop.mjs", "--work", work, "--site", join(here, "out", "site"), "--width", "560", "--fps", "12");
 }

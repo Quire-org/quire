@@ -128,6 +128,8 @@ export function withLook(doc: ScrapDoc, look: string): ScrapDoc {
     layers: doc.layers.map((layer): Layer => {
       // Text keeps the room it took in the font and look it was made in (its size fitted to it).
       if (layer.type === "text") return { ...layer, look, font: l.font, color: undefined, box: layer.box ?? { font: layer.font, look: layer.look } };
+      // A board's notes and arrows have no look: their paper and colour are their own.
+      if (layer.type === "note" || layer.type === "arrow") return layer;
       return { ...layer, look };
     }),
   };

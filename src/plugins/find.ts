@@ -86,7 +86,8 @@ export interface FindTag {
 export interface FindItem {
   id: string;
   title: string;
-  author: { id: string; name: string; account: string };
+  /** Who made it; on another platform than the work's, that platform and their page there (see ItemSource). */
+  author: { id: string; name: string; account: string; platform?: string; url?: string };
   url: string | null;
   thumb: string;
   width: number;
@@ -168,9 +169,10 @@ export const useFinders = create<{ finders: Record<string, Finder>; login: Login
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+// Up to 200: a section's options can be the reader's own (their boards, say).
 const options = (v: unknown): FindOption[] =>
   (Array.isArray(v) ? v : [])
-    .slice(0, 40)
+    .slice(0, 200)
     .map((o) => ({ value: text(o?.value, 80), label: text(o?.label, 60) }))
     .filter((o) => o.value && o.label);
 
@@ -208,6 +210,13 @@ function link(v: unknown): string | null {
   }
 }
 
+/** An author's platform and page, when they are on another platform than the work: both, or neither. */
+function elsewhere(author: Record<string, unknown>): { platform?: string; url?: string } {
+  const platform = text(author.platform, 40).toLowerCase().replace(/[^a-z0-9-]/g, "");
+  const url = link(author.url);
+  return platform && url ? { platform, url } : {};
+}
+
 function cleanItem(p: PluginInfo, v: Record<string, unknown>): FindItem | null {
   const thumb = fetchable(p, v?.thumb);
   const id = text(v?.id, 80);
@@ -217,7 +226,7 @@ function cleanItem(p: PluginInfo, v: Record<string, unknown>): FindItem | null {
   return {
     id,
     title: text(v.title, 300),
-    author: { id: text(author.id, 80), name: text(author.name, 120), account: text(author.account, 120) },
+    author: { id: text(author.id, 80), name: text(author.name, 120), account: text(author.account, 120), ...elsewhere(author) },
     url: link(v.url),
     thumb,
     width: num(v.width),
@@ -264,7 +273,7 @@ function cleanFiles(p: PluginInfo, v: Record<string, unknown>): FindFiles {
       id: text(s.id, 80),
       url: link(s.url) ?? "",
       title: text(s.title, 300),
-      author: { id: text(author.id, 80), name: text(author.name, 120), account: text(author.account, 120) || undefined },
+      author: { id: text(author.id, 80), name: text(author.name, 120), account: text(author.account, 120) || undefined, ...elsewhere(author) },
       tags: cleanTags(s.tags),
       date: text(s.date, 40) || null,
       adult: s.adult === true,
@@ -458,7 +467,8 @@ export const finder = {
  * with a browser instead). Where it ended, with the window's cookies for `cookies` (none when signed in
  * with a browser), or null.
  */
-export function openLogin(p: PluginInfo, url: string, until: string[], name: string, cookies: string[]): Promise<{ url: string; cookies: Record<string, string> } | null> {
+/** A sign-in page in its own window, until it goes to one of `until` (with `load`, once that page has loaded). */
+export function openLogin(p: PluginInfo, url: string, until: string[], name: string, cookies: string[], load = false): Promise<{ url: string; cookies: Record<string, string> } | null> {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (back: { url: string; cookies: Record<string, string> } | null) => {
@@ -471,7 +481,7 @@ export function openLogin(p: PluginInfo, url: string, until: string[], name: str
     const done = (back: string | null) => finish(back == null ? null : { url: back, cookies: {} });
     useFinders.getState().login?.done(null);
     useFinders.setState({ login: { pluginId: p.id, name, url, done } });
-    api.pluginLogin(p.id, url, until, name, cookies).then(finish, (e) => {
+    api.pluginLogin(p.id, url, until, name, cookies, load).then(finish, (e) => {
       useStore.getState().toast(`Couldn't open the sign-in window: ${String(e)}`, "error");
       done(null);
     });

@@ -35,7 +35,7 @@ vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p, invok
 // jsdom draws nothing: a canvas whose context takes every call, measures text by its length, and "renders" to a JPEG blob.
 const noop = () => {};
 const ctx = new Proxy({} as Record<string | symbol, unknown>, {
-  get: (t, k) => (k in t ? t[k] : k === "measureText" ? (s: string) => ({ width: s.length * 10 }) : k === "getImageData" ? () => ({ data: new Uint8ClampedArray(4) }) : noop),
+  get: (t, k) => (k in t ? t[k] : k === "measureText" ? (s: string) => ({ width: s.length * 10 }) : k === "getImageData" ? () => ({ data: new Uint8ClampedArray(4) }) : k === "createRadialGradient" || k === "createLinearGradient" ? () => ({ addColorStop: noop }) : noop),
   set: (t, k, v) => ((t[k] = v), true),
 });
 HTMLCanvasElement.prototype.getContext = (() => ctx) as never;
@@ -337,8 +337,8 @@ describe("a scrapbook cover", () => {
     await act(async () => (Array.from(document.body.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Text") as HTMLButtonElement).click());
     await act(async () => (Array.from(document.body.querySelectorAll(".scrap-look")).find((b) => b.textContent?.includes("Manga")) as HTMLButtonElement).click());
     expect(doc().layers[1]).toMatchObject({ type: "text", text: "sea", look: "manga", font: "bangers" });
-    // Selected: its controls show; the text is edited there.
-    const area = document.body.querySelector(".scrap-selected textarea") as HTMLTextAreaElement;
+    // A new text is typed into where it is on the page.
+    const area = document.body.querySelector(".scrap-page .scrap-typing") as HTMLTextAreaElement;
     const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
     await act(async () => {
       set.call(area, "Summer at sea");
@@ -450,7 +450,7 @@ describe("bars across a cover's background", () => {
     expect(doc().bars).toHaveLength(1);
     const id = doc().bars![0].id;
     expect(useScrapbook.getState().editing!.selected).toBe(id);
-    expect(document.body.querySelector(".scrap-selected")?.textContent).toContain("Bar");
+    expect(document.body.querySelector(".scrap-bar")?.textContent).toContain("Bar");
     await act(async () => button("Lightning").click());
     expect(doc().bars![0].style).toBe("lightning");
     // jsdom has no layout: the page is drawn 120 × 60, at the top left.
@@ -538,5 +538,130 @@ describe("the cover editor's right-click and export", () => {
     // Nothing is saved to the scrapbook by it: still editing.
     expect(useScrapbook.getState().editing).not.toBeNull();
     root.unmount();
+  });
+});
+
+describe("the editor: several at once, and keys to add", () => {
+  const sticker = (id: string, x: number) => ({ id, type: "sticker" as const, src: { builtin: STICKERS[0].id }, look: "original", outline: false, aspect: 1, x, y: 0.5, w: 0.15, rot: 0 });
+
+  it("a box dragged across the page selects what it touches; they move, restack and go together", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    reset();
+    await act(async () => useScrapbook.getState().open({ kind: "tag", id: "motives/sea", name: "sea" }));
+    // On a page drawn 120 × 60: "a" over x 15..33, "b" 51..69, "c" 87..105, all at y 21..39.
+    await act(async () => useScrapbook.getState().change((d) => ({ ...d, layers: [sticker("a", 0.2), sticker("b", 0.5), sticker("c", 0.8)] })));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(Scrapbook)));
+    const e = () => useScrapbook.getState().editing!;
+    const el = document.body.querySelector(".scrap-page")!;
+    const fire = (type: string, x: number, y: number, more: MouseEventInit = {}) => act(async () => void el.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, ...more })));
+    await fire("pointerdown", 2, 2);
+    await fire("pointermove", 70, 58);
+    expect(document.body.querySelector(".scrap-sweep")).not.toBeNull();
+    await fire("pointerup", 70, 58);
+    expect(e().many).toEqual(["a", "b"]);
+    expect(document.body.querySelector(".scrap-bar")?.textContent).toContain("2 selected");
+    expect(document.body.querySelectorAll(".scrap-sel.many")).toHaveLength(2);
+    // Dragging one moves both.
+    await fire("pointerdown", 60, 30);
+    await fire("pointermove", 66, 30);
+    await fire("pointerup", 66, 30);
+    expect(e().doc.layers.map((l) => l.x)).toEqual([expect.closeTo(0.25), expect.closeTo(0.55), 0.8]);
+    expect(e().many).toEqual(["a", "b"]);
+    await act(async () => (document.body.querySelector(".scrap-bar button[title='Bring to front']") as HTMLButtonElement).click());
+    expect(e().doc.layers.map((l) => l.id).join("")).toBe("cab");
+    // ⇧-click takes one more in, ⌫ takes them all off, ⌘Z brings them back.
+    await fire("pointerdown", 96, 30, { shiftKey: true });
+    await fire("pointerup", 96, 30, { shiftKey: true });
+    expect(e().many).toEqual(["a", "b", "c"]);
+    await act(async () => void window.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace" })));
+    expect(e().doc.layers).toHaveLength(0);
+    await act(async () => void window.dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true })));
+    expect(e().doc.layers).toHaveLength(3);
+    root.unmount();
+    useScrapbook.getState().cancel();
+  });
+
+  it("a selection box can start beside the page, and a click beside it selects nothing", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    reset();
+    await act(async () => useScrapbook.getState().open({ kind: "tag", id: "motives/sea", name: "sea" }));
+    await act(async () => useScrapbook.getState().change((d) => ({ ...d, layers: [sticker("a", 0.2), sticker("b", 0.5), sticker("c", 0.8)] })));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(Scrapbook)));
+    const e = () => useScrapbook.getState().editing!;
+    // The page is drawn 120 × 60 at the top left: 130, 70 is on the stage beside it.
+    const stage = document.body.querySelector(".scrap-stage")!;
+    const fire = (type: string, x: number, y: number) => act(async () => void stage.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y })));
+    await fire("pointerdown", 130, 70);
+    await fire("pointermove", 40, 20);
+    await fire("pointerup", 40, 20);
+    expect(e().many).toEqual(["b", "c"]);
+    await fire("pointerdown", 130, 70);
+    await fire("pointerup", 130, 70);
+    expect(e().many).toEqual([]);
+    expect(e().selected).toBeNull();
+    root.unmount();
+    useScrapbook.getState().cancel();
+  });
+
+  it("on a board, T, N and A put a text, a note and an arrow on; a text emptied goes", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    reset();
+    await act(async () => useScrapbook.getState().newBoard("Refs", { w: 1200, h: 600 }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(Scrapbook)));
+    const e = () => useScrapbook.getState().editing!;
+    const key = (k: string) => act(async () => void window.dispatchEvent(new KeyboardEvent("keydown", { key: k })));
+    await key("t");
+    expect(e().doc.layers[0]).toMatchObject({ type: "text", text: "Text" });
+    expect(e().typing).toBe(e().doc.layers[0].id);
+    const area = document.body.querySelector(".scrap-page .scrap-typing") as HTMLTextAreaElement;
+    expect(document.activeElement).toBe(area);
+    // Emptied and left: it goes.
+    const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!;
+    await act(async () => {
+      set.call(area, "");
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => void area.blur());
+    expect(e().doc.layers).toHaveLength(0);
+    expect(e().typing).toBeNull();
+    await key("n");
+    expect(e().doc.layers[0]).toMatchObject({ type: "note", text: "", fix: { kind: "pin", where: "one" } });
+    await act(async () => void (document.body.querySelector(".scrap-typing") as HTMLTextAreaElement).blur());
+    expect(e().doc.layers).toHaveLength(1); // a blank note stays
+    await key("a");
+    expect(e().doc.layers[1]).toMatchObject({ type: "arrow", heads: "end" });
+    expect(document.body.querySelector(".scrap-bar")?.textContent).toContain("Arrow");
+    root.unmount();
+    useScrapbook.getState().cancel();
+  });
+});
+
+describe("a board's pictures of the library", () => {
+  it("are asked for as the app's own, so a board drawn with them can still be saved and exported", async () => {
+    const made: { crossOrigin?: string }[] = [];
+    const Was = (globalThis as { Image: new () => object }).Image;
+    (globalThis as { Image: unknown }).Image = class extends (Was as new () => object) {
+      constructor() {
+        super();
+        made.push(this as { crossOrigin?: string });
+      }
+    };
+    try {
+      const cache = new AssetCache(async () => "blob:x", async () => "thumb://localhost/a.jpg?w=1600");
+      cache.item("Photos/a.jpg");
+      await settle();
+      expect(made[0]?.crossOrigin).toBe("anonymous");
+    } finally {
+      (globalThis as { Image: unknown }).Image = Was;
+    }
   });
 });

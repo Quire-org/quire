@@ -10,7 +10,7 @@ import { blobUrl, useScrapbook } from "../scrapbook/store";
 import { useSourcePictures } from "../scrapbook/pictures";
 import { edgeAround } from "../scrapbook/render";
 import { checkStickerSpace, stickerContext, stickerImageData, stickerSpace } from "../scrapbook/color";
-import { NO_TUNE, findSubjects, insidePolygon, lassoSubject, merge, onSubject, pieceOf, render, tuned, withCloserLook, type Piece, type Subject, type Tune } from "../scrapbook/subjects";
+import { NO_TUNE, findSubjects, insidePolygon, lassoSubject, merge, onSubject, pieceOf, render, tuned, tunedEdge, withCloserLook, withDabs, type Dab, type Piece, type Subject, type Tune } from "../scrapbook/subjects";
 import { newId, type CustomSticker, type Target } from "../scrapbook/model";
 import type { MediaItem } from "../lib/types";
 
@@ -657,7 +657,9 @@ function Tuner({ pieces, initial, ceilings, onBack, onSave, saveLabel, note }: {
   const tune = tunes[at];
   const setTune = (t: Tune) => setTunes((all) => all.map((x, i) => (i === at ? t : x)));
   const ceiling = ceilings?.[at];
-  const alpha = useMemo(() => capped(tuned(piece, tune), ceiling), [piece, tune, ceiling]);
+  // The trimmed or grown, softened edge (slow to work out) only when those change; what is painted, over it, at each stroke's step.
+  const edged = useMemo(() => tunedEdge(piece, tune.edge, tune.soft), [piece, tune.edge, tune.soft]);
+  const alpha = useMemo(() => capped(withDabs(edged, piece.w, piece.h, tune.dabs), ceiling), [edged, piece, tune.dabs, ceiling]);
   const canvas = useRef<HTMLCanvasElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   // The stroke being painted: its number and where its last dab went (a fast stroke is filled in between).
@@ -680,19 +682,24 @@ function Tuner({ pieces, initial, ceilings, onBack, onSave, saveLabel, note }: {
     }
   };
 
+  // The sticker's pixels and a canvas to put them on, made once a piece (not at every step of a stroke).
+  const work = useRef<{ piece: Piece; data: Uint8ClampedArray; raw: HTMLCanvasElement } | null>(null);
   useEffect(() => {
     const c = canvas.current;
     if (!c) return;
-    const data = new Uint8ClampedArray(piece.rgb);
+    if (work.current?.piece !== piece) {
+      const raw = document.createElement("canvas");
+      raw.width = piece.w;
+      raw.height = piece.h;
+      work.current = { piece, data: new Uint8ClampedArray(piece.rgb), raw };
+    }
+    const { data, raw } = work.current;
     for (let p = 0; p < piece.w * piece.h; p++) data[p * 4 + 3] = alpha[p];
-    const raw = document.createElement("canvas");
-    raw.width = piece.w;
-    raw.height = piece.h;
     stickerContext(raw).putImageData(stickerImageData(data, piece.w, piece.h), 0, 0);
     // With the cut edge it gets on a cover, or as it is.
     const shown = edge ? edgeAround(raw, "#ffffff", Math.max(3, piece.w * 0.03), stickerSpace()) : raw;
-    c.width = shown.width;
-    c.height = shown.height;
+    if (c.width !== shown.width) c.width = shown.width;
+    if (c.height !== shown.height) c.height = shown.height;
     const ctx = stickerContext(c);
     ctx.clearRect(0, 0, c.width, c.height);
     ctx.drawImage(shown, 0, 0);
@@ -800,8 +807,22 @@ function Tuner({ pieces, initial, ceilings, onBack, onSave, saveLabel, note }: {
     const n = Math.max(1, Math.ceil(d / Math.max(1, size / 2)));
     const dabs = Array.from({ length: n }, (_, i) => ({ x: s.last.x + ((p.x - s.last.x) * (i + 1)) / n, y: s.last.y + ((p.y - s.last.y) * (i + 1)) / n, r: size, keep: brush === "keep", stroke: s.id }));
     s.last = p;
-    setTunes((all) => all.map((t, i) => (i === at ? { ...t, dabs: [...t.dabs, ...dabs] } : t)));
+    // A pointer moves several times a frame: its dabs are painted together, once a frame.
+    waiting.current.push(...dabs);
+    if (!dabFrame.current) dabFrame.current = requestAnimationFrame(() => paintWaiting.current());
   };
+  const waiting = useRef<Dab[]>([]);
+  const dabFrame = useRef(0);
+  const paintWaiting = useRef(() => {});
+  paintWaiting.current = () => {
+    cancelAnimationFrame(dabFrame.current);
+    dabFrame.current = 0;
+    const more = waiting.current;
+    if (!more.length) return;
+    waiting.current = [];
+    setTunes((all) => all.map((t, i) => (i === at ? { ...t, dabs: [...t.dabs, ...more] } : t)));
+  };
+  useEffect(() => () => cancelAnimationFrame(dabFrame.current), []);
   const track = (e: { clientX: number; clientY: number }) => {
     const r = stage.current?.getBoundingClientRect();
     if (r) setCursor({ x: e.clientX - r.left, y: e.clientY - r.top, k: scaleNow() });
@@ -847,10 +868,12 @@ function Tuner({ pieces, initial, ceilings, onBack, onSave, saveLabel, note }: {
             else if (stroke.current) dab(e);
           }}
           onPointerUp={() => {
+            paintWaiting.current();
             moving.current = null;
             stroke.current = null;
           }}
           onPointerCancel={() => {
+            paintWaiting.current();
             moving.current = null;
             stroke.current = null;
           }}

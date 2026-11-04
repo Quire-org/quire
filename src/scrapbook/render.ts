@@ -1,4 +1,4 @@
-import type { Background, Bar, Layer, ScrapDoc, StickerLayer, TextLayer } from "./model";
+import { PIN_COLOURS, TAPE_COLOURS, type ArrowLayer, type Background, type Bar, type Fix, type Layer, type NoteLayer, type PhotoLayer, type ScrapDoc, type StickerLayer, type TextLayer } from "./model";
 import { CLASSIC_FRAME, ORIGINAL, fontById, fontCss, lookById } from "./looks";
 import { builtin } from "./stickers";
 
@@ -28,7 +28,11 @@ export class AssetCache {
   private loaded = new Map<string, Drawable | "loading" | "failed">();
   private made = new Map<string, HTMLCanvasElement>();
   private waiting = new Set<() => void>();
-  constructor(private blobUrl: (name: string) => Promise<string>) {}
+  /** `itemUrl`: a picture of the library by its key (a board's pointed at), or null when it is gone. */
+  constructor(
+    private blobUrl: (name: string) => Promise<string>,
+    private itemUrl: (key: string) => Promise<string | null> = async () => null,
+  ) {}
 
   /** Called when a picture arrives (the editor redraws). */
   onLoad(f: () => void): () => void {
@@ -46,6 +50,8 @@ export class AssetCache {
         (u) =>
           new Promise<HTMLImageElement>((resolve, reject) => {
             const img = new Image();
+            // Asked for as the app's own (the thumb protocol answers so), or a page drawn with it couldn't be saved or exported.
+            img.crossOrigin = "anonymous";
             img.onload = () => resolve(img);
             img.onerror = () => reject(new Error(`could not load ${key}`));
             img.src = u;
@@ -61,6 +67,25 @@ export class AssetCache {
 
   blob(name: string): Drawable | null {
     return this.load(`blob:${name}`, () => this.blobUrl(name));
+  }
+
+  /** A library picture a board points at, by its key. */
+  item(key: string): Drawable | null {
+    return this.load(`item:${key}`, async () => {
+      const url = await this.itemUrl(key);
+      if (!url) throw new Error(`${key} is gone`);
+      return url;
+    });
+  }
+
+  /** A photo layer's picture: its copy, or the library's picture it points at. */
+  photo(layer: PhotoLayer): Drawable | null {
+    return layer.item ? this.item(layer.item) : this.blob(layer.blob);
+  }
+
+  /** Whether a photo layer's picture couldn't be had (a library picture gone since). */
+  missing(layer: PhotoLayer): boolean {
+    return this.loaded.get(layer.item ? `item:${layer.item}` : `blob:${layer.blob}`) === "failed";
   }
 
   /** A built-in sticker as itself (original), or its line art in a look's ink. */
@@ -100,7 +125,7 @@ export class AssetCache {
       let missing = false;
       if (doc.background.kind === "photo" && !this.blob(doc.background.blob) && this.loaded.get(`blob:${doc.background.blob}`) !== "failed") missing = true;
       for (const l of doc.layers) {
-        if (l.type === "photo" && !this.blob(l.blob) && this.loaded.get(`blob:${l.blob}`) !== "failed") missing = true;
+        if (l.type === "photo" && !this.photo(l) && !this.missing(l)) missing = true;
         if (l.type === "sticker" && !this.sticker(l)) {
           const key = "blob" in l.src ? `blob:${l.src.blob}` : l.look === ORIGINAL ? `full:${l.src.builtin}` : `line:${l.src.builtin}`;
           if (this.loaded.get(key) !== "failed") missing = true;
@@ -234,10 +259,44 @@ function drawBackground(ctx: CanvasRenderingContext2D, bg: Background, bars: Bar
       for (let y = 0; y < H; y += s * 2) ctx.fillRect(0, y, W, s);
       break;
     }
+    case "cork":
+      drawCork(ctx, bg, W, H);
+      break;
     case "plain":
       break;
   }
   ctx.restore();
+}
+
+/** Cork: its grain, dark and light flecks, inside a wooden frame. The same every time. */
+function drawCork(ctx: CanvasRenderingContext2D, bg: Background & { kind: "pattern" }, W: number, H: number) {
+  const u = Math.min(W, H);
+  const r = seeded("cork");
+  const flecks = Math.round((W * H) / (u * u * 0.0006));
+  for (let i = 0; i < flecks; i++) {
+    ctx.globalAlpha = 0.12 + r() * 0.3;
+    ctx.fillStyle = r() < 0.6 ? bg.ink : "#e9cfa7";
+    const s = u * (0.002 + r() * 0.006);
+    ctx.beginPath();
+    ctx.ellipse(r() * W, r() * H, s, s * (0.5 + r() * 0.5), r() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // The frame: wood, with a shadow cast on the cork inside it.
+  const f = u * 0.022;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = f * 0.9;
+  ctx.lineWidth = f * 2;
+  ctx.strokeStyle = "#6e4a2c";
+  ctx.strokeRect(0, 0, W, H);
+  ctx.restore();
+  ctx.lineWidth = f * 2;
+  ctx.strokeStyle = "#7a5030";
+  ctx.strokeRect(0, 0, W, H);
+  ctx.lineWidth = Math.max(1, f * 0.12);
+  ctx.strokeStyle = "rgba(255,255,255,0.18)";
+  ctx.strokeRect(f, f, W - f * 2, H - f * 2);
 }
 
 /* ---------------- bars ---------------- */
@@ -454,13 +513,167 @@ function textFit(ctx: CanvasRenderingContext2D, layer: TextLayer, H: number): { 
 
 /** A layer's size on a W × H page, in pixels (before turning): what the editor's handles go round. */
 export function layerSize(ctx: CanvasRenderingContext2D, layer: Layer, W: number, H: number): { w: number; h: number } {
-  if (layer.type !== "text") {
-    const w = layer.w * W;
-    if (layer.type === "photo" && layer.frame === "polaroid") return { w: w * 1.1, h: w * layer.aspect + w * 0.28 };
-    return { w, h: w * layer.aspect };
+  if (layer.type === "text") {
+    const { w, h } = textFit(ctx, layer, H);
+    return { w, h };
   }
-  const { w, h } = textFit(ctx, layer, H);
-  return { w, h };
+  const w = layer.w * W;
+  if (layer.type === "note") return noteLayout(ctx, layer, W).box;
+  // An arrow is held by a band as long as it, about as wide as its head (and never too thin to grab).
+  if (layer.type === "arrow") return { w, h: Math.max(18, arrowHead(layer, W, H) * 1.4) };
+  if (layer.type === "photo" && layer.frame === "polaroid") return { w: w * 1.1, h: w * layer.aspect + w * 0.28 };
+  return { w, h: w * layer.aspect };
+}
+
+/** Where a text's letters are drawn on the page `H` tall: their size and the room they take (for typing into it in place). */
+export const textMetrics = (ctx: CanvasRenderingContext2D, layer: TextLayer, H: number) => textFit(ctx, layer, H);
+
+/** A note's letters, its paper's margin and its size on the page `W` wide (for typing into it in place). */
+export const noteMetrics = (ctx: CanvasRenderingContext2D, layer: NoteLayer, W: number) => noteLayout(ctx, layer, W);
+
+/** The font notes are written in. */
+export const NOTE_FONT = "caveat";
+
+/** A note's lines, its letters' size and its paper's size: as wide as it is set, as tall as its text needs (squarish at least). */
+function noteLayout(ctx: CanvasRenderingContext2D, layer: NoteLayer, W: number): { lines: string[]; px: number; pad: number; box: { w: number; h: number } } {
+  const w = layer.w * W;
+  const pad = w * 0.09;
+  const px = w * 0.095;
+  ctx.save();
+  ctx.font = fontCss(NOTE_FONT, px);
+  const lines: string[] = [];
+  for (const para of layer.text.split("\n")) {
+    let line = "";
+    for (const word of para.split(/\s+/)) {
+      const next = line ? `${line} ${word}` : word;
+      if (line && ctx.measureText(next).width > w - pad * 2) {
+        lines.push(line);
+        line = word;
+      } else line = next;
+    }
+    lines.push(line);
+  }
+  ctx.restore();
+  return { lines, px, pad, box: { w, h: Math.max(w * 0.8, pad * 2 + lines.length * px * 1.2) } };
+}
+
+function drawNote(ctx: CanvasRenderingContext2D, layer: NoteLayer, W: number) {
+  const { lines, px, pad, box } = noteLayout(ctx, layer, W);
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.3)";
+  ctx.shadowBlur = box.w * 0.05;
+  ctx.shadowOffsetY = box.w * 0.02;
+  ctx.fillStyle = layer.paper;
+  ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h);
+  ctx.restore();
+  // A slightly darker fold along its top, as a sticky note's glue strip.
+  ctx.fillStyle = "rgba(0,0,0,0.05)";
+  ctx.fillRect(-box.w / 2, -box.h / 2, box.w, box.h * 0.12);
+  ctx.fillStyle = "#2b2622";
+  ctx.font = fontCss(NOTE_FONT, px);
+  ctx.textBaseline = "top";
+  lines.forEach((line, i) => ctx.fillText(line, -box.w / 2 + pad, -box.h / 2 + pad + i * px * 1.2));
+}
+
+/** An arrow's head: how long and wide, in pixels. */
+const arrowHead = (layer: ArrowLayer, W: number, H: number) => Math.max(8, layer.thickness * Math.min(W, H) * 4.5);
+
+function drawArrow(ctx: CanvasRenderingContext2D, layer: ArrowLayer, W: number, H: number) {
+  const L = layer.w * W;
+  const t = Math.max(1.5, layer.thickness * Math.min(W, H));
+  const head = Math.min(arrowHead(layer, W, H), L * 0.45);
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.3)";
+  ctx.shadowBlur = t * 1.5;
+  ctx.shadowOffsetY = t * 0.4;
+  ctx.strokeStyle = layer.color;
+  ctx.fillStyle = layer.color;
+  ctx.lineWidth = t;
+  ctx.lineCap = "round";
+  const from = layer.heads === "both" ? -L / 2 + head * 0.8 : -L / 2;
+  ctx.beginPath();
+  ctx.moveTo(from, 0);
+  ctx.lineTo(L / 2 - head * 0.8, 0);
+  ctx.stroke();
+  const point = (x: number, dir: 1 | -1) => {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x - dir * head, -head * 0.55);
+    ctx.lineTo(x - dir * head * 0.78, 0);
+    ctx.lineTo(x - dir * head, head * 0.55);
+    ctx.closePath();
+    ctx.fill();
+  };
+  point(L / 2, 1);
+  if (layer.heads === "both") point(-L / 2, -1);
+  ctx.restore();
+}
+
+/** A colour of its own for each pin or strip (by its id), from `palette`, when none is chosen ("random"). */
+const colourOf = (chosen: string | undefined, id: string, palette: string[], otherwise?: string) => (chosen && chosen !== "random" ? chosen : !chosen && otherwise ? otherwise : palette[Math.floor(seeded(id)() * palette.length)]);
+
+/** A push pin's head, seen from above at an angle. */
+function drawPin(ctx: CanvasRenderingContext2D, colour: string, size: number) {
+  ctx.save();
+  // Its shadow on the paper, off to the lower right, and the needle's.
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  ctx.beginPath();
+  ctx.ellipse(size * 0.35, size * 0.45, size * 0.55, size * 0.4, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  const head = ctx.createRadialGradient(-size * 0.2, -size * 0.25, size * 0.08, 0, 0, size * 0.6);
+  head.addColorStop(0, "#ffffff");
+  head.addColorStop(0.25, colour);
+  head.addColorStop(1, shade(colour, -0.35));
+  ctx.fillStyle = head;
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** A colour lighter (amount > 0) or darker (< 0). */
+function shade(hex: string, amount: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v: number) => Math.round(Math.min(255, Math.max(0, amount < 0 ? v * (1 + amount) : v + (255 - v) * amount)));
+  return `rgb(${ch(n >> 16)},${ch((n >> 8) & 255)},${ch(n & 255)})`;
+}
+
+/**
+ * What holds a photo or a note up, over it, in its own space (the middle of a `w` × `h` box, turned
+ * `rot`): pins near its edge (one in the middle of its top, or at its corners), or strips of tape across
+ * its corners. A pin's head is seen from above, so it isn't turned with the picture.
+ */
+function drawFix(ctx: CanvasRenderingContext2D, fix: Fix, id: string, w: number, h: number, rot: number, u: number, tape: string) {
+  const top = -h / 2;
+  const corners = fix.where === "all" ? [[-1, -1], [1, -1], [-1, 1], [1, 1]] : fix.where === "top" ? [[-1, -1], [1, -1]] : null;
+  if (fix.kind === "pin") {
+    const m = Math.min(w, h) * 0.07;
+    const at = corners ? corners.map(([sx, sy]) => [sx * (w / 2 - m), sy * (h / 2 - m)]) : [[0, top + m]];
+    at.forEach(([x, y], i) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((-rot * Math.PI) / 180);
+      drawPin(ctx, colourOf(fix.color, `${id}:${i}`, PIN_COLOURS), Math.max(7, u * 0.014));
+      ctx.restore();
+    });
+    return;
+  }
+  // Washi tape, a little see-through: across each corner, its ends past both edges; one strip lies
+  // across the middle of the top, half over the picture.
+  const long = Math.min(w, h) * 0.34;
+  const wide = Math.min(w, h) * 0.085;
+  const strips = corners ? corners.map(([sx, sy]) => ({ x: (sx * w) / 2 - sx * wide * 0.15, y: (sy * h) / 2 - sy * wide * 0.15, a: -sx * sy * 42 })) : [{ x: 0, y: top, a: (seeded(id)() - 0.5) * 6 }];
+  ctx.save();
+  ctx.globalAlpha = 0.86;
+  strips.forEach((s, i) => {
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate((s.a * Math.PI) / 180);
+    ctx.fillStyle = colourOf(fix.color, `${id}:t${i}`, TAPE_COLOURS, tape);
+    ctx.fillRect(-long / 2, -wide / 2, long, wide);
+    ctx.restore();
+  });
+  ctx.restore();
 }
 
 type Paint = (c: CanvasRenderingContext2D, each: (line: string, x: number, y: number) => void) => void;
@@ -583,10 +796,32 @@ export function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, W: number
     ctx.restore();
     return;
   }
+  if (layer.type === "note" || layer.type === "arrow") {
+    if (layer.type === "note") {
+      drawNote(ctx, layer, W);
+      if (layer.fix) {
+        const { w: nw, h: nh } = layerSize(ctx, layer, W, H);
+        drawFix(ctx, layer.fix, layer.id, nw, nh, layer.rot, Math.min(W, H), CLASSIC_FRAME.tape);
+      }
+    } else drawArrow(ctx, layer, W, H);
+    ctx.restore();
+    return;
+  }
   const w = layer.w * W;
   const h = w * layer.aspect;
   if (layer.type === "photo") {
-    const img = assets.blob(layer.blob);
+    const img = assets.photo(layer);
+    // A library picture gone since it was pointed at: a gap with a dashed edge where it was.
+    if (!img && assets.missing(layer)) {
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.setLineDash([w * 0.04, w * 0.03]);
+      ctx.lineWidth = Math.max(1, w * 0.01);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.restore();
+      return;
+    }
     const f = layer.look ? lookById(layer.look).frame : CLASSIC_FRAME;
     // The frame's (or the bare photo's) shadow: soft, a hard ink one, or a glow.
     const shade = (strength: number) => {
@@ -625,16 +860,11 @@ export function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, W: number
       ctx.restore();
       edge(-w / 2, -h / 2, w, h);
     }
-    if (layer.frame === "tape") {
-      // Two strips of washi tape over the top corners.
-      ctx.fillStyle = f.tape;
-      for (const side of [-1, 1]) {
-        ctx.save();
-        ctx.translate((side * w) / 2.2, -h / 2);
-        ctx.rotate((side * -35 * Math.PI) / 180);
-        ctx.fillRect(-w * 0.13, -w * 0.035, w * 0.26, w * 0.07);
-        ctx.restore();
-      }
+    // Pinned or taped up, as it says ("tape" as a frame: a cover from before, taped at its top corners).
+    const fix = layer.fix ?? (layer.frame === "tape" ? ({ kind: "tape", where: "top" } as const) : null);
+    if (fix) {
+      const box = layer.frame === "polaroid" ? layerSize(ctx, layer, W, H) : { w, h };
+      drawFix(ctx, fix, layer.id, box.w, box.h, layer.rot, Math.min(W, H), f.tape);
     }
     ctx.restore();
     return;
@@ -667,10 +897,23 @@ export function drawLayer(ctx: CanvasRenderingContext2D, layer: Layer, W: number
 }
 
 export function drawPage(ctx: CanvasRenderingContext2D, doc: ScrapDoc, W: number, H: number, assets: AssetCache) {
+  drawBackdrop(ctx, doc, W, H, assets);
+  drawLayers(ctx, doc, W, H, assets, false);
+}
+
+/** The page's background and bars alone: what stays put while things on it are moved (the editor keeps it on a canvas of its own). */
+export function drawBackdrop(ctx: CanvasRenderingContext2D, doc: Pick<ScrapDoc, "background" | "bars">, W: number, H: number, assets: AssetCache) {
   ctx.save();
   ctx.clearRect(0, 0, W, H);
   drawBackground(ctx, doc.background, doc.bars ?? [], W, H, assets);
   drawBars(ctx, doc.bars ?? [], W, H);
+  ctx.restore();
+}
+
+/** What is on the page, over its backdrop (`clear`: on a canvas of their own, cleared first). */
+export function drawLayers(ctx: CanvasRenderingContext2D, doc: Pick<ScrapDoc, "layers">, W: number, H: number, assets: AssetCache, clear = true) {
+  ctx.save();
+  if (clear) ctx.clearRect(0, 0, W, H);
   for (const layer of doc.layers) drawLayer(ctx, layer, W, H, assets);
   ctx.restore();
 }
@@ -693,7 +936,7 @@ export function layerAt(ctx: CanvasRenderingContext2D, doc: ScrapDoc, W: number,
 /** Every font a cover's text uses, loaded (canvas text draws in a fallback until then). */
 export async function fontsReady(doc: ScrapDoc): Promise<void> {
   if (typeof document === "undefined" || !document.fonts) return;
-  const wanted = new Set(doc.layers.filter((l): l is TextLayer => l.type === "text").map((l) => fontCss(l.font, 48)));
+  const wanted = new Set(doc.layers.flatMap((l) => (l.type === "text" ? [fontCss(l.font, 48)] : l.type === "note" ? [fontCss(NOTE_FONT, 48)] : [])));
   await Promise.all([...wanted].map((f) => document.fonts.load(f).catch(() => [])));
 }
 

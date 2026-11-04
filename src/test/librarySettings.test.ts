@@ -50,6 +50,8 @@ describe("settings kept with the library", () => {
       slideshow: { interval: 9, hideUi: false },
       pageTurns: true,
       seriesTogether: false,
+      boardPictures: "link",
+      boardFix: { kind: "tape", where: "all" },
       fit: "fill",
       online: { ask: true, each: true, keep: true },
       connected: { all: false, platforms: ["site-a"] },
@@ -61,7 +63,7 @@ describe("settings kept with the library", () => {
     await flushAll();
     await settle();
     const s = useStore.getState();
-    expect([s.theme, s.themeMode, s.pageTurns, s.seriesTogether, s.fitMode, s.slideshow.interval, s.slideshow.hideUi]).toEqual(["manga", "light", true, false, "fill", 9, false]);
+    expect([s.theme, s.themeMode, s.pageTurns, s.seriesTogether, s.boardPictures, s.boardFix, s.fitMode, s.slideshow.interval, s.slideshow.hideUi]).toEqual(["manga", "light", true, false, "link", { kind: "tape", where: "all" }, "fill", 9, false]);
     expect(useSounds.getState()).toMatchObject({ menus: true, volume: 0.5 });
     expect(useOnline.getState().settings).toEqual({ ask: true, each: true, keep: true });
     expect(useOnline.getState().connected).toEqual({ all: false, platforms: ["site-a"] });

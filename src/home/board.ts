@@ -31,6 +31,8 @@ export type BlockType =
   | "slideshow"
   | "picture"
   | "scrapbook"
+  | "board"
+  | "boards"
   | "activity"
   | "drive"
   | "backup"
@@ -64,6 +66,8 @@ export interface Block {
   screens?: string[];
   /** Jump in: the saved searches on it (their ids). */
   searches?: string[];
+  /** A board: the one it shows (its id), or RANDOM_BOARD, a new one each time the Home opens; none, the one last changed. */
+  board?: string;
   /** From extensions: the shared panel it shows. */
   panel?: string;
   /** Its name not shown: the block is all content. */
@@ -170,12 +174,33 @@ export const KINDS: Record<BlockType, Kind> = {
   slideshow: { name: "Slideshow", about: "One picture at a time, changing slowly; Play opens them full screen.", group: "rediscover", w: 4, h: 5, minW: 2, minH: 3, sourced: true },
   picture: { name: "One picture", about: "A picture you pin, or a new one each day.", group: "rediscover", w: 3, h: 4, minW: 2, minH: 2, sourced: true },
   scrapbook: { name: "Scrapbook", about: "The album covers you made in the Scrapbook.", group: "rediscover", w: 6, h: 4, minW: 2, minH: 3 },
+  board: { name: "A board", about: "One of your Scrapbook boards, large: the one last changed, one you pick, or a random one. Click it to work on it.", group: "pickup", w: 6, h: 4, minW: 2, minH: 2 },
+  boards: { name: "Boards", about: "Your Scrapbook boards, the last changed first, and a button that starts a new one.", group: "pickup", w: 6, h: 3, minW: 3, minH: 2 },
   activity: { name: "Activity", about: "What is running, with pause and stop.", group: "status", w: 4, h: 3, minW: 3, minH: 2 },
   drive: { name: "The drive", about: "Space left on the library's drive, and its health.", group: "status", w: 3, h: 2, minW: 2, minH: 2 },
   backup: { name: "Backup", about: "When the library was last backed up.", group: "status", w: 3, h: 2, minW: 2, minH: 2 },
   shortcuts: { name: "Shortcuts", about: "Buttons to the screens you use most.", group: "utility", w: 3, h: 3, minW: 2, minH: 2 },
   theme: { name: "Theme", about: "The app's look, each theme shown in its own: pick one here. Its key goes to the next.", group: "utility", w: 4, h: 3, minW: 2, minH: 2 },
 };
+
+/**
+ * Boards in a strip `along` pixels long and `across` deep, each whole in its own shape (`shapes`: its
+ * length along the strip over its depth), all equally deep: as many as fit at a fair size (`least` of
+ * the depth at the least), the first ones first; fewer and larger when there isn't room for more; one
+ * alone made smaller to fit. How many, and how deep they are.
+ */
+export function boardStrip(shapes: number[], along: number, across: number, gap = 8, least = 0.55): { n: number; depth: number } {
+  const floor = Math.min(across, Math.max(60, across * least));
+  for (let n = shapes.length; n >= 1; n--) {
+    const length = shapes.slice(0, n).reduce((sum, a) => sum + a, 0);
+    const depth = Math.min(across, (along - gap * (n - 1)) / length);
+    if (depth >= floor || n === 1) return { n, depth: Math.max(0, depth) };
+  }
+  return { n: 0, depth: across };
+}
+
+/** A board block's pick that changes: a new board each time the Home opens. */
+export const RANDOM_BOARD = "random";
 
 /** The screens a Shortcuts block can hold, and the ones it starts with. */
 export const SHORTCUT_SCREENS = ["browse", "albums", "dupes", "files", "tags", "people", "artists", "scrapbook", "find"] as const;
@@ -219,6 +244,8 @@ export const PRESETS: { id: PresetId; name: string; about: string; blocks: Spot[
       at("jumpin", 0, 29, 6, 2),
       at("shared", 6, 29, 6, 3),
       at("theme", 0, 31, 6, 3),
+      at("board", 6, 32, 6, 4),
+      at("boards", 0, 34, 6, 3),
     ],
   },
   {
@@ -466,6 +493,26 @@ export function pick<T>(items: T[], n: number, seed: number): T[] {
     [out[i], out[j]] = [out[j], out[i]];
   }
   return out.slice(0, k);
+}
+
+/**
+ * `n` of the pictures, the same ones for a seed whatever order they come in: each ranked by a hash of
+ * its key with the seed, the first taken. A picture coming or going changes only its own place (the
+ * library read again, one seen leaving "Not seen in a while"), never the whole pick.
+ */
+export function pickStable<T extends { key: string }>(items: T[], n: number, seed: number): T[] {
+  const rank = (key: string) => {
+    let h = (seed ^ 0x9e3779b9) >>> 0;
+    for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 2654435761) >>> 0;
+    h ^= h >>> 16;
+    h = Math.imul(h, 2246822507) >>> 0;
+    return (h ^ (h >>> 13)) >>> 0;
+  };
+  return items
+    .map((it) => ({ it, r: rank(it.key) }))
+    .sort((a, b) => a.r - b.r)
+    .slice(0, n)
+    .map((x) => x.it);
 }
 
 /** Today's number, for a pick that changes once a day. */

@@ -16,7 +16,11 @@ const STEP = 120;
  * belong to what is being made (an album's pages, a tag's pictures) or the library's own pictures
  * (album pages left out), narrowed by folder and by name.
  */
-export function MiniBrowser({ own, ownLabel, row, onPick, action }: { own: MediaItem[]; ownLabel: string; row: number; onPick: (it: MediaItem) => void; action?: { label: ReactNode; title: string; onClick: (it: MediaItem) => void } }) {
+/** What a picture dragged out of a MiniBrowser carries: its key. */
+export const PICTURE_DRAG = "application/x-quire-picture";
+
+/** `draggable`: its pictures can be dragged out (onto a scrapbook page), carrying their keys as PICTURE_DRAG. */
+export function MiniBrowser({ own, ownLabel, row, onPick, action, draggable }: { own: MediaItem[]; ownLabel: string; row: number; onPick: (it: MediaItem) => void; action?: { label: ReactNode; title: string; onClick: (it: MediaItem) => void }; draggable?: boolean }) {
   const root = useStore((x) => x.root);
   const all = useStore((x) => x.allItems);
   const [scope, setScope] = useState<"own" | "library">(own.length ? "own" : "library");
@@ -73,7 +77,7 @@ export function MiniBrowser({ own, ownLabel, row, onPick, action }: { own: Media
             const ratio = shapes[it.key] ?? 1;
             return (
               <div key={it.key} className="mini-tile" style={{ flexGrow: ratio, flexBasis: ratio * row, aspectRatio: String(ratio) }} title={`${it.dir ? `${it.dir}/` : ""}${it.name}`}>
-                <button className="mini-pick" onClick={() => onPick(it)}>
+                <button className="mini-pick" onClick={() => onPick(it)} draggable={draggable} onDragStart={draggable ? (ev) => ev.dataTransfer.setData(PICTURE_DRAG, it.key) : undefined}>
                   <img
                     src={src(it)}
                     alt=""

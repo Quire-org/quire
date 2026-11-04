@@ -190,6 +190,9 @@ export interface LibrarySettings {
   slideshow?: { interval: number; hideUi: boolean };
   pageTurns?: boolean;
   seriesTogether?: boolean;
+  boardPictures?: "copy" | "link";
+  /** How a new photo or note on a board is held up (null: neither). */
+  boardFix?: { kind: "pin" | "tape"; where: "one" | "top" | "all" } | null;
   fit?: "fit" | "fill";
   /** Asking before going online (see lib/online). */
   online?: { ask: boolean; each: boolean; keep: boolean };
@@ -206,7 +209,11 @@ export interface ItemSource {
   id: string;
   url: string;
   title: string;
-  author: { id: string; name: string; account?: string };
+  /**
+   * Who made it. `platform` and `url` when that is an account on another platform than the work's (a
+   * pin's maker on the site the pin links to): suggested as an artist there, and linked by that address.
+   */
+  author: { id: string; name: string; account?: string; platform?: string; url?: string };
   /** The platform's tags: offered as suggestions; one linked to a tag of yours (`sourceMap`) brings it in on import. `kind` where the platform says (a character's name tells People who is in it). */
   tags: { name: string; translated: string | null; kind?: "artist" | "series" | "character" | "general" | "meta" }[];
   date: string | null;

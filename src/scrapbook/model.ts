@@ -5,20 +5,70 @@
  * tag cards show. Pictures it uses (photos, custom stickers, renders) are its own files, so a cover
  * stays whole when the picture it came from moves or goes. People and artists have a banner on
  * their page that stickers are put on as it is shown, kept here as where each sticker is.
+ *
+ * Boards are scrapbook pages of their own, for nothing in the library: an artist's references, say.
+ * Each has a name and a size of its own (changed at will: what is on it keeps its place), notes and
+ * arrows besides, and pictures copied onto it or, as the library is set to, pointing at the library's
+ * picture (which they follow when it moves).
  */
 
 import type { Tune } from "./subjects";
 
-export type TargetKind = "album" | "tag";
-export type Target = { kind: "album"; key: string; name: string } | { kind: "tag"; id: string; name: string };
+export type TargetKind = "album" | "tag" | "board";
+export type Target = { kind: "album"; key: string; name: string } | { kind: "tag"; id: string; name: string } | { kind: "board"; id: string; name: string };
 
-/** The rendered size of each kind of cover, in pixels. */
-export const PAGE: Record<TargetKind, { w: number; h: number }> = {
+/** The rendered size of each kind of cover, in pixels (a board's is its own; this is where a new one starts). */
+const PAGE: Record<TargetKind, { w: number; h: number }> = {
   album: { w: 900, h: 1278 },
   tag: { w: 1200, h: 600 },
+  board: { w: 1920, h: 1080 },
 };
 
-export type PatternId = "plain" | "dots" | "grid" | "stripes" | "lined" | "checks" | "tone";
+/** A page's size: a board's own, else its kind's. */
+export const pageOf = (doc: Pick<ScrapDoc, "kind" | "size">): { w: number; h: number } => doc.size ?? PAGE[doc.kind];
+
+/** A board's sides, at most and at least (larger ones would take too much memory to draw and export). */
+export const BOARD_MAX = 8000;
+export const BOARD_MIN = 300;
+
+/** Sizes a board can take at once. */
+export const BOARD_SIZES: { name: string; w: number; h: number }[] = [
+  { name: "Wide (16:9)", w: 1920, h: 1080 },
+  { name: "Square", w: 1600, h: 1600 },
+  { name: "A4 across", w: 2480, h: 1754 },
+  { name: "A4 upright", w: 1754, h: 2480 },
+  { name: "Banner (2:1)", w: 2400, h: 1200 },
+  { name: "Very wide (3:1)", w: 3600, h: 1200 },
+  { name: "Large wall (4K)", w: 3840, h: 2160 },
+];
+
+/**
+ * A board at another size: everything on it keeps its place and its size in pixels, as a canvas grows
+ * or shrinks round it, and anything left outside comes back to its edge.
+ */
+export function resized(doc: ScrapDoc, w: number, h: number): ScrapDoc {
+  const W = Math.round(Math.min(BOARD_MAX, Math.max(BOARD_MIN, w)));
+  const H = Math.round(Math.min(BOARD_MAX, Math.max(BOARD_MIN, h)));
+  const { w: W0, h: H0 } = pageOf(doc);
+  if (W === W0 && H === H0) return doc;
+  const kx = W0 / W;
+  const ky = H0 / H;
+  const inside = (v: number) => Math.min(1, Math.max(0, v));
+  return {
+    ...doc,
+    size: { w: W, h: H },
+    layers: doc.layers.map((l): Layer => {
+      const at = { x: inside(l.x * kx), y: inside(l.y * ky) };
+      if (l.type === "text") return { ...l, ...at, size: l.size * ky };
+      if (l.type === "arrow") return { ...l, ...at, w: l.w * kx, thickness: (l.thickness * Math.min(W0, H0)) / Math.min(W, H) };
+      return { ...l, ...at, w: l.w * kx };
+    }),
+    bars: doc.bars?.map((b) => ({ ...b, x: inside(b.x * kx), width: (b.width * Math.min(W0, H0)) / Math.min(W, H) })),
+  };
+}
+
+/** `cork`: a pin board, which pins every photo and note to it. */
+export type PatternId = "plain" | "dots" | "grid" | "stripes" | "lined" | "checks" | "tone" | "cork";
 
 export type Background =
   | { kind: "pattern"; pattern: PatternId; color: string; ink: string }
@@ -49,12 +99,35 @@ export interface StickerLayer extends Placement {
   flip?: boolean;
 }
 
+/** What holds a photo or a note up: pins or strips of tape, at one place (a pin in the middle of its top, tape over one top corner), the two top corners, or all four. */
+export interface Fix {
+  kind: "pin" | "tape";
+  where: "one" | "top" | "all";
+  /** Their colour; "random", a colour each (as before one could be chosen: pins random, tape the frame's). */
+  color?: string;
+}
+
+/** Colours for pins' heads, and for washi tape (laid on see-through). */
+export const PIN_COLOURS = ["#e5484d", "#3e63dd", "#f5a524", "#30a46c", "#f2f2f2", "#8e4ec6"];
+export const TAPE_COLOURS = ["#f4d35e", "#f7a8c4", "#9ad8c0", "#a9c8f5", "#f2efe8", "#c9a7e8"];
+export const FIX_PLACES: { id: Fix["where"]; name: string }[] = [
+  { id: "one", name: "One" },
+  { id: "top", name: "Top corners" },
+  { id: "all", name: "All corners" },
+];
+
 export interface PhotoLayer extends Placement {
   id: string;
   type: "photo";
+  /** Its own copy's file; "" for a picture of the library pointed at (`item`). */
   blob: string;
+  /** The library's picture it shows, by key, when pointed at rather than copied (a board's, as set). */
+  item?: string;
   aspect: number;
+  /** Bare, or on a polaroid's paper ("tape" only in older covers: it is `fix` now, see `migrated`). */
   frame: "none" | "polaroid" | "tape";
+  /** Pinned or taped up; null or none, neither. */
+  fix?: Fix | null;
   /** A theme's look for its frame (paper, edge, shadow or glow, tape); the classic white without. */
   look?: string;
 }
@@ -79,7 +152,36 @@ export interface TextLayer extends Placement {
   box?: { font: string; look: string };
 }
 
-export type Layer = StickerLayer | PhotoLayer | TextLayer;
+/** A note on a board: its text written on a square of paper, wrapped to its width. */
+export interface NoteLayer extends Placement {
+  id: string;
+  type: "note";
+  text: string;
+  /** The paper's colour. */
+  paper: string;
+  /** Pinned or taped up; null or none, neither. */
+  fix?: Fix | null;
+}
+
+/**
+ * An arrow on a board: `w` long (a fraction of the page's width) through its centre, turned `rot`,
+ * pointing right before it is turned; `thickness` a fraction of the page's shorter side.
+ */
+export interface ArrowLayer extends Placement {
+  id: string;
+  type: "arrow";
+  color: string;
+  thickness: number;
+  /** A head at its end, or at both ends. */
+  heads: "end" | "both";
+}
+
+export type Layer = StickerLayer | PhotoLayer | TextLayer | NoteLayer | ArrowLayer;
+
+/** Papers for notes. */
+export const NOTE_PAPERS = ["#fff1a8", "#f7c6d6", "#bfe8d4", "#cfe3ff", "#fbd3b8", "#ffffff"];
+/** Colours for arrows. */
+export const ARROW_COLOURS = ["#e5484d", "#16151a", "#ffffff", "#3e63dd", "#f5a524", "#30a46c"];
 
 /** How a bar is drawn: a plain band, a lightning bolt, a strip of torn paper, a stitched ribbon, pinking-shear teeth. */
 export type BarStyle = "straight" | "lightning" | "torn" | "stitched" | "zigzag";
@@ -130,6 +232,9 @@ export function newBar(doc: ScrapDoc): Bar {
 export interface ScrapDoc {
   id: string;
   kind: TargetKind;
+  /** A board's name and size (a cover's are its album's or tag's, and its kind's). */
+  name?: string;
+  size?: { w: number; h: number };
   background: Background;
   /** Bars splitting the background, behind every layer. */
   bars?: Bar[];
@@ -211,6 +316,9 @@ export const newId = () => `${Date.now().toString(36)}${Math.random().toString(3
 /** Blue with small white dots: where a new cover starts. */
 export const DEFAULT_BACKGROUND: Background = { kind: "pattern", pattern: "dots", color: "#5b8def", ink: "#ffffff" };
 
+/** Cork in a wooden frame: every photo and note on it pinned. Where a new board starts. */
+export const PIN_BOARD: Background = { kind: "pattern", pattern: "cork", color: "#c49a6c", ink: "#8b6340" };
+
 /** Ready-made backgrounds, by look. */
 export const BACKGROUNDS: { name: string; bg: Background }[] = [
   { name: "Blue dots", bg: DEFAULT_BACKGROUND },
@@ -225,14 +333,31 @@ export const BACKGROUNDS: { name: string; bg: Background }[] = [
   { name: "Peach", bg: { kind: "pattern", pattern: "plain", color: "#fbd3b8", ink: "#ffffff" } },
   { name: "Paper", bg: { kind: "pattern", pattern: "plain", color: "#f4f1ea", ink: "#ffffff" } },
   { name: "Ink", bg: { kind: "pattern", pattern: "plain", color: "#16151a", ink: "#ffffff" } },
+  { name: "Pin board", bg: PIN_BOARD },
 ];
+
+/**
+ * A page as kept before pins and tape were what holds a picture up: a photo framed by "tape" is bare
+ * and taped at its top corners, and on a pin board every photo and note without a say is pinned at
+ * its top (as the board pinned them all before).
+ */
+export function migrated(doc: ScrapDoc): ScrapDoc {
+  const cork = doc.background.kind === "pattern" && doc.background.pattern === "cork";
+  let changed = false;
+  const layers = doc.layers.map((l): Layer => {
+    if (l.type === "photo" && l.frame === "tape") return (changed = true), { ...l, frame: "none", fix: { kind: "tape", where: "top" } };
+    if (cork && (l.type === "photo" || l.type === "note") && l.fix === undefined) return (changed = true), { ...l, fix: { kind: "pin", where: "one" } };
+    return l;
+  });
+  return changed ? { ...doc, layers } : doc;
+}
 
 /** The blob names a cover uses (its photos, custom stickers, background), to keep them while it does. */
 export function blobsOf(doc: ScrapDoc): string[] {
   const out: string[] = [];
   if (doc.background.kind === "photo") out.push(doc.background.blob);
   for (const l of doc.layers) {
-    if (l.type === "photo") out.push(l.blob);
+    if (l.type === "photo" && l.blob) out.push(l.blob);
     if (l.type === "sticker" && "blob" in l.src) out.push(l.src.blob);
   }
   if (doc.rendered) out.push(doc.rendered);

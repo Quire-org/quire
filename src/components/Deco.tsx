@@ -1,5 +1,5 @@
 /** Little decorations for the Cozy theme. Hidden by CSS in other themes. */
-export function Deco({ kind, className = "" }: { kind: "plant" | "mug" | "cat" | "sprout"; className?: string }) {
+export function Deco({ kind, className = "" }: { kind: "plant" | "mug" | "cat"; className?: string }) {
   const common = { className: `deco deco-${kind} ${className}`, "aria-hidden": true, focusable: "false" } as const;
   if (kind === "plant")
     return (
@@ -20,14 +20,6 @@ export function Deco({ kind, className = "" }: { kind: "plant" | "mug" | "cat" |
         <path d="M82 56h10a12 12 0 0 1 0 24H82" fill="none" stroke="#e8c9bf" strokeWidth="8" />
         <path d="M30 48h50v6H30z" fill="#d89a93" />
         <path d="M46 36c0-6 6-6 6-12s-6-6-6-12M60 38c0-6 6-6 6-12s-6-6-6-12" fill="none" stroke="#b4a797" strokeWidth="3" strokeLinecap="round" opacity="0.7" />
-      </svg>
-    );
-  if (kind === "sprout")
-    return (
-      <svg {...common} viewBox="0 0 60 60" width="40" height="40">
-        <path d="M30 56V30" stroke="#7fa883" strokeWidth="3" strokeLinecap="round" />
-        <path d="M30 34c-12 2-18-6-18-14 10 0 18 4 18 14z" fill="#9db9a4" />
-        <path d="M30 30c2-12 10-16 18-16 0 10-6 18-18 16z" fill="#7fa883" />
       </svg>
     );
   return (

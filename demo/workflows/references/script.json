@@ -7,78 +7,95 @@
   },
   "parts": [
     {
-      "caption": "Find more to draw from.",
-      "line": "Your Pixiv feed, right inside Quire.",
+      "caption": "Look for references.",
+      "line": "Search Pinterest, right inside Quire.",
       "length": 84,
-      "scroll": {
-        "tall": "feed-tall",
-        "from": 6,
-        "to": 64,
-        "share": 0.5
-      },
       "steps": [
         {
-          "frame": "feed"
+          "frame": "search-typed"
+        },
+        {
+          "frame": "search",
+          "at": 32
         }
       ]
     },
     {
-      "caption": "Into the basket, then the library.",
-      "line": "Pick what to keep and bring it in with Import.",
-      "length": 116,
+      "caption": "Keep the ones you like.",
+      "line": "Into the basket, then into your library.",
+      "length": 120,
       "steps": [
         {
-          "frame": "work",
+          "frame": "pin",
           "click": 14
         },
         {
-          "frame": "work-basket",
+          "frame": "pin-basket",
           "at": 26
         },
         {
           "frame": "basket",
-          "at": 44,
+          "at": 46,
           "click": 16
         },
         {
           "frame": "import-where",
-          "at": 66,
+          "at": 68,
           "enter": "open"
         },
         {
           "frame": "import",
-          "at": 84,
+          "at": 88,
           "click": 14
         }
       ]
     },
     {
-      "caption": "Artists, gathered for you.",
-      "line": "What came in from one artist is offered as theirs.",
-      "length": 96,
-      "steps": [
+      "caption": "Pin them to a board.",
+      "line": "Pictures from your library, notes and arrows.",
+      "length": 126,
+      "camera": [
         {
-          "frame": "artists",
-          "click": 22
+          "at": 66,
+          "zoom": 1,
+          "focus": [
+            0.47,
+            0.7
+          ]
         },
         {
-          "frame": "artist",
-          "at": 46,
-          "enter": "open"
+          "at": 96,
+          "zoom": 1.45
+        }
+      ],
+      "steps": [
+        {
+          "frame": "board-empty",
+          "click": 16
+        },
+        {
+          "frame": "board-one",
+          "at": 32,
+          "click": 16
+        },
+        {
+          "frame": "board-note",
+          "at": 64
+        },
+        {
+          "frame": "board",
+          "at": 100
         }
       ]
     },
     {
-      "caption": "Tagged on your computer.",
-      "line": "Look things up by style, subject or character.",
-      "length": 100,
+      "caption": "Keep it beside your drawing.",
+      "line": "In a window of its own, above your other apps.",
+      "length": 84,
       "steps": [
         {
-          "frame": "tag"
-        },
-        {
-          "frame": "browse-tags",
-          "at": 50
+          "frame": "board-window",
+          "enter": "open"
         }
       ]
     }
@@ -87,11 +104,11 @@
     "title": "Quire",
     "lines": [
       "Free and open source, for macOS, Windows and Linux",
-      "Pixiv comes with the Pixiv plugin."
+      "Pinterest comes with the Pinterest plugin."
     ],
     "link": "github.com/Quire-org/quire"
   },
   "stills": {
-    "references": "work"
+    "references": "search"
   }
 }

@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import type { MediaItem } from "../lib/types";
 
-const be = vi.hoisted(() => ({ home: null as unknown, saved: [] as unknown[] }));
+const be = vi.hoisted(() => ({ home: null as unknown, saved: [] as unknown[], scrap: null as unknown }));
 vi.mock("../lib/api", () => ({
   api: new Proxy(
     {
@@ -18,6 +18,7 @@ vi.mock("../lib/api", () => ({
       facesLoad: async () => ({ faces: [], scanned: {} }),
       scanAlbums: async () => [],
       pluginList: async () => [],
+      scrapbookLoad: async () => be.scrap,
     } as Record<string, unknown>,
     { get: (t, k: string) => t[k] ?? (async () => null) },
   ),
@@ -188,6 +189,13 @@ describe("the Home's board", () => {
     expect(board.nearestDay([pic("f", new Date(2026, 6, 1).getTime())], now)).toBeNull();
     const many = Array.from({ length: 50 }, (_, i) => i);
     expect(board.pick(many, 5, 42)).toEqual(board.pick(many, 5, 42));
+    // The pictures' pick: the same whatever order they come in, and one gone only frees its own place.
+    const pics = many.map((n) => ({ key: `p/${n}.jpg` }));
+    const chosen = board.pickStable(pics, 5, 42);
+    expect(board.pickStable([...pics].reverse(), 5, 42)).toEqual(chosen);
+    const without = board.pickStable(pics.filter((p) => p !== chosen[2]), 5, 42);
+    expect(without.slice(0, 4)).toEqual(chosen.filter((p) => p !== chosen[2]));
+    expect(board.pickStable(pics, 5, 43)).not.toEqual(chosen);
     expect(board.pick(many, 5, 42)).not.toEqual(board.pick(many, 5, 43));
     expect(new Set(board.pick(many, 50, 1)).size).toBe(50);
   });
@@ -433,6 +441,69 @@ describe("Home blocks for Find", () => {
     await act(async () => useHome.getState().undo());
     expect(host.querySelector(`[data-block="${id}"]`)).not.toBeNull();
     root.unmount();
+  });
+});
+
+describe("blocks for the Scrapbook's boards", () => {
+  it("shows boards whole in their own shapes, all one height: as many as fit at a fair size, else fewer and larger", () => {
+    const fourK = 3840 / 2160;
+    const a4 = 210 / 297;
+    // A narrow block: a 4K board and an A4 one both fit, each in its own shape, neither squeezed.
+    const both = board.boardStrip([fourK, a4], 232, 160);
+    expect(both.n).toBe(2);
+    expect(both.depth * fourK + 8 + both.depth * a4).toBeCloseTo(232);
+    // Room enough: the block's full height.
+    expect(board.boardStrip([fourK, a4, 1], 1000, 160)).toEqual({ n: 3, depth: 160 });
+    // Two would be too small: one, larger.
+    const one = board.boardStrip([fourK, fourK], 200, 160);
+    expect(one.n).toBe(1);
+    expect(one.depth).toBeCloseTo(200 / fourK);
+    expect(board.boardStrip([], 200, 160).n).toBe(0);
+  });
+
+  it("A board shows the last changed, one picked or a random one; Boards lists them after a button for a new one", async () => {
+    be.home = null;
+    useStore.setState({ root: null, screen: "welcome" } as never);
+    useHome.setState({ doc: null, docRoot: null, fresh: false, arranging: false, history: [] });
+    const page = (id: string, name: string, updated: number, kind = "board") => ({ id, kind, name, size: { w: 900, h: 1600 }, background: { kind: "pattern", pattern: "cork", color: "#c49a6c", ink: "#8b6340" }, layers: [], updated });
+    be.scrap = { version: 1, books: { b1: page("b1", "Poses", 1), b2: page("b2", "Light", 3), c1: page("c1", "", 5, "album") }, stickers: [], banners: {} };
+    await useStore.getState().openRoot("/vol");
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const { actionOf, canShuffle } = await import("../home/blocks");
+    const { useScrapbook } = await import("../scrapbook/store");
+    useHome.getState().start("gallery");
+    const one = useHome.getState().addBlock("board")!;
+    const all = useHome.getState().addBlock("boards")!;
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(Home)));
+    const inOne = (sel: string) => host.querySelector(`[data-block="${one}"] ${sel}`);
+    const block = (id: string) => useHome.getState().doc!.blocks.find((b) => b.id === id)!;
+    // At first the board last changed, its name on it.
+    expect(inOne(".home-pic-label")?.textContent).toBe("Light");
+    // One picked: the block is named after it.
+    await act(async () => useHome.getState().updateBlock(one, { board: "b1" }));
+    expect(inOne(".home-block-title")?.textContent).toBe("Poses");
+    expect(inOne(".home-pic-label")).toBeNull();
+    // A random one, with a shuffle for another.
+    await act(async () => useHome.getState().updateBlock(one, { board: board.RANDOM_BOARD }));
+    expect(["Poses", "Light"]).toContain(inOne(".home-pic-label")?.textContent);
+    expect(canShuffle(block(one))).toBe(true);
+    // Boards: the last changed first, covers left out.
+    expect(Array.from(host.querySelectorAll(`[data-block="${all}"] .home-board-tile .home-pic-label`), (t) => t.textContent)).toEqual(["Light", "Poses"]);
+    await act(async () => (host.querySelector(`[data-block="${all}"] .home-board-new`) as HTMLButtonElement).click());
+    expect(document.body.textContent).toContain("Make the board");
+    await act(async () => void window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })));
+    expect(document.body.textContent).not.toContain("Make the board");
+    // A board's key opens the board it shows.
+    const shown = inOne(".home-pic-label")!.textContent === "Poses" ? "b1" : "b2";
+    await act(async () => actionOf(block(one))!());
+    expect(useStore.getState().screen).toBe("cover");
+    expect(useScrapbook.getState().editing?.doc.id).toBe(shown);
+    useScrapbook.getState().cancel();
+    root.unmount();
+    be.scrap = null;
   });
 });
 

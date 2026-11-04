@@ -15,7 +15,7 @@
           "frame": "home"
         },
         {
-          "frame": "layout-mosaic",
+          "frame": "layout-board",
           "at": 22,
           "enter": "wipe"
         },

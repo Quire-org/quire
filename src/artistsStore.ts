@@ -105,6 +105,8 @@ export interface ArtistSuggestion {
   authorId: string;
   name: string;
   account: string;
+  /** Their page there, when the platform is another than the work's (see ItemSource's author). */
+  url: string | null;
   items: string[];
   /** The library's artist linked to that account already, if one is. */
   artist: LocalArtist | null;
@@ -178,10 +180,12 @@ export function suggestionsFor(doc: ArtistsDoc, sources: Record<string, ItemSour
     // A page of an album given an artist (a work of several pages) is theirs already.
     const album = albumOf(k);
     if (!s.author?.id || doc.items[k]?.length || (album && doc.items[albumArtistKey(album)]?.length) || (present && !present.has(k))) continue;
-    const key = `${s.platform}:${s.author.id}`;
+    // On the platform they are on: the work's, or another its maker is known by.
+    const platform = s.author.platform ?? s.platform;
+    const key = `${platform}:${s.author.id}`;
     if (dismissed.has(key)) continue;
     let g = groups.get(key);
-    if (!g) groups.set(key, (g = { key, platform: s.platform, authorId: s.author.id, name: s.author.name, account: s.author.account ?? "", items: [], artist: linkedArtist(doc, s.platform, s.author.id) }));
+    if (!g) groups.set(key, (g = { key, platform, authorId: s.author.id, name: s.author.name, account: s.author.account ?? "", url: s.author.url ?? null, items: [], artist: linkedArtist(doc, platform, s.author.id) }));
     g.items.push(k);
   }
   return [...groups.values()].sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name));
@@ -511,16 +515,16 @@ export const useArtists = create<ArtistsState>((set, get) => {
 
     async accept(s, into) {
       await get().load();
-      const link = { platform: s.platform, id: s.authorId, account: s.account, url: null };
+      const link = { platform: s.platform, id: s.authorId, account: s.account, url: s.url };
       if (into) await get().linkTo(into, link);
       const id = into ?? s.artist?.id ?? get().create(s.name || s.account || s.authorId, link);
       if (!id) return null;
       // An album's pages (a work of several pages): the album is theirs.
       const byKey = new Map(useStore.getState().allItems.map((i) => [i.key, i]));
       get().assign([...new Set(s.items.map((k) => { const it = byKey.get(k); return it ? artistKeyOf(it) : k; }))], id);
-      // A new artist is filled in from the platform: their icon, description and pages; a page in
-      // common with an artist from another platform says they may be one.
-      if (!s.artist && !into)
+      // A new artist is filled in from the platform, when a plugin offers it: their icon, description
+      // and pages; a page in common with an artist from another platform says they may be one.
+      if (!s.artist && !into && Object.values(useFinders.getState().finders).some((f) => f.platform === s.platform))
         void get()
           .refresh(id)
           .then(() => {

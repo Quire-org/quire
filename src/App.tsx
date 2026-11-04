@@ -15,6 +15,7 @@ import { Viewer } from "./screens/Viewer";
 import { Browse } from "./screens/Browse";
 import { Dupes } from "./screens/Dupes";
 import { Albums } from "./screens/Albums";
+import { ScreenGuard } from "./components/ScreenGuard";
 import { VaultUnlock } from "./screens/VaultUnlock";
 import { Files } from "./screens/Files";
 import { PluginHost } from "./components/PluginHost";
@@ -97,7 +98,7 @@ export default function App() {
   }, []);
 
   // The window closing: what the stores still have to write (a rating a moment ago) is written first,
-  // then the window goes (destroyed: closing it again would only ask this again).
+  // then the boards' windows and the window go (destroyed: closing it again would only ask this again).
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     let closing = false;
@@ -107,6 +108,9 @@ export default function App() {
         if (closing) return;
         closing = true;
         await flushAll().catch(() => {});
+        await import("@tauri-apps/api/webviewWindow")
+          .then(async ({ getAllWebviewWindows }) => Promise.all((await getAllWebviewWindows()).filter((w) => w.label.startsWith("board-")).map((w) => w.destroy())))
+          .catch(() => {});
         await getCurrentWindow()
           .destroy()
           .catch((err) => {
@@ -147,20 +151,22 @@ export default function App() {
 
   return (
     <IconContext.Provider value={{ weight: iconWeight, size: 16, className: "ico" }}>
-      {screen === "welcome" && <Welcome />}
-      {screen === "home" && <Home />}
-      {screen === "viewer" && <Viewer />}
-      {screen === "browse" && <Browse />}
-      {screen === "dupes" && <Dupes />}
-      {screen === "albums" && <Albums />}
-      {screen === "files" && <Files />}
-      {screen === "tags" && <Tags />}
-      {screen === "people" && <People />}
-      {screen === "artists" && <Artists />}
-      {screen === "find" && <Find />}
-      {screen === "activity" && <ActivityScreen />}
-      {screen === "scrapbook" && <Scrapbook />}
-      {screen === "cover" && <CoverEditor />}
+      <ScreenGuard key={screen} screen={screen}>
+        {screen === "welcome" && <Welcome />}
+        {screen === "home" && <Home />}
+        {screen === "viewer" && <Viewer />}
+        {screen === "browse" && <Browse />}
+        {screen === "dupes" && <Dupes />}
+        {screen === "albums" && <Albums />}
+        {screen === "files" && <Files />}
+        {screen === "tags" && <Tags />}
+        {screen === "people" && <People />}
+        {screen === "artists" && <Artists />}
+        {screen === "find" && <Find />}
+        {screen === "activity" && <ActivityScreen />}
+        {screen === "scrapbook" && <Scrapbook />}
+        {screen === "cover" && <CoverEditor />}
+      </ScreenGuard>
       {studio && <StickerStudio key={studio.sticker?.id ?? studio.item?.key ?? "pick"} />}
       <ConfirmHost />
       <FolderBrowserHost />

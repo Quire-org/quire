@@ -47,10 +47,12 @@ async function bootstrap() {
   // The app is keyboard driven; the browser context menu only gets in the way.
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
+  // A board in a window of its own (scrapbook/boardWindow) shows only the board.
+  const q = new URLSearchParams(location.search);
+  const board = q.get("board");
+  const { BoardWindow } = board ? await import("./screens/BoardWindow") : { BoardWindow: null };
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>,
+    <React.StrictMode>{BoardWindow && board ? <BoardWindow id={board} root={q.get("root") ?? ""} /> : <App />}</React.StrictMode>,
   );
 }
 

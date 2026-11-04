@@ -130,3 +130,27 @@ describe("Files: picking several", () => {
     f.unmount();
   });
 });
+
+describe("Files: a file shown from elsewhere", () => {
+  it("opens at the file's folder with the file selected (Show in Files); a PDF's page shows the PDF", async () => {
+    const { api } = await import("../lib/api");
+    const asked: string[] = [];
+    const was = api.listDir;
+    (api as { listDir: unknown }).listDir = async (_root: string, dir: string) => (asked.push(dir), entries);
+    try {
+      useStore.setState({ root: "/vol" } as never);
+      useStore.getState().showInFiles("/vol/Docs/book.pdf#3");
+      expect(useStore.getState().filesShow).toBe("/vol/Docs/book.pdf");
+      useStore.getState().showInFiles("/vol/Docs/note7.txt");
+      expect(useStore.getState().screen).toBe("files");
+      const f = await files("list");
+      await wait(20);
+      expect(asked[asked.length - 1]).toBe("/vol/Docs");
+      expect(picked()).toBe("7");
+      expect(useStore.getState().filesShow).toBeNull();
+      f.unmount();
+    } finally {
+      (api as { listDir: unknown }).listDir = was;
+    }
+  });
+});

@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { debounced } from "../lib/pending";
-import { api } from "../lib/api";
+import { api, canThumb, mediaUrl, thumbUrl } from "../lib/api";
 import { base64 } from "../lib/base64";
 import { useStore, type Screen } from "../store";
 import { useTags } from "../tagsStore";
 import { usePeople } from "../peopleStore";
 import { useArtists } from "../artistsStore";
 import { AssetCache, drawPage, fontsReady } from "./render";
-import { DEFAULT_BACKGROUND, EMPTY_LIBRARY, PAGE, blobsOf, blobsOfBanner, newId, type Banner, type BannerSticker, type CustomSticker, type Layer, type ScrapDoc, type ScrapLibrary, type StickerSource, type Target } from "./model";
+import { BOARD_MAX, DEFAULT_BACKGROUND, EMPTY_LIBRARY, PIN_BOARD, blobsOf, blobsOfBanner, migrated, newId, pageOf, type Banner, type BannerSticker, type CustomSticker, type Layer, type ScrapDoc, type ScrapLibrary, type StickerSource, type Target } from "./model";
 import { steppedJob } from "../lib/jobs";
 import type { MediaItem } from "../lib/types";
 
@@ -25,7 +25,11 @@ export type BannerTarget = { kind: "person" | "artist"; id: string };
 interface Editing {
   target: Target;
   doc: ScrapDoc;
+  /** What is selected: the one its settings show for (the last picked), and all of them when several are (`many`). */
   selected: string | null;
+  many: string[];
+  /** The text or note being typed into on the page. */
+  typing: string | null;
   past: ScrapDoc[];
   future: ScrapDoc[];
   /** Changes of the same kind in a row (dragging, typing) undo as one. */
@@ -33,6 +37,8 @@ interface Editing {
   saving: boolean;
   /** Pictures saved while editing: gone again if the editing is cancelled. */
   added: string[];
+  /** The pictures it had when opened: once closed, those it no longer has go (a board keeps itself as it goes). */
+  had: string[];
 }
 
 interface ScrapState {
@@ -47,7 +53,11 @@ interface ScrapState {
 
   open(target: Target): Promise<void>;
   change(fn: (doc: ScrapDoc) => ScrapDoc, mergeKey?: string): void;
-  select(id: string | null): void;
+  /** One thing selected (none: the page); with `add`, taken into the selection or out of it. */
+  select(id: string | null, add?: boolean): void;
+  selectMany(ids: string[]): void;
+  /** Typing into a text or a note on the page (null: done). */
+  type(id: string | null): void;
   undo(): void;
   redo(): void;
   /** Renders the cover, saves it and its layout, and gives it to the album or tag. */
@@ -73,6 +83,12 @@ interface ScrapState {
   saveBanner(target: BannerTarget, stickers: BannerSticker[]): void;
   /** A banner whose artist is gone. */
   dropBanner(id: string): Promise<void>;
+  /** A new board, named and sized, open to edit. */
+  newBoard(name: string, size: { w: number; h: number }): Promise<void>;
+  renameBoard(id: string, name: string): void;
+  removeBoard(id: string): Promise<void>;
+  /** Pictures moved (`move` gives where a key went, else null): stickers' sources and the pictures boards point at follow. */
+  follow(move: (key: string) => string | null): void;
 }
 
 let loadedFor: string | null = null;
@@ -93,13 +109,31 @@ export async function blobUrl(name: string): Promise<string> {
 /** A picture's URL if it has been read already (to show it at once, with no empty frame first). */
 export const knownUrl = (name: string): string | null => urls.get(name) ?? null;
 
+/** A library picture a board points at, by its key: its backend copy at a board's size, or none once it is gone. */
+async function itemUrl(key: string): Promise<string | null> {
+  const s = useStore.getState();
+  const it = s.allItems.find((i) => i.key === key);
+  if (!it || !s.root) return null;
+  return canThumb(it) ? thumbUrl(s.root, it, 1600) : mediaUrl(it);
+}
+
+/** A library picture's height over its width (its small copy, loaded to see). */
+export async function pictureAspect(it: MediaItem): Promise<number> {
+  const url = await itemUrl(it.key);
+  if (!url) throw new Error("it isn't in the library any more");
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  return img.naturalHeight / Math.max(1, img.naturalWidth);
+}
+
 /** The pictures the editor and the cards draw, shared. */
-export const assets = new AssetCache(blobUrl);
+export const assets = new AssetCache(blobUrl, itemUrl);
 
 /** A picture's bytes as base64, for the backend. */
 /** A cover drawn at its full size times `scale`, once its fonts and pictures are in. */
 async function renderCover(doc: ScrapDoc, scale = 1): Promise<HTMLCanvasElement> {
-  const { w, h } = PAGE[doc.kind];
+  const { w, h } = pageOf(doc);
   await Promise.all([fontsReady(doc), assets.ready(doc)]);
   const canvas = document.createElement("canvas");
   canvas.width = w * scale;
@@ -111,12 +145,13 @@ async function renderCover(doc: ScrapDoc, scale = 1): Promise<HTMLCanvasElement>
 const encode = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
   new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("could not render the cover"))), type, quality));
 
-/** A cover as it looks, saved as a picture where the user picks (PNG or JPEG), at twice its size so it stays sharp. */
+/** A cover as it looks, saved as a picture where the user picks (PNG or JPEG), at twice its size so it stays sharp (a large board at what a picture can be). */
 export async function exportCover(doc: ScrapDoc, target: Target): Promise<void> {
   try {
-    const canvas = await renderCover(doc, 2);
+    const { w, h } = pageOf(doc);
+    const canvas = await renderCover(doc, Math.min(2, BOARD_MAX / Math.max(w, h)));
     const [png, jpeg] = await Promise.all([encode(canvas, "image/png").then(base64), encode(canvas, "image/jpeg", 0.92).then(base64)]);
-    const name = `${target.name.replace(/[/\\:]/g, "-")} ${target.kind === "album" ? "cover" : "banner"}.png`;
+    const name = `${target.name.replace(/[/\\:]/g, "-")}${target.kind === "board" ? "" : target.kind === "album" ? " cover" : " banner"}.png`;
     const path = await api.scrapbookExport(name, png, jpeg);
     if (path) useStore.getState().toast(`Saved ${path.split("/").pop()}`, "ok");
   } catch (err) {
@@ -140,6 +175,27 @@ useStore.subscribe((s, prev) => {
     useScrapbook.setState({ lib: null });
   }
 });
+
+/**
+ * A board being made keeps itself as it goes (no Done needed): its layout into the scrapbooks soon
+ * after each change, written with them, and to a window showing it at once. Its card's picture is
+ * drawn again when it is closed.
+ */
+const boardKeep = debounced("board", 400, async (root) => {
+  const st = useScrapbook.getState();
+  const e = st.editing;
+  const lib = st.lib;
+  if (!e || e.doc.kind !== "board" || !lib || loadedFor !== root) return;
+  const doc: ScrapDoc = { ...e.doc, rendered: lib.books[e.doc.id]?.rendered, updated: Date.now() };
+  const next = { ...lib, books: { ...lib.books, [doc.id]: doc } };
+  useScrapbook.setState({ lib: next });
+  scrapSave.schedule(root);
+  await scrapSave.flush();
+  void import("@tauri-apps/api/event").then(({ emit }) => emit("board-saved", doc)).catch(() => {});
+});
+function keepBoard(doc: ScrapDoc) {
+  if (doc.kind === "board" && loadedFor) boardKeep.schedule(loadedFor);
+}
 
 /** Every picture some scrapbook or the sticker shelf still uses. */
 /** A sticker's files: its picture, and what it was cut from if kept. */
@@ -169,8 +225,9 @@ function coverName(book: string): string | undefined {
   return tag?.split("/").pop();
 }
 
-/** The scrapbook an album or a tag has, by id. */
+/** The scrapbook an album or a tag has, by id (a board is its own). */
 export function coverOf(target: Target): string | undefined {
+  if (target.kind === "board") return target.id;
   if (target.kind === "album") return useStore.getState().library?.albumCovers?.[target.key];
   return useTags.getState().data?.covers?.[target.id];
 }
@@ -187,6 +244,7 @@ function setBanner(target: BannerTarget, banner: string | null) {
 }
 
 function setCover(target: Target, book: string | null) {
+  if (target.kind === "board") return;
   if (target.kind === "album") {
     const lib = useStore.getState().library;
     if (!lib) return;
@@ -217,7 +275,9 @@ export const useScrapbook = create<ScrapState>((set, get) => ({
     if (!root) return EMPTY_LIBRARY;
     if (loadedFor === root && get().lib) return get().lib!;
     const raw = (await api.scrapbookLoad(root).catch(() => null)) as Partial<ScrapLibrary> | null;
-    const lib: ScrapLibrary = { ...EMPTY_LIBRARY, ...(raw ?? {}), books: raw?.books ?? {}, stickers: raw?.stickers ?? [], banners: raw?.banners ?? {} };
+    // Each page as it is kept now (see `migrated`).
+    const books = Object.fromEntries(Object.entries(raw?.books ?? {}).map(([id, doc]) => [id, migrated(doc)]));
+    const lib: ScrapLibrary = { ...EMPTY_LIBRARY, ...(raw ?? {}), books, stickers: raw?.stickers ?? [], banners: raw?.banners ?? {} };
     loadedFor = root;
     set({ lib });
     return lib;
@@ -238,7 +298,7 @@ export const useScrapbook = create<ScrapState>((set, get) => ({
     const kept = id ? lib.books[id] : undefined;
     const doc: ScrapDoc = kept ? structuredClone(kept) : { id: newId(), kind: target.kind, background: DEFAULT_BACKGROUND, layers: [], updated: Date.now() };
     const from = useStore.getState().screen;
-    set({ editing: { target, doc, selected: null, past: [], future: [], mergeKey: null, saving: false, added: [] }, back: from === "cover" ? get().back : from });
+    set({ editing: { target, doc, selected: null, many: [], typing: null, past: [], future: [], mergeKey: null, saving: false, added: [], had: blobsOf(doc) }, back: from === "cover" ? get().back : from });
     useStore.setState({ screen: "cover" });
   },
 
@@ -250,25 +310,47 @@ export const useScrapbook = create<ScrapState>((set, get) => ({
     // A drag or a run of typing is one step back, not one per move.
     const merge = !!mergeKey && mergeKey === e.mergeKey;
     set({ editing: { ...e, doc, past: merge ? e.past : [...e.past.slice(-80), e.doc], future: [], mergeKey: mergeKey ?? null } });
+    keepBoard(doc);
   },
 
-  select(id) {
+  select(id, add = false) {
     const e = get().editing;
-    if (e) set({ editing: { ...e, selected: id, mergeKey: null } });
+    if (!e) return;
+    if (add && id) {
+      const has = e.many.includes(id) || e.selected === id;
+      const many = has ? (e.many.length ? e.many : [e.selected!]).filter((x) => x !== id) : [...(e.many.length ? e.many : e.selected ? [e.selected] : []), id];
+      set({ editing: { ...e, many, selected: many[many.length - 1] ?? null, mergeKey: null } });
+      return;
+    }
+    set({ editing: { ...e, selected: id, many: id ? [id] : [], typing: id && id === e.typing ? e.typing : null, mergeKey: null } });
+  },
+
+  selectMany(ids) {
+    const e = get().editing;
+    if (e) set({ editing: { ...e, many: ids, selected: ids[ids.length - 1] ?? null, typing: null, mergeKey: null } });
+  },
+
+  type(id) {
+    const e = get().editing;
+    if (e) set({ editing: { ...e, typing: id, ...(id ? { selected: id, many: [id] } : {}), mergeKey: null } });
   },
 
   undo() {
     const e = get().editing;
     if (!e?.past.length) return;
     const doc = e.past[e.past.length - 1];
-    set({ editing: { ...e, doc, past: e.past.slice(0, -1), future: [e.doc, ...e.future], mergeKey: null, selected: [...doc.layers, ...(doc.bars ?? [])].some((l) => l.id === e.selected) ? e.selected : null } });
+    const there = (id: string) => [...doc.layers, ...(doc.bars ?? [])].some((l) => l.id === id);
+    set({ editing: { ...e, doc, past: e.past.slice(0, -1), future: [e.doc, ...e.future], mergeKey: null, selected: e.selected && there(e.selected) ? e.selected : null, many: e.many.filter(there), typing: null } });
+    keepBoard(doc);
   },
 
   redo() {
     const e = get().editing;
     if (!e?.future.length) return;
     const [doc, ...future] = e.future;
-    set({ editing: { ...e, doc, past: [...e.past, e.doc], future, mergeKey: null } });
+    const there = (id: string) => [...doc.layers, ...(doc.bars ?? [])].some((l) => l.id === id);
+    set({ editing: { ...e, doc, past: [...e.past, e.doc], future, mergeKey: null, selected: e.selected && there(e.selected) ? e.selected : null, many: e.many.filter(there), typing: null } });
+    keepBoard(doc);
   },
 
   async done() {
@@ -277,7 +359,9 @@ export const useScrapbook = create<ScrapState>((set, get) => ({
     if (!e || !lib || e.saving) return false;
     set({ editing: { ...e, saving: true } });
     try {
-      const picture = await encode(await renderCover(e.doc), "image/jpeg", 0.9);
+      // A board's picture is what its card shows: no larger than a screen's worth.
+      const { w, h } = pageOf(e.doc);
+      const picture = await encode(await renderCover(e.doc, e.doc.kind === "board" ? Math.min(1, 1600 / Math.max(w, h)) : 1), "image/jpeg", 0.9);
       // A new name each time: whatever showed the old one shows the new one, not a cached copy.
       const rendered = `cover-${e.doc.id}-${Date.now().toString(36)}.jpg`;
       await get().putBlob(rendered, picture);
@@ -288,10 +372,14 @@ export const useScrapbook = create<ScrapState>((set, get) => ({
       persist(next);
       setCover(e.target, doc.id);
       // What the cover no longer uses (its old render, photos taken out) goes.
-      await forget([...(before ? blobsOf(before) : []), ...get().editing!.added], next);
+      await forget([...(before ? blobsOf(before) : []), ...e.had, ...get().editing!.added], next);
       set({ editing: null });
       useStore.setState({ screen: get().back });
-      useStore.getState().toast(`Scrapbook cover saved for ${e.target.name}`, "ok");
+      if (doc.kind === "board") {
+        // A window showing it shows it as it is now.
+        void import("@tauri-apps/api/event").then(({ emit }) => emit("board-saved", doc)).catch(() => {});
+        useStore.getState().toast(`Board ${doc.name ?? ""} saved`, "ok");
+      } else useStore.getState().toast(`Scrapbook cover saved for ${e.target.name}`, "ok");
       return true;
     } catch (err) {
       useStore.getState().toast(`Could not save the cover: ${String(err)}`, "error");
@@ -396,6 +484,54 @@ export const useScrapbook = create<ScrapState>((set, get) => ({
     const next = { ...lib, stickers };
     set({ lib: next });
     persist(next);
+  },
+
+  async newBoard(name, size) {
+    const lib = await get().load();
+    const doc: ScrapDoc = { id: newId(), kind: "board", name: name.trim() || "Board", size, background: PIN_BOARD, layers: [], updated: Date.now() };
+    const next = { ...lib, books: { ...lib.books, [doc.id]: doc } };
+    set({ lib: next });
+    persist(next);
+    await get().open({ kind: "board", id: doc.id, name: doc.name! });
+  },
+
+  renameBoard(id, name) {
+    const lib = get().lib;
+    const book = lib?.books[id];
+    if (!lib || !book || !name.trim()) return;
+    const next = { ...lib, books: { ...lib.books, [id]: { ...book, name: name.trim() } } };
+    set({ lib: next });
+    persist(next);
+  },
+
+  async removeBoard(id) {
+    const lib = await get().load();
+    const gone = lib.books[id];
+    if (!gone || gone.kind !== "board") return;
+    const books = { ...lib.books };
+    delete books[id];
+    const next = { ...lib, books };
+    set({ lib: next });
+    persist(next);
+    await forget(blobsOf(gone), next);
+  },
+
+  follow(move) {
+    const lib = get().lib;
+    if (!lib) return;
+    const photos = (doc: ScrapDoc): ScrapDoc => {
+      if (!doc.layers.some((l) => l.type === "photo" && l.item && move(l.item) != null)) return doc;
+      return { ...doc, layers: doc.layers.map((l) => (l.type === "photo" && l.item && move(l.item) != null ? { ...l, item: move(l.item)! } : l)) };
+    };
+    const books = Object.fromEntries(Object.entries(lib.books).map(([id, doc]) => [id, photos(doc)]));
+    const stickers = lib.stickers.map((st) => (st.source && move(st.source) != null ? { ...st, source: move(st.source)! } : st));
+    if (Object.keys(books).every((id) => books[id] === lib.books[id]) && stickers.every((st, i) => st === lib.stickers[i])) return;
+    const next = { ...lib, books, stickers };
+    set({ lib: next });
+    persist(next);
+    // The board being made follows too.
+    const e = get().editing;
+    if (e) set({ editing: { ...e, doc: photos(e.doc) } });
   },
 
   removeSticker(id) {
