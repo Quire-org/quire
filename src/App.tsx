@@ -96,17 +96,23 @@ export default function App() {
     };
   }, []);
 
-  // The window closing: what the stores still have to write (a rating a moment ago) is written first.
+  // The window closing: what the stores still have to write (a rating a moment ago) is written first,
+  // then the window goes (destroyed: closing it again would only ask this again).
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     let closing = false;
     void getCurrentWindow()
       .onCloseRequested(async (e) => {
-        if (closing) return;
         e.preventDefault();
+        if (closing) return;
         closing = true;
         await flushAll().catch(() => {});
-        void getCurrentWindow().close();
+        await getCurrentWindow()
+          .destroy()
+          .catch((err) => {
+            closing = false;
+            useStore.getState().toast(`The window couldn't close: ${String(err)}`, "error");
+          });
       })
       .then((u) => (unlisten = u))
       .catch(() => {});
@@ -127,15 +133,9 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
-  // Updates, a moment after the app opens when that is turned on (Settings › Updates): what is found
-  // waits there. This build's version is read either way, for that page.
-  useEffect(() => {
-    const u = useUpdates.getState();
-    void u.loadBuild();
-    if (!u.auto) return;
-    const t = setTimeout(() => void useUpdates.getState().check(true), 5000);
-    return () => clearTimeout(t);
-  }, []);
+  // This build's version, for Settings › Updates. Updates are looked for when a library that asks for
+  // it opens (see lib/librarySettings).
+  useEffect(() => void useUpdates.getState().loadBuild(), []);
 
   // Open a folder passed on the command line / QUIRE_ROOT, else the library open last time
   // when its drive is there; else the Welcome card stays.

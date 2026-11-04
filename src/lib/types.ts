@@ -178,6 +178,25 @@ export interface Library {
   seriesNot?: string[];
   /** What is in the trash and where it came from: trash key → the key it had (an album folder's too), so Restore puts it back there. */
   trashFrom?: Record<string, string>;
+  /** The app's settings, kept with the library so any copy of the app opening it has them (see lib/librarySettings). */
+  settings?: LibrarySettings;
+}
+
+/** Settings kept with a library: each is also remembered on the computer, for before a library is open. */
+export interface LibrarySettings {
+  theme?: string;
+  mode?: "light" | "dark" | "system";
+  sounds?: { menus: boolean; sorting: boolean; volume: number };
+  slideshow?: { interval: number; hideUi: boolean };
+  pageTurns?: boolean;
+  seriesTogether?: boolean;
+  fit?: "fit" | "fill";
+  /** Asking before going online (see lib/online). */
+  online?: { ask: boolean; each: boolean; keep: boolean };
+  /** What is connected, kept while `online.keep` is on. */
+  connected?: { all: boolean; platforms: string[] };
+  /** Checking for updates when the library opens. */
+  updates?: { auto: boolean };
 }
 
 /** Where a picture came from, kept with it through moves: a work on a platform Find searched. */

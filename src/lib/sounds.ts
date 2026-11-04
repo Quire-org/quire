@@ -111,7 +111,7 @@ function loadPrefs(): SoundPrefs {
   return DEFAULTS;
 }
 
-/** The sound settings, kept on this computer like the theme. */
+/** The sound settings, kept with the library like the theme (see librarySettings), and on this computer as last used. */
 export const useSounds = create<SoundPrefs & { set: (patch: Partial<SoundPrefs>) => void }>((set, get) => ({
   ...loadPrefs(),
   set(patch) {
@@ -122,6 +122,8 @@ export const useSounds = create<SoundPrefs & { set: (patch: Partial<SoundPrefs>)
     } catch {
       /* storage unavailable */
     }
+    // The store is reached lazily: it imports this.
+    void import("../store").then(({ useStore }) => useStore.getState().keepSettings({ sounds: { menus, sorting, volume } }));
   },
 }));
 

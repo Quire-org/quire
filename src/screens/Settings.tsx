@@ -316,7 +316,7 @@ function TrashPage() {
   );
 }
 
-/** Asking before going online (lib/online.ts): kept on this computer, for where it is (mobile data, a public Wi-Fi). */
+/** Asking before going online (lib/online.ts): kept with the library (lib/librarySettings), as the other settings are. */
 function OnlinePage() {
   const o = useOnline();
   const finders = useFinders((f) => f.finders);
@@ -328,7 +328,7 @@ function OnlinePage() {
       <section className="settings-options">
         <OptionRow
           title="Ask before going online"
-          info="On, nothing an extension fetches goes out until you press Connect: Find's searches, works and pictures, artists' pages on their platforms, the basket's pictures, saved searches checked for what is new, and extensions' own requests in the background. Where those would show, a Connect button stands instead. For mobile data or a public Wi-Fi. Kept on this computer."
+          info="On, nothing an extension fetches goes out until you press Connect: Find's searches, works and pictures, artists' pages on their platforms, the basket's pictures, saved searches checked for what is new, and extensions' own requests in the background. Where those would show, a Connect button stands instead. For mobile data or a public Wi-Fi. Kept with this library."
           toggle={{ on: o.settings.ask, label: o.settings.ask ? "Asks" : "Off", onChange: (on) => o.set({ ask: on }) }}
         />
         {o.settings.ask && (

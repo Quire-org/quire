@@ -14,7 +14,7 @@ import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
 import { useTags } from "../tagsStore";
 import { usePeople } from "../peopleStore";
 import { useArtists } from "../artistsStore";
-import { COLS, GROUPS, KINDS, NARROW_COLS, PRESETS, canMosaic, move, narrow, readingOrder, resize, type Block, type BlockFilter, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, MINE } from "../home/board";
+import { COLS, GROUPS, KINDS, NARROW_COLS, PRESETS, canMosaic, move, narrow, readingOrder, resize, type Block, type BlockFilter, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, MINE, GALLERY_KINDS } from "../home/board";
 import { useHome } from "../home/store";
 import { actionOf, BlockBody, defaultSearches, defaultShortcuts, shuffles, useBlockTitle, usePool, useSalt, useSharedPanels, useShortcutOptions } from "../home/blocks";
 import { useFind } from "../findStore";
@@ -547,6 +547,18 @@ function BlockSettings({ block, title, onDone }: { block: Block; title: string; 
             <button className={`btn sm ${block.layout === "mosaic" ? "active" : "ghost"}`} onClick={() => set({ layout: "mosaic" })} title="Each picture its own shape, in rows that fill the block">
               Mosaic
             </button>
+          </div>
+        </div>
+      )}
+      {GALLERY_KINDS.includes(block.type) && (
+        <div className="home-field">
+          <span className="label">Most rows</span>
+          <div className="btn-group">
+            {[undefined, 1, 2, 3, 4, 5, 6].map((n) => (
+              <button key={n ?? "any"} className={`btn sm ${block.maxRows === n ? "active" : "ghost"}`} onClick={() => set({ maxRows: n })} title={n ? `At most ${n} row${n === 1 ? "" : "s"} of pictures, however tall the block: fewer, bigger ones` : "As many rows as fit the block"}>
+                {n ?? "Any"}
+              </button>
+            ))}
           </div>
         </div>
       )}

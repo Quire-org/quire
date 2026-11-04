@@ -148,6 +148,25 @@ describe("the Home's board", () => {
     expect(board.canMosaic({ ...block("a", 0, 0, 6, 6), type: "activity" })).toBe(false);
   });
 
+  it("keeps a mosaic to the most rows asked for: fewer, bigger rows filling the same box", () => {
+    const list = Array.from({ length: 60 }, (_, i) => ({ key: `p${i}`, a: [1.5, 0.75, 1, 1.33, 0.66][i % 5] }));
+    const rowsOf = (tiles: { y: number }[]) => new Set(tiles.map((t) => Math.round(t.y))).size;
+    const free = board.justify(list, 800, 900)!;
+    expect(rowsOf(free)).toBeGreaterThan(2);
+    // Two rows can't fill this height without trimming too much: as tall as they may be, in the middle.
+    const two = board.justify(list, 800, 900, 2)!;
+    expect(rowsOf(two)).toBe(2);
+    expect(Math.min(...two.map((t) => t.h))).toBeGreaterThan(Math.min(...free.map((t) => t.h)));
+    const [top, bottom] = [Math.min(...two.map((t) => t.y)), Math.max(...two.map((t) => t.y + t.h))];
+    expect(top).toBeGreaterThan(0);
+    expect(top).toBeCloseTo(900 - bottom, 0);
+    // Each keeps its shape, up to the trim.
+    for (const t of two) expect(Math.abs(t.w / t.h / list.find((p) => p.key === t.key)!.a - 1)).toBeLessThanOrEqual(0.15 + 1e-9);
+    // The kinds with rows of pictures can be capped; the others have none.
+    expect(board.GALLERY_KINDS).toEqual(expect.arrayContaining(["random", "source", "sort", "basket"]));
+    expect(board.GALLERY_KINDS).not.toContain("activity");
+  });
+
   it("keeps its stickers' random filters with the folders and albums they name when they move", () => {
     const doc = { ...board.emptyDoc(), stickers: [{ id: "s", random: { categories: [board.MINE], filter: { folders: ["Trips/a"], album: "Trips/book" } }, aspect: 1, look: "original", outline: false, x: 0.5, y: 1, w: 0.1, rot: 0 }] };
     expect(board.followMoves(doc, [["Trips", "Away"]]).stickers![0].random!.filter).toEqual({ folders: ["Away/a"], album: "Away/book" });

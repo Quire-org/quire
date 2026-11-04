@@ -1,9 +1,9 @@
 /**
- * Updates, the app's own and its plugins': checked when asked (Settings › Updates), and when the app
- * opens if that is turned on (off at first, as checking goes online). What is found waits there:
+ * Updates, the app's own and its plugins': checked when asked (Settings › Updates), and when a
+ * library opens if that is turned on (off at first, as checking goes online). What is found waits there:
  * the app's new version is downloaded when asked, as a job in Activity, and put in place with a
  * restart once nothing is running; plugins whose update asks for nothing new update together.
- * The setting is kept on this computer.
+ * The setting is kept with the library (see librarySettings).
  */
 import { create } from "zustand";
 import { api } from "./api";
@@ -24,7 +24,7 @@ function loadAuto(): boolean {
 }
 
 interface UpdatesState {
-  /** Check when the app opens. */
+  /** Check when a library opens. */
   auto: boolean;
   build: AppBuild | null;
   /** A newer version of the app, from the last check. */
@@ -73,6 +73,7 @@ export const useUpdates = create<UpdatesState>((set, get) => ({
     } catch {
       /* kept for this run only */
     }
+    useStore.getState().keepSettings({ updates: { auto: on } });
   },
 
   async loadBuild() {

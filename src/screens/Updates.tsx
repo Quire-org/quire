@@ -35,8 +35,8 @@ export function Updates() {
           action={{ label: u.checking ? "Checking…" : "Check now", onClick: () => void u.check(), disabled: u.checking }}
         />
         <OptionRow
-          title="Check when the app opens"
-          info="On, the app asks GitHub once each time it opens, a few seconds in, even while Going online asks first: turning this on is your yes for that. What it finds waits here, with a dot on Settings; nothing is downloaded by itself. Off, nothing goes online for updates until you press Check now. Kept on this computer."
+          title="Check when a library opens"
+          info="On, the app asks GitHub once each time it runs, a few seconds after a library opens, even while Going online asks first: turning this on is your yes for that. What it finds waits here, with a dot on Settings; nothing is downloaded by itself. Off, nothing goes online for updates until you press Check now. Kept with this library."
           toggle={{ on: u.auto, label: u.auto ? "On" : "Off", onChange: u.setAuto }}
         />
       </section>

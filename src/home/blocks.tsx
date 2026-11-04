@@ -91,10 +91,10 @@ function useBox<T extends HTMLElement>(): [React.RefObject<T | null>, { w: numbe
 }
 
 const GAP = 4;
-/** As many rows as tiles of about `side` fit, and as many columns as keep them square-ish. */
-function fit(box: { w: number; h: number }, side = 150): { cols: number; rows: number } {
+/** As many rows as tiles of about `side` fit (`maxRows` at most), and as many columns as keep them square-ish. */
+function fit(box: { w: number; h: number }, side = 150, maxRows = Infinity): { cols: number; rows: number } {
   if (!box.w || !box.h) return { cols: 1, rows: 1 };
-  const rows = Math.max(1, Math.round(box.h / side));
+  const rows = Math.max(1, Math.min(maxRows, Math.round(box.h / side)));
   const s = (box.h - (rows - 1) * GAP) / rows;
   return { cols: Math.max(1, Math.round((box.w + GAP) / (s + GAP))), rows };
 }
@@ -180,10 +180,10 @@ function Pics({ items, labelOf, side }: { items: MediaItem[]; labelOf?: (i: Medi
   const tiles = useMemo(() => {
     if (!mosaic || !settled) return null;
     const known = pool.filter((i) => shapeOf(i) !== undefined);
-    return justify(known.map((i) => ({ key: i.key, a: shapeOf(i)! })), box.w, box.h);
+    return justify(known.map((i) => ({ key: i.key, a: shapeOf(i)! })), box.w, box.h, block?.maxRows);
     // Laid out once it settles (and again if the block's size changes), not as each later shape comes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mosaic, settled, pool, box.w, box.h]);
+  }, [mosaic, settled, pool, box.w, box.h, block?.maxRows]);
   void version;
   if (mosaic && !settled) return <div ref={ref} className="home-pics home-mosaic" aria-busy="true" />;
   if (tiles) {
@@ -198,7 +198,7 @@ function Pics({ items, labelOf, side }: { items: MediaItem[]; labelOf?: (i: Medi
       </div>
     );
   }
-  const { cols, rows: room } = fit(box, side);
+  const { cols, rows: room } = fit(box, side, block?.maxRows);
   // Fewer pictures than cells: as many rows as they fill, each taller, so no empty rows are left.
   const rows = Math.max(1, Math.min(room, Math.ceil(items.length / cols)));
   const shown = items.slice(0, cols * rows);
@@ -497,6 +497,7 @@ function BasketTile({ pluginId, item }: { pluginId: string; item: BasketItem }) 
 }
 
 function BasketBlock() {
+  const maxRows = useContext(BlockCtx)?.maxRows;
   const root = useStore((s) => s.root);
   const baskets = useFind((f) => f.baskets);
   const finders = useFinders((f) => f.finders);
@@ -514,7 +515,7 @@ function BasketBlock() {
       connect: mayGoOnline(pid, online) ? undefined : () => useOnline.getState().connect(pid),
     }));
   if (!groups.length) return <Quiet action={<Go label="Find" to={() => useStore.getState().openFind()} />}>The basket is empty: put works in it in Find to look at them later.</Quiet>;
-  return <PlatformRows groups={groups} />;
+  return <PlatformRows groups={groups} maxRows={maxRows} />;
 }
 
 /** One thing an extension shares: its picture, by address (fetched as the plugin's) or its own. */
@@ -564,7 +565,7 @@ function SharedBlock({ block }: { block: Block }) {
         connect: part.items.some((i) => i.thumb && !i.image) && !mayGoOnline(pid, online) ? () => useOnline.getState().connect(pid) : undefined,
       };
     });
-  return groups.length ? <PlatformRows groups={groups} /> : <Quiet>Nothing in it right now.</Quiet>;
+  return groups.length ? <PlatformRows groups={groups} maxRows={block.maxRows} /> : <Quiet>Nothing in it right now.</Quiet>;
 }
 
 /* ---------- pick up ---------- */

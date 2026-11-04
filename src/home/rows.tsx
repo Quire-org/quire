@@ -25,9 +25,10 @@ const HEAD = 24;
 
 /**
  * Several platforms' pictures in one block: with room, a row each under its logo and name; without,
- * one grid of the first few of each, each tile with its platform's logo on it.
+ * one grid of the first few of each, each tile with its platform's logo on it. Never more than
+ * `maxRows` rows: more platforms than that share the one grid.
  */
-export function PlatformRows({ groups }: { groups: RowGroup[] }) {
+export function PlatformRows({ groups, maxRows = Infinity }: { groups: RowGroup[]; maxRows?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
@@ -44,7 +45,7 @@ export function PlatformRows({ groups }: { groups: RowGroup[] }) {
   const waiting = groups.filter((g) => g.connect);
   // Waiting for Connect: one strip of buttons (one for all when Connect is for all), not a cell each.
   const connects: FitItem[] = !waiting.length ? [] : each ? waiting.map((g) => ({ id: g.id, label: `Connect ${g.name}`, icon: g.icon, go: g.connect! })) : [{ id: "all", label: "Connect", icon: <Plugs />, go: waiting[0].connect! }];
-  const rowsFit = open.length > 0 && box.h >= open.length * (HEAD + MIN_TILE + 8);
+  const rowsFit = open.length > 0 && open.length <= maxRows && box.h >= open.length * (HEAD + MIN_TILE + 8);
   return (
     <div className="home-rows">
       {connects.length > 0 && (
@@ -54,7 +55,7 @@ export function PlatformRows({ groups }: { groups: RowGroup[] }) {
         </div>
       )}
       <div ref={ref} className={`home-rows-body ${open.length ? "" : "empty"}`}>
-        {open.length > 0 && (rowsFit ? <Rows groups={open} box={box} /> : <Mixed groups={open} box={box} />)}
+        {open.length > 0 && (rowsFit ? <Rows groups={open} box={box} /> : <Mixed groups={open} box={box} maxRows={maxRows} />)}
       </div>
     </div>
   );
@@ -87,9 +88,9 @@ function Rows({ groups, box }: { groups: RowGroup[]; box: { w: number; h: number
 }
 
 /** One grid: the first of each in turn, so every platform shows, each tile with its logo. */
-function Mixed({ groups, box }: { groups: RowGroup[]; box: { w: number; h: number } }) {
+function Mixed({ groups, box, maxRows }: { groups: RowGroup[]; box: { w: number; h: number }; maxRows: number }) {
   const side = 120;
-  const rows = Math.max(1, Math.round(box.h / side));
+  const rows = Math.max(1, Math.min(maxRows, Math.round(box.h / side)));
   const s = (box.h - (rows - 1) * GAP) / rows;
   const cols = Math.max(1, Math.round((box.w + GAP) / (s + GAP)));
   const mixed: { key: string; node: ReactNode; icon: ReactNode; name: string }[] = [];

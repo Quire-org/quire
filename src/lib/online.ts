@@ -1,11 +1,12 @@
 import { create } from "zustand";
+import type { LibrarySettings } from "./types";
 
 /**
  * Asking before going online: with it on, nothing an extension fetches (Find's searches, works and
  * pictures, artists' pages, the basket's pictures, saved searches checked, an extension's own
  * requests) goes out until the reader says Connect, for every platform at once or each on its own.
- * For a reader on mobile data or a public Wi-Fi. Kept on this computer (it is about where this
- * computer is, not the library); a connection lasts until the app closes, or until Disconnect.
+ * For a reader on mobile data or a public Wi-Fi. Kept with the library (see librarySettings) and on
+ * this computer as last used; a connection lasts until the app closes, or until Disconnect.
  */
 export interface OnlineSettings {
   ask: boolean;
@@ -42,10 +43,17 @@ function write(key: string, value: unknown) {
   }
 }
 
+/** Kept with the open library too (the store is reached lazily: it imports this). */
+function keep(patch: Partial<LibrarySettings>) {
+  void import("../store").then(({ useStore }) => useStore.getState().keepSettings(patch));
+}
+
 interface OnlineState {
   settings: OnlineSettings;
   connected: Connected;
   set(patch: Partial<OnlineSettings>): void;
+  /** A library's settings taken in, and what it kept connected (when connections are kept). */
+  take(settings: OnlineSettings, connected?: Connected): void;
   /** Connected: a platform (when each is asked for on its own), or all. */
   connect(pluginId?: string): void;
   disconnect(): void;
@@ -63,22 +71,30 @@ export const useOnline = create<OnlineState>((set, get) => ({
     write(SETTINGS_KEY, settings);
     write(KEPT_KEY, settings.keep ? get().connected : null);
     set({ settings });
+    keep({ online: settings, connected: settings.keep ? get().connected : undefined });
+  },
+  take(settings, kept) {
+    const connected = settings.keep ? (kept ?? NONE) : get().connected;
+    write(SETTINGS_KEY, settings);
+    write(KEPT_KEY, settings.keep ? connected : null);
+    set({ settings, connected });
   },
   connect(pluginId) {
     const c = get().connected;
     const connected = get().settings.each && pluginId ? { ...c, platforms: [...new Set([...c.platforms, pluginId])] } : { ...c, all: true };
-    if (get().settings.keep) write(KEPT_KEY, connected);
+    if (get().settings.keep) write(KEPT_KEY, connected), keep({ connected });
     set({ connected });
   },
   disconnect() {
     write(KEPT_KEY, null);
     set({ connected: NONE });
+    keep({ connected: undefined });
   },
   forget(pluginId) {
     const c = get().connected;
     if (!c.platforms.includes(pluginId)) return;
     const connected = { ...c, platforms: c.platforms.filter((p) => p !== pluginId) };
-    if (get().settings.keep) write(KEPT_KEY, connected);
+    if (get().settings.keep) write(KEPT_KEY, connected), keep({ connected });
     set({ connected });
   },
 }));

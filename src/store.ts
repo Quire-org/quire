@@ -13,7 +13,7 @@ import { findMoves, identityOf, nextSnapshot, readSnapshot, seenIn, snapshotSig,
 import { folderMoves, mover, rekeyRecord, type MovePair } from "./lib/moves";
 import { applyLook, loadModeId, resolveMode, watchSystemMode, type Mode, type ResolvedMode, loadThemeId } from "./themes";
 import { basename, shuffled, uid, naturalCompare, plainCompare } from "./lib/format";
-import type { Album, AlbumRename, History, ItemSource, Library, MediaItem, Target, VaultStatus } from "./lib/types";
+import type { Album, AlbumRename, History, ItemSource, Library, LibrarySettings, MediaItem, Target, VaultStatus } from "./lib/types";
 import { useEdit, type Pipeline } from "./editStore";
 import { steppedJob } from "./lib/jobs";
 import { PART, bucketOf, filedFolder, folderName, fromRoot, inTarget, isFilingName, ownFolderOf, partOf, targetFor, within } from "./lib/filing";
@@ -71,7 +71,7 @@ export interface AlbumFilters {
 const DEFAULT_BROWSE: BrowseFilters = { location: "all", kind: "all", folders: null, query: "", sortBy: "name", desc: false, minRating: 0, unratedOnly: false, random: false, zoom: 220, layout: "masonry", tagged: "all", tags: [], tagsMode: "or", tagsOut: [], tagsOutMode: "or", artists: [], people: [] };
 const DEFAULT_ALBUMS: AlbumFilters = { query: "", rootSel: "all", kind: "all", minRating: 0, unratedOnly: false, sortBy: "name", desc: false, random: false, zoom: 260, tags: [], tagsMode: "or", tagsOut: [], tagsOutMode: "or", artists: [], people: [] };
 
-/** This computer's own preferences (the bars folded away, the slideshow's pace): not the library's. */
+/** Preferences remembered on this computer: the bars folded away, and the last used of the library's settings (see lib/librarySettings), for before a library opens. */
 function loadPref<T extends object>(key: string, def: T): T {
   try {
     const v = JSON.parse(localStorage.getItem(key) ?? "null");
@@ -195,6 +195,8 @@ interface Actions {
   closeRoot(): void;
   rescan(quiet?: boolean): Promise<void>;
   saveLibrary(): Promise<void>;
+  /** Settings changed: into the open library (see lib/librarySettings), saved when anything differs. */
+  keepSettings(patch: Partial<LibrarySettings>): void;
   setIndex(i: number): void;
   next(): void;
   prev(): void;
@@ -220,6 +222,7 @@ interface Actions {
   /** Viewer over the contents of several albums, in the given order. */
   openAlbums_Slideshow(albums: Album[]): Promise<void>;
   toggleFit(): void;
+  setFitMode(fitMode: FitMode): void;
   setPageTurns(on: boolean): void;
   setSeriesTogether(on: boolean): void;
   /** These pictures one series (with any series they are in); in the viewer, its members come right after the one on show. */
@@ -439,6 +442,17 @@ const librarySave = debounced("library", 250, async (root) => {
     useStore.getState().toast(`Could not save library: ${e}`, "error");
   }
 });
+
+/** A library's settings being taken in (see lib/librarySettings): their setters don't keep them back into it. */
+let takingSettings = false;
+export function takingFromLibrary(run: () => void) {
+  takingSettings = true;
+  try {
+    run();
+  } finally {
+    takingSettings = false;
+  }
+}
 
 function loadSeriesTogether(): boolean {
   try {
@@ -663,6 +677,8 @@ export const useStore = create<Store>((set, get) => ({
         albums: [],
         albumsLoaded: false,
       });
+      // Its settings (the theme, sounds, going online…) taken in; those it hasn't, given it from this computer's.
+      (await import("./lib/librarySettings")).adoptSettings();
       get().toast(`${unsorted.length} unsorted items`, "ok");
       // Full scan in the background: feeds Browse and re-attaches ratings to moved files.
       void get().loadAll(true);
@@ -744,6 +760,16 @@ export const useStore = create<Store>((set, get) => ({
     const { root, library } = get();
     if (!root || !library) return;
     librarySave.schedule(root);
+  },
+
+  keepSettings(patch) {
+    const library = get().library;
+    if (!library || takingSettings) return;
+    const kept = library.settings ?? {};
+    const changed = (Object.keys(patch) as (keyof LibrarySettings)[]).some((k) => JSON.stringify(patch[k]) !== JSON.stringify(kept[k]));
+    if (!changed) return;
+    set({ library: { ...library, settings: { ...kept, ...patch } } });
+    void get().saveLibrary();
   },
 
   setIndex(i) {
@@ -1466,22 +1492,26 @@ export const useStore = create<Store>((set, get) => ({
     const slideshow = { ...get().slideshow, interval: seconds };
     set({ slideshow });
     savePref("quire.slideshow", { interval: seconds, hideUi: slideshow.hideUi });
+    get().keepSettings({ slideshow: { interval: seconds, hideUi: slideshow.hideUi } });
   },
 
   setSlideshowHideUi(on) {
     const slideshow = { ...get().slideshow, hideUi: on };
     set({ slideshow });
     savePref("quire.slideshow", { interval: slideshow.interval, hideUi: on });
+    get().keepSettings({ slideshow: { interval: slideshow.interval, hideUi: on } });
   },
 
   setTheme(id) {
     const mode = applyLook(id, get().themeMode);
     set({ theme: id, mode });
+    get().keepSettings({ theme: id });
   },
 
   setThemeMode(themeMode) {
     const mode = applyLook(get().theme, themeMode);
     set({ themeMode, mode });
+    get().keepSettings({ mode: themeMode });
   },
 
   toggleNav() {
@@ -1547,6 +1577,7 @@ export const useStore = create<Store>((set, get) => ({
       /* ignore */
     }
     set({ pageTurns: on });
+    get().keepSettings({ pageTurns: on });
   },
 
   setSeriesTogether(on) {
@@ -1556,6 +1587,7 @@ export const useStore = create<Store>((set, get) => ({
       /* ignore */
     }
     set({ seriesTogether: on });
+    get().keepSettings({ seriesTogether: on });
   },
 
   makeSeries(keys) {
@@ -1592,13 +1624,18 @@ export const useStore = create<Store>((set, get) => ({
 
   toggleFit() {
     const fitMode: FitMode = get().fitMode === "fit" ? "fill" : "fit";
+    get().setFitMode(fitMode);
+    get().toast(fitMode === "fit" ? "Fit: whole image visible" : "Fill: edge to edge, may crop");
+  },
+
+  setFitMode(fitMode) {
     try {
       localStorage.setItem("quire.fit", fitMode);
     } catch {
       /* ignore */
     }
     set({ fitMode });
-    get().toast(fitMode === "fit" ? "Fit: whole image visible" : "Fill: edge to edge, may crop");
+    get().keepSettings({ fit: fitMode });
   },
 
   async undo() {

@@ -70,6 +70,8 @@ export interface Block {
   bare?: boolean;
   /** Its pictures in a mosaic (each its own shape), where the block is big enough; else a grid. */
   layout?: "mosaic";
+  /** Its pictures in at most this many rows, however tall the block: fewer, bigger ones. */
+  maxRows?: number;
 }
 
 /** Which folders the Home's pictures may come from: all, all but these, or only these. */
@@ -474,6 +476,8 @@ export const MOSAIC_KINDS: BlockType[] = ["viewed", "newest", "onthisday", "rand
 /** A mosaic needs room for a few pictures of each shape: a block at least this many cells. */
 export const MOSAIC_MIN = { w: 4, h: 3 };
 export const canMosaic = (b: Block) => MOSAIC_KINDS.includes(b.type) && b.w >= MOSAIC_MIN.w && b.h >= MOSAIC_MIN.h;
+/** The kinds whose pictures fill rows (a grid, a mosaic, a row a platform): their rows can be capped. */
+export const GALLERY_KINDS: BlockType[] = [...MOSAIC_KINDS, "sort", "dupes", "series", "basket", "shared"];
 
 /** A picture placed in a mosaic, in pixels of its box. */
 export interface Tile {
@@ -489,14 +493,16 @@ export interface Tile {
  * a picture's height (about 100 to 240 px), as many of them as need the least trimming (each row
  * filled edge to edge, then all of them stretched to the box's height, which trims the pictures a
  * little at their sides or top). None when the best still trims more than `most` (too few
- * pictures, or too small a box): a grid does better then.
+ * pictures, or too small a box): a grid does better then. Kept to `maxRows`, rows are stretched no
+ * further than `most` allows, and what height is left is shared above and below them.
  */
-export function justify(list: { key: string; a: number }[], W: number, H: number, gap = 4, most = 0.15): Tile[] | null {
+export function justify(list: { key: string; a: number }[], W: number, H: number, maxRows = Infinity, gap = 4, most = 0.15): Tile[] | null {
   if (!list.length || W < 60 || H < 60) return null;
-  let best: { rows: { key: string; a: number }[][]; heights: number[]; trim: number } | null = null;
+  let best: { rows: { key: string; a: number }[][]; heights: number[]; stretch: number; trim: number } | null = null;
   const fewest = Math.max(1, Math.round(H / 240));
-  const rowsMost = Math.max(fewest, Math.floor(H / 100));
-  for (let r = fewest; r <= rowsMost; r++) {
+  const natural = Math.max(fewest, Math.floor(H / 100));
+  const rowsMost = Math.max(1, Math.min(maxRows, natural));
+  for (let r = Math.min(fewest, rowsMost); r <= rowsMost; r++) {
     const target = (H - (r - 1) * gap) / r;
     const rows: { key: string; a: number }[][] = [];
     let i = 0;
@@ -515,13 +521,16 @@ export function justify(list: { key: string; a: number }[], W: number, H: number
     const heights = rows.map((row) => (W - (row.length - 1) * gap) / row.reduce((s, p) => s + p.a, 0));
     const stretch = (H - (r - 1) * gap) / heights.reduce((s, h) => s + h, 0);
     const trim = Math.abs(1 - stretch);
-    if (!best || trim < best.trim) best = { rows, heights: heights.map((h) => h * stretch), trim };
+    if (!best || trim < best.trim) best = { rows, heights, stretch, trim };
   }
-  if (!best || best.trim > most) return null;
+  const capped = rowsMost < natural;
+  if (!best || (best.trim > most && !capped)) return null;
+  const stretch = Math.min(1 + most, Math.max(1 - most, best.stretch));
+  const heights = best.heights.map((h) => h * stretch);
   const tiles: Tile[] = [];
-  let y = 0;
+  let y = (H - heights.reduce((s, h) => s + h, 0) - (heights.length - 1) * gap) / 2;
   best.rows.forEach((row, n) => {
-    const h = best!.heights[n];
+    const h = heights[n];
     const sum = row.reduce((s, p) => s + p.a, 0);
     let x = 0;
     for (const p of row) {
