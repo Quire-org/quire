@@ -141,7 +141,7 @@ export function Files() {
     if (!entries.some((x) => x.path === show)) return s.toast(`${show.split("/").pop()} isn't in its folder any more`, "error");
     setSelected(new Set([show]));
     anchor.current = { path: show, base: new Set() };
-    requestAnimationFrame(() => document.querySelector(`[data-path="${CSS.escape(show)}"]`)?.scrollIntoView({ block: "center" }));
+    requestAnimationFrame(() => Array.from(document.querySelectorAll<HTMLElement>("[data-path]")).find((n) => n.dataset.path === show)?.scrollIntoView?.({ block: "center" }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, showIn, listed, entries]);
 
