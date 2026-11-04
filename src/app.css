@@ -707,6 +707,14 @@
   white-space: nowrap;
   max-width: 260px;
 }
+/* The web demo's note beside the library's path: quiet, but there on every screen. */
+.hud-demo {
+  font-size: 11px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  white-space: nowrap;
+}
 .item-name {
   color: var(--fg);
   overflow: hidden;
@@ -7202,7 +7210,8 @@ html.show-keys .subtab .kbd {
 /* A narrow window keeps the brand whole: the library path goes first, then the names of the tabs
    not open (their icons stay, the name in the tooltip). */
 @media (max-width: 1240px) {
-  .topnav .hud-root {
+  .topnav .hud-root,
+  .topnav .hud-demo-more {
     display: none;
   }
 }

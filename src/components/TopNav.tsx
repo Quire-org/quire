@@ -85,6 +85,11 @@ export function TopNav({ current, children, bar }: { current: Screen; children?:
         <span className="faint mono hud-root" title={s.root ?? ""}>
           {s.root ? s.root.split("/").filter(Boolean).slice(-2).join("/") : ""}
         </span>
+        {import.meta.env.VITE_DEMO && (
+          <span className="hud-demo faint mono" title="The web demo: what you do here stays in this tab, and a reload starts it afresh.">
+            Demo<span className="hud-demo-more"> · nothing is saved</span>
+          </span>
+        )}
       </div>
       {/* A screen's own controls in place of the tabs (the Home while it is arranged). */}
       {bar ? (
