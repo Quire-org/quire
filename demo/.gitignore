@@ -1,0 +1,6 @@
+node_modules/
+out/
+# Made by `npm run capture` each time.
+public/scenes/
+public/scenes.json
+public/mark.svg

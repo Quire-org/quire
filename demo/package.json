@@ -1,0 +1,21 @@
+{
+  "name": "quire-demo",
+  "private": true,
+  "type": "module",
+  "description": "Quire's demo video and README screenshots, from its browser preview's demo mode",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "video": "node render.mjs video",
+    "stills": "node render.mjs stills",
+    "loop": "node loop.mjs",
+    "studio": "node render.mjs studio",
+    "all": "npm run capture && npm run video && npm run stills && npm run loop"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.537",
+    "@remotion/google-fonts": "4.0.537",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.537"
+  }
+}

@@ -1,0 +1,54 @@
+# The README's demo: its screenshots, the looping clip and the whole video, made from the browser
+# preview's demo mode (demo/, see docs/development.md) and published with GitHub Pages at
+# https://quire-org.github.io/quire/, where the README shows them. Only the latest set is kept.
+# Runs when a release is published, or by hand (Actions → Demo → Run workflow).
+name: Demo
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: demo
+  cancel-in-progress: true
+
+jobs:
+  demo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            demo/package-lock.json
+      - name: ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - run: npm ci
+      - run: npm ci
+        working-directory: demo
+      - name: Capture and render
+        working-directory: demo
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: npm run all
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: demo/out/site
+      - id: deploy
+        uses: actions/deploy-pages@v4

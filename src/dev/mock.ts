@@ -3,13 +3,21 @@ let mockTags: unknown = null;
  * Browser-only stand-in for the Tauri bridge, enabled with `?mock` on the
  * Vite dev server (never bundled into the app). It lets the UI be developed
  * and screenshotted in a plain browser. Media files are served from a static
- * HTTP server rooted at the fake volume (see README, "Browser preview").
+ * HTTP server rooted at the fake volume (see docs/development.md, "Browser preview").
  */
 import type { Library, MediaItem } from "../lib/types";
 import { MOCK_WHO, mockPicture } from "./mockPictures.js";
 
-const ROOT = "/mock/testvol";
+/**
+ * `?mock&demo`: the example library (examples/library: openly licensed art and photos, see its
+ * CREDITS.md) in place of the made-up volume, set up as `npm run example` sets it up, a few
+ * favourites rated: for the screenshots and the demo video (demo/). Its pictures come from the
+ * file server as they are.
+ */
+const DEMO = new URLSearchParams(location.search).has("demo");
+const ROOT = DEMO ? "/Volumes/Pictures" : "/mock/testvol";
 const FILES_BASE = "http://localhost:8787/";
+const demoFiles: string[] = DEMO ? await fetch(`${FILES_BASE}__demo/index.json`).then((r) => r.json()) : [];
 
 interface Entry {
   rel: string;
@@ -18,7 +26,7 @@ interface Entry {
 }
 
 // Mirrors the generated test volume.
-const seed: Entry[] = [
+const testVolume: Entry[] = [
   { rel: "DCIM/100CANON/CLIP_0001.mp4", kind: "video", files: ["DCIM/100CANON/CLIP_0001.mp4"] },
   { rel: "DCIM/101CANON/CLIP_0002.mp4", kind: "video", files: ["DCIM/101CANON/CLIP_0002.mp4"] },
   { rel: "DCIM/101CANON/CLIP_0003.mp4", kind: "video", files: ["DCIM/101CANON/CLIP_0003.mp4"] },
@@ -43,7 +51,24 @@ const seed: Entry[] = [
   { rel: "Albums/Caf%C3%A9%20Night/IMG_1006.png", kind: "image", files: ["Albums/Caf%C3%A9%20Night/IMG_1006.png"] },
 ];
 
-let library: Library = { version: 1, targets: [], ratings: {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false, backupDest: null, lastBackup: null, ids: {} };
+const seed: Entry[] = DEMO ? demoFiles.map((rel) => ({ rel, kind: "image", files: [rel] })) : testVolume;
+const DEMO_TARGETS = [
+  { id: "photos", name: "Photos", path: "Photos", hotkey: "j" },
+  { id: "people", name: "People", path: "People", hotkey: "n" },
+  { id: "artworks", name: "Artworks", path: "Artworks", hotkey: "q" },
+];
+const DEMO_RATINGS: Record<string, number> = {
+  "Photos/geiranger-fjord.jpg": 10,
+  "Photos/barn-owl.jpg": 9,
+  "Photos/iceberg-under-the-stars.jpg": 9,
+  "Photos/tokyo-neon-street.jpg": 9,
+  "Photos/glen-coe-rainbow.jpg": 8,
+  "Photos/snow-monkey-yawning.jpg": 8,
+  "Artworks/pepper-and-carrot-flying-cover.jpg": 10,
+  "Artworks/carrot-with-heart-balloons.jpg": 9,
+  "Artworks/pepper-reading-in-bloom.jpg": 8,
+};
+let library: Library = { version: 1, targets: DEMO ? DEMO_TARGETS : [], ratings: DEMO ? DEMO_RATINGS : {}, trashDir: "_deleted", albumRoots: ["Albums"], albumRatings: {}, autoDecodeAlbumNames: false, backupDest: null, lastBackup: null, ids: {} };
 let items: MediaItem[] = seed.map((e) => toItem(e.files.map((f) => `${ROOT}/${f}`), `${ROOT}/${e.rel}`, e.kind));
 // Folders made with nothing in them yet (the rest are known by the files in them).
 const emptyDirs = new Set<string>();
@@ -532,6 +557,13 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "media_info":
       return { width: 4000, height: 3000, format: "JPEG", exif: { dateTaken: "2024-05-04 12:33:10", make: "Canon", model: "EOS R6", lens: "RF 35mm F1.8", exposure: "1/250 s", fNumber: "f/2.8", iso: "200", focal: "35 mm", software: null, gps: null, orientation: null } };
     case "load_tags":
+      if (DEMO && !mockTags) {
+        // The example tags: an album's on the album, anything else's on the picture (as `npm run example` gives them).
+        const given: Record<string, string[]> = await fetch(`${FILES_BASE}__demo/tags.json`).then((r) => r.json());
+        const tags = Object.fromEntries(Object.entries(given).map(([key, ids]) => [key.startsWith("Albums/") ? `album:${key}` : key, ids]));
+        const types = [...new Set(Object.values(given).flatMap((ids) => ids.map((id) => id.split("/")[0])))].sort();
+        mockTags = { version: 1, types, tags, auto: {}, indexed: {}, autoMap: {}, albums: {} };
+      }
       if (E2E && !mockTags) {
         // Tags on a third of the pictures, one with a very long name (to be cut short wherever it shows).
         const tags: Record<string, string[]> = {};
@@ -741,7 +773,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "find_clear":
       return null;
     case "faces_load":
-      return mockFaces();
+      // The example library's faces aren't known to the preview (the made-up pictures' are drawn where they are).
+      return DEMO ? { faces: [], scanned: {}, noCharacters: [] } : mockFaces();
     case "faces_sort": {
       // Who is in the made-up pictures stands in for the face finder's numbers. The first group has
       // someone else in it, less like the rest (a wrong one to find), and found faces vary in how sure.

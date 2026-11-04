@@ -1,7 +1,8 @@
 // Gets the example library ready to open: a copy of examples/library in examples/.work/library
 // (the app writes its own files into a library, which mustn't land in the repository), set up as
-// a library already: Photos, People and Artworks as targets (keys 1, 2, 3), Albums as the album
-// folder, and the example tags (examples/tags.json) given. Inbox is what is left to sort.
+// a library already: Photos, People and Artworks as targets (keys J, N and Q, as the app suggests
+// them: digits rate), Albums as the album folder, and the example tags (examples/tags.json) given.
+// Inbox is what is left to sort.
 // `npm run example` makes it afresh; then open the folder it prints in Quire.
 import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -22,9 +23,9 @@ cpSync(from, to, { recursive: true, filter: (p) => !/(^|\/)(CREDITS\.md|\.quire[
 const library = {
   version: 1,
   targets: [
-    { id: "photos", name: "Photos", path: "Photos", hotkey: "1" },
-    { id: "people", name: "People", path: "People", hotkey: "2" },
-    { id: "artworks", name: "Artworks", path: "Artworks", hotkey: "3" },
+    { id: "photos", name: "Photos", path: "Photos", hotkey: "j" },
+    { id: "people", name: "People", path: "People", hotkey: "n" },
+    { id: "artworks", name: "Artworks", path: "Artworks", hotkey: "q" },
   ],
   ratings: {},
   trashDir: "_deleted",
