@@ -1,5 +1,5 @@
-# The README's demo: its screenshots, the looping clip and the whole video, made from the browser
-# preview's demo mode (demo/, see docs/development.md) and published with GitHub Pages at
+# The README's demo: its screenshots, the looping clip, the whole video and the workflow videos, made
+# from the browser preview's demo mode (demo/, see docs/development.md) and published with GitHub Pages at
 # https://quire-org.github.io/quire/, where the README shows them. Only the latest set is kept.
 # Runs when a release is published, or by hand (Actions → Demo → Run workflow).
 name: Demo
@@ -38,6 +38,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+      - name: Official plugins the workflow videos show, beside the checkout (where the preview finds them)
+        run: |
+          git clone --depth 1 https://github.com/Quire-org/pixiv-find ../pixiv-find
+          git clone --depth 1 https://github.com/Quire-org/manga-translate ../manga-translate
       - run: npm ci
       - run: npm ci
         working-directory: demo

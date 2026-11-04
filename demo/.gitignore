@@ -4,3 +4,4 @@ out/
 public/scenes/
 public/scenes.json
 public/mark.svg
+workflows/*/public/

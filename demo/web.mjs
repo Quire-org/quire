@@ -34,4 +34,5 @@ for (const rel of found) {
 mkdirSync(join(files, "__demo"), { recursive: true });
 writeFileSync(join(files, "__demo", "index.json"), JSON.stringify(found.sort()));
 cpSync(join(repo, "examples", "tags.json"), join(files, "__demo", "tags.json"));
+cpSync(join(repo, "examples", "faces.json"), join(files, "__demo", "faces.json"));
 console.log(`out/site/demo: the app and ${found.length} pictures`);

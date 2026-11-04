@@ -1,16 +1,177 @@
 {
   "name": "quire",
   "repository": "https://github.com/Quire-org/quire",
-  "title": { "title": "Quire", "line": "A private picture library for your drives" },
+  "title": {
+    "title": "Quire",
+    "line": "A private picture library for your drives"
+  },
   "parts": [
-    { "caption": "A home for your pictures, arranged your way", "length": 120, "zoom": [1, 1.05], "origin": "30% 30%", "steps": [{ "frame": "home" }] },
-    { "caption": "Sort with single keys: rate 1 to 10, file into folders", "length": 170, "zoom": [1, 1.03], "steps": [{ "frame": "sort-1" }, { "frame": "sort-2", "at": 50 }, { "frame": "sort-3", "at": 108 }] },
-    { "caption": "Browse everything, narrowed by tags, people, ratings or folders", "length": 160, "scroll": { "tall": "browse-tall", "from": 12, "to": 100, "share": 0.55 }, "steps": [{ "frame": "browse" }, { "frame": "browse-tags", "at": 108 }] },
-    { "caption": "Albums and comics, read page by page", "length": 185, "steps": [{ "frame": "albums", "click": true }, { "frame": "reader-1", "at": 52 }, { "frame": "reader-2", "at": 98 }, { "frame": "reader-3", "at": 140 }] },
-    { "caption": "Tags found on your own computer, nothing sent anywhere", "length": 105, "zoom": [1, 1.08], "origin": "18% 22%", "steps": [{ "frame": "tags" }] },
-    { "caption": "Seven themes, each in light and dark", "length": 150, "steps": [{ "frame": "look-cp2077-dark" }, { "frame": "look-cozy-light", "at": 37 }, { "frame": "look-manga-light", "at": 74 }, { "frame": "look-gallery-dark", "at": 111 }] }
+    {
+      "caption": "A home for your pictures.",
+      "line": "Arrange it your way.",
+      "length": 96,
+      "steps": [
+        {
+          "frame": "home"
+        },
+        {
+          "frame": "layout-mosaic",
+          "at": 22,
+          "enter": "wipe"
+        },
+        {
+          "frame": "layout-hero",
+          "at": 44,
+          "enter": "wipe"
+        },
+        {
+          "frame": "layout-trio",
+          "at": 66,
+          "enter": "wipe"
+        }
+      ]
+    },
+    {
+      "caption": "Sort with single keys.",
+      "line": "Rate from 1 to 10, file into folders with a letter.",
+      "length": 96,
+      "camera": [
+        {
+          "at": 12,
+          "zoom": 1,
+          "focus": [
+            0.16,
+            0.96
+          ]
+        },
+        {
+          "at": 32,
+          "zoom": 1.4
+        }
+      ],
+      "steps": [
+        {
+          "frame": "sort-1"
+        },
+        {
+          "frame": "sort-2",
+          "at": 34
+        },
+        {
+          "frame": "sort-3",
+          "at": 64
+        }
+      ]
+    },
+    {
+      "caption": "Browse everything.",
+      "line": "Narrowed by tags, people, ratings or folders.",
+      "length": 96,
+      "scroll": {
+        "tall": "browse-tall",
+        "from": 4,
+        "to": 58,
+        "share": 0.5
+      },
+      "steps": [
+        {
+          "frame": "browse"
+        },
+        {
+          "frame": "browse-tags",
+          "at": 66
+        }
+      ]
+    },
+    {
+      "caption": "Albums and comics.",
+      "line": "Read page by page.",
+      "length": 108,
+      "steps": [
+        {
+          "frame": "albums",
+          "click": true
+        },
+        {
+          "frame": "reader-1",
+          "at": 26,
+          "enter": "open"
+        },
+        {
+          "frame": "reader-2",
+          "at": 58,
+          "enter": "slide"
+        },
+        {
+          "frame": "reader-3",
+          "at": 84,
+          "enter": "slide"
+        }
+      ]
+    },
+    {
+      "caption": "Tagged on your computer.",
+      "line": "Nothing is sent anywhere.",
+      "length": 66,
+      "camera": [
+        {
+          "at": 8,
+          "zoom": 1,
+          "focus": [
+            0.1,
+            0.22
+          ]
+        },
+        {
+          "at": 66,
+          "zoom": 1.25
+        }
+      ],
+      "steps": [
+        {
+          "frame": "tags"
+        }
+      ]
+    },
+    {
+      "caption": "Seven themes.",
+      "line": "Each in light and dark.",
+      "length": 96,
+      "steps": [
+        {
+          "frame": "look-cp2077-dark"
+        },
+        {
+          "frame": "look-cozy-light",
+          "at": 20,
+          "enter": "wipe"
+        },
+        {
+          "frame": "look-manga-light",
+          "at": 40,
+          "enter": "wipe"
+        },
+        {
+          "frame": "look-gallery-dark",
+          "at": 60,
+          "enter": "wipe"
+        }
+      ]
+    }
   ],
-  "end": { "title": "Quire", "lines": ["Free and open source, for macOS, Windows and Linux"], "link": "github.com/Quire-org/quire" },
-  "stills": { "sort": "sort-2", "browse": "browse", "albums": "albums", "reader": "reader-1", "tags": "tags", "themes": "look-cp2077-dark" },
-  "loop": { "from": 2.6, "length": 14.2 }
+  "end": {
+    "title": "Quire",
+    "lines": [
+      "Free and open source, for macOS, Windows and Linux"
+    ],
+    "link": "github.com/Quire-org/quire"
+  },
+  "stills": {
+    "sort": "sort-2",
+    "browse": "browse",
+    "albums": "albums",
+    "reader": "reader-1",
+    "tags": "tags",
+    "themes": "look-cp2077-dark"
+  }
 }

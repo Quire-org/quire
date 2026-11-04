@@ -1,0 +1,53 @@
+{
+  "name": "photographer",
+  "repository": "https://github.com/Quire-org/quire",
+  "title": { "title": "Quire", "line": "Sorting a photo shoot" },
+  "parts": [
+    {
+      "caption": "Cull with single keys.",
+      "line": "Rate it, file it or trash it: one key each.",
+      "length": 116,
+      "steps": [
+        { "frame": "cull-0" },
+        { "frame": "cull-1", "at": 22 },
+        { "frame": "cull-2", "at": 40 },
+        { "frame": "cull-3", "at": 58 },
+        { "frame": "cull-4", "at": 76 },
+        { "frame": "cull-5", "at": 94 }
+      ]
+    },
+    {
+      "caption": "Look-alikes, kept together.",
+      "line": "Shots of one moment are offered as a series.",
+      "length": 80,
+      "steps": [{ "frame": "series-1", "click": 18 }, { "frame": "series-2", "at": 42 }]
+    },
+    {
+      "caption": "Duplicates, weeded out.",
+      "line": "Copies side by side: keep the best one.",
+      "length": 80,
+      "steps": [{ "frame": "dupes-1", "click": 20 }, { "frame": "dupes-2", "at": 44, "enter": "open" }]
+    },
+    {
+      "caption": "Edit, and keep the original.",
+      "line": "Overwrite keeps it out of sight; Revert brings it back.",
+      "length": 132,
+      "steps": [
+        { "frame": "edit-1" },
+        { "frame": "edit-2", "at": 18 },
+        { "frame": "edit-3", "at": 34, "click": 10 },
+        { "frame": "edit-4", "at": 50, "enter": "open" },
+        { "frame": "edit-5", "at": 72, "click": 16 },
+        { "frame": "edit-6", "at": 100 }
+      ]
+    },
+    {
+      "caption": "The best of the shoot.",
+      "line": "Everything rated 8 and up, best first.",
+      "length": 70,
+      "steps": [{ "frame": "best" }]
+    }
+  ],
+  "end": { "title": "Quire", "lines": ["Free and open source, for macOS, Windows and Linux"], "link": "github.com/Quire-org/quire" },
+  "stills": { "photographer": "cull-1" }
+}

@@ -19,9 +19,11 @@ const SCALE = 2;
 
 /**
  * Runs `steps` against the preview opened with `query` (added to `?mock&demo`, such as
- * `&find=<plugin id>`), keeping what they `shot` in `work`'s public folder.
+ * `&find=<plugin id>`), keeping what they `shot` in `work`'s public folder. `init` runs in the page
+ * before the app loads: it can set the demo mode's hooks (`__demoFiles`, `__demoEngine`, see
+ * src/dev/mock.ts).
  */
-export async function capture({ work, query = "", look = { theme: "midnight", mode: "dark" }, steps }) {
+export async function capture({ work, query = "", look = { theme: "midnight", mode: "dark" }, init, steps }) {
   const out = join(work, "public", "scenes");
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
@@ -48,6 +50,7 @@ export async function capture({ work, query = "", look = { theme: "midnight", mo
   const browser = await chromium.launch({ executablePath: chrome, headless: true });
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: SCALE });
   page.on("pageerror", (e) => console.error("page error:", e.message));
+  if (init) await page.addInitScript(init);
 
   /** Each frame: its file, and what happens on the way to it (a key, a click). */
   const frames = [];

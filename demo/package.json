@@ -10,7 +10,8 @@
     "loop": "node loop.mjs",
     "web": "node web.mjs",
     "studio": "node render.mjs studio",
-    "all": "npm run capture && npm run video && npm run stills && npm run loop && npm run web"
+    "all": "npm run capture && npm run video && npm run stills && npm run loop && npm run workflows && npm run web",
+    "workflows": "node workflows.mjs"
   },
   "dependencies": {
     "@remotion/cli": "4.0.537",

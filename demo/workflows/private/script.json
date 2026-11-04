@@ -1,0 +1,44 @@
+{
+  "name": "private",
+  "repository": "https://github.com/Quire-org/quire",
+  "title": { "title": "Quire", "line": "Keeping your own photos private" },
+  "parts": [
+    {
+      "caption": "Faces, found on your computer.",
+      "line": "Name someone once, and Quire finds them again.",
+      "length": 120,
+      "steps": [
+        { "frame": "people", "click": 18 },
+        { "frame": "people-naming", "at": 28 },
+        { "frame": "people-named", "at": 56, "click": 16 },
+        { "frame": "person", "at": 82, "enter": "open" }
+      ]
+    },
+    {
+      "caption": "Lock it all in a vault.",
+      "line": "Encrypted on the drive, opened with your passphrase or Touch ID.",
+      "length": 138,
+      "steps": [
+        { "frame": "vault-new", "click": 16 },
+        { "frame": "vault-code", "at": 26, "click": 16 },
+        { "frame": "vault-status", "at": 50, "click": 14 },
+        { "frame": "vault-encrypting", "at": 70 },
+        { "frame": "vault-done", "at": 90 },
+        { "frame": "unlock", "at": 110, "enter": "wipe" }
+      ]
+    },
+    {
+      "caption": "Show a picture on your phone.",
+      "line": "Only what's on screen, to a device you let in.",
+      "length": 110,
+      "steps": [
+        { "frame": "cast-0", "click": 14 },
+        { "frame": "cast-1", "at": 22, "click": 14, "enter": "open" },
+        { "frame": "cast-2", "at": 46, "click": 16 },
+        { "frame": "cast-3", "at": 70 }
+      ]
+    }
+  ],
+  "end": { "title": "Quire", "lines": ["Free and open source, for macOS, Windows and Linux", "Nothing leaves your computer unless you say so."], "link": "github.com/Quire-org/quire" },
+  "stills": { "private": "people-named" }
+}

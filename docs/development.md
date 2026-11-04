@@ -86,6 +86,16 @@ npm run all        # capture, then render into out/site what the workflow publis
   mode, with the example library's pictures beside it. Nothing done there is saved.
 - `npm run studio` opens Remotion's studio, to watch the video while changing it.
 
+- `npm run workflows` makes the workflow videos the README links to, one per folder in
+  `workflows/` (a capture and a `script.json` each, on the same kit), into `out/site` beside
+  Quire's own with a screenshot each; `npm run workflows -- manga` makes only that one. Two of them
+  show official plugins, which the Demo workflow clones beside the checkout, where the preview's
+  file server finds a plugin by its id. A capture can set the demo mode's hooks before the app
+  loads (`init`): `__demoFiles` adds files served from elsewhere on the file server (the manga
+  video's album is an official plugin's test pages) and `__demoEngine` answers the engine's runs (there
+  with the run recorded beside each page). The faces in the demo mode are the ones Quire's face
+  finder found in the example library, kept in `examples/faces.json`.
+
 A plugin's repository can make its own the same way: a capture on `kit.mjs` (from a checkout of
 Quire beside the plugin, where the preview's file server finds it by its id; `?mock&demo&find=<id>`
 runs a Find plugin against the made-up site in its `test/fake-site.js`) and a `script.json`, then

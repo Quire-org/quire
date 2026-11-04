@@ -1,0 +1,97 @@
+{
+  "name": "references",
+  "repository": "https://github.com/Quire-org/quire",
+  "title": {
+    "title": "Quire",
+    "line": "Collecting references"
+  },
+  "parts": [
+    {
+      "caption": "Find more to draw from.",
+      "line": "Your Pixiv feed, right inside Quire.",
+      "length": 84,
+      "scroll": {
+        "tall": "feed-tall",
+        "from": 6,
+        "to": 64,
+        "share": 0.5
+      },
+      "steps": [
+        {
+          "frame": "feed"
+        }
+      ]
+    },
+    {
+      "caption": "Into the basket, then the library.",
+      "line": "Pick what to keep and bring it in with Import.",
+      "length": 116,
+      "steps": [
+        {
+          "frame": "work",
+          "click": 14
+        },
+        {
+          "frame": "work-basket",
+          "at": 26
+        },
+        {
+          "frame": "basket",
+          "at": 44,
+          "click": 16
+        },
+        {
+          "frame": "import-where",
+          "at": 66,
+          "enter": "open"
+        },
+        {
+          "frame": "import",
+          "at": 84,
+          "click": 14
+        }
+      ]
+    },
+    {
+      "caption": "Artists, gathered for you.",
+      "line": "What came in from one artist is offered as theirs.",
+      "length": 96,
+      "steps": [
+        {
+          "frame": "artists",
+          "click": 22
+        },
+        {
+          "frame": "artist",
+          "at": 46,
+          "enter": "open"
+        }
+      ]
+    },
+    {
+      "caption": "Tagged on your computer.",
+      "line": "Look things up by style, subject or character.",
+      "length": 100,
+      "steps": [
+        {
+          "frame": "tag"
+        },
+        {
+          "frame": "browse-tags",
+          "at": 50
+        }
+      ]
+    }
+  ],
+  "end": {
+    "title": "Quire",
+    "lines": [
+      "Free and open source, for macOS, Windows and Linux",
+      "Pixiv comes with the Pixiv plugin."
+    ],
+    "link": "github.com/Quire-org/quire"
+  },
+  "stills": {
+    "references": "work"
+  }
+}

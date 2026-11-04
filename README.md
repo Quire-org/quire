@@ -21,13 +21,13 @@
 </p>
 
 <p align="center">
-  <img src="https://quire-org.github.io/quire/quire-demo.webp" width="840" alt="Quire's Home, a picture rated and filed with two keys, and the library browsed and filtered by a tag">
+  <img src="https://quire-org.github.io/quire/quire-demo.webp" width="840" alt="Quire in 24 seconds: the Home in three layouts, a picture rated and filed with two keys, the library browsed, a comic read, tags and themes">
   <br>
-  <a href="https://quire-org.github.io/quire/quire-demo.mp4">Watch the whole demo (33 seconds)</a> ·
+  <a href="https://quire-org.github.io/quire/quire-demo.mp4">Watch it sharper, as a video</a> ·
   <a href="https://quire-org.github.io/quire/demo/">Try it in your browser</a>
 </p>
 
-<p align="center"><sub>The browser demo runs on a library of example pictures; nothing you do there is saved, and tags and faces, which need Quire's local engine, aren't found there.</sub></p>
+<p align="center"><sub>The browser demo runs on a library of example pictures; nothing you do there is saved. Its tags and faces were found beforehand: finding new ones needs Quire's local engine.</sub></p>
 
 Quire keeps a large collection of pictures and videos in order where it already lives: an SD card,
 an external drive or any folder. You go through what's new full screen, rating and filing each
@@ -106,6 +106,29 @@ stickers, and showing a picture on another screen on the same network.
   <tr>
     <td align="center">Tags</td>
     <td align="center">The Home, in another theme</td>
+  </tr>
+</table>
+
+## See it in use
+
+Four short videos, each following one way of using Quire.
+
+<table>
+  <tr>
+    <td width="50%"><a href="https://quire-org.github.io/quire/photographer-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/photographer.jpg" alt="A photo shoot culled in Sort: a picture just rated 8"></a></td>
+    <td width="50%"><a href="https://quire-org.github.io/quire/references-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/references.jpg" alt="A work from Pixiv open in Find, about to go into the basket"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><b>A photo shoot</b>: culled with single keys, look-alikes kept together, duplicates weeded out, an edit taken back (21 s)</td>
+    <td align="center"><b>Collecting references</b>: Pixiv in Find, works brought in, their artist gathered, tags to look things up by (18 s)</td>
+  </tr>
+  <tr>
+    <td><a href="https://quire-org.github.io/quire/manga-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/manga.jpg" alt="A Japanese manga page read in English, the translation over its balloons"></a></td>
+    <td><a href="https://quire-org.github.io/quire/private-demo.mp4"><img src="https://quire-org.github.io/quire/screenshots/private.jpg" alt="People: faces found on the computer, grouped by person"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Reading manga</b>: albums page by page, and Japanese pages read in English with Manga Translate (16 s)</td>
+    <td align="center"><b>Private photos</b>: faces named once, the library in a vault, a picture shown on a phone (18 s)</td>
   </tr>
 </table>
 

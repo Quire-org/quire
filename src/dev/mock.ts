@@ -5,7 +5,7 @@ let mockTags: unknown = null;
  * and screenshotted in a plain browser. Media files are served from a static
  * HTTP server rooted at the fake volume (see docs/development.md, "Browser preview").
  */
-import type { Library, MediaItem } from "../lib/types";
+import type { Library, MediaItem, VersionLink } from "../lib/types";
 import { emptyDoc, presetBlocks } from "../home/board";
 import { MOCK_WHO, mockPicture } from "./mockPictures.js";
 
@@ -26,6 +26,12 @@ if (WEB && !localStorage.getItem("quire.theme")) {
   localStorage.setItem("quire.mode", "dark");
 }
 const demoFiles: string[] = DEMO ? await fetch(`${FILES_BASE}__demo/index.json`).then((r) => r.json()) : [];
+/**
+ * What a demo's capture can add before the app loads (demo/kit.mjs, `init`): files for the library
+ * served from elsewhere on the file server (a plugin's sample pages), and answers for the engine's
+ * runs (one recorded beside such a page), or null to leave a run to the mock.
+ */
+const demoHooks = window as unknown as { __demoFiles?: { rel: string; from: string }[]; __demoEngine?: (args: Record<string, unknown>, src: string) => Promise<unknown> };
 
 interface Entry {
   rel: string;
@@ -59,7 +65,7 @@ const testVolume: Entry[] = [
   { rel: "Albums/Caf%C3%A9%20Night/IMG_1006.png", kind: "image", files: ["Albums/Caf%C3%A9%20Night/IMG_1006.png"] },
 ];
 
-const seed: Entry[] = DEMO ? demoFiles.map((rel) => ({ rel, kind: "image", files: [rel] })) : testVolume;
+const seed: Entry[] = DEMO ? [...demoFiles, ...(demoHooks.__demoFiles ?? []).map((f) => f.rel)].map((rel) => ({ rel, kind: "image", files: [rel] })) : testVolume;
 const DEMO_TARGETS = [
   { id: "photos", name: "Photos", path: "Photos", hotkey: "j" },
   { id: "people", name: "People", path: "People", hotkey: "n" },
@@ -134,6 +140,52 @@ function mockSig(it: { key: string; primary: string }, off = 0, doff = 0) {
   return { phash, quads: [phash, phash, phash, phash], dhash: flip("0f0f0f0f0f0f0f0f", doff), width: pic.width, height: pic.height };
 }
 
+/**
+ * In the demo, the example library's copies and look-alikes, by name: the picture each is like and how
+ * many of its fingerprint's 64 bits differ (up to 10 a duplicate, 11 or 12 only a look-alike).
+ */
+const DEMO_ALIKE: Record<string, [string, number]> = {
+  "cheetah-portrait-copy-reencoded": ["cheetah-portrait", 3],
+  "harbour-sunset-aegina-copy-small": ["harbour-sunset-aegina", 2],
+  "gullfoss-rainbow-second-shot": ["gullfoss-rainbow", 11],
+  "london-skyline-2015": ["london-skyline-2008", 12],
+};
+function demoSig(it: MediaItem) {
+  const [like, off] = DEMO_ALIKE[it.name] ?? [it.name, 0];
+  const sig = mockSig({ key: like, primary: it.primary }, off);
+  return it.name.endsWith("-copy-small") ? { ...sig, width: sig.width / 2, height: sig.height / 2 } : sig;
+}
+
+/**
+ * Edits in the mock, drawn in the browser so a saved edit looks edited: each edited file's picture
+ * (an object URL), its fingerprint, what it was made from, and the original kept for Revert.
+ */
+const edited = new Map<string, string>();
+const editFps = new Map<string, string>();
+const links: Record<string, VersionLink> = {};
+const keptFor = new Map<string, string>();
+/** Where each file Find "downloaded" came from on the made-up site, by its path in the cache. */
+const downloaded = new Map<string, string>();
+const fingerprintOf = (path: string) => editFps.get(path) ?? "fp-" + path.split("/").pop()!;
+const srcOf = (path: string) => edited.get(path) ?? FILES_BASE + encodeURI(served(path).slice(ROOT.length + 1));
+
+/** A picture turned, flipped and cropped (crop: x, y, w, h as fractions of the turned frame), as a JPEG's object URL. */
+async function drawEdit(path: string, op: { rotate: number; flipH: boolean; flipV?: boolean; crop: number[] | null }) {
+  const img = await createImageBitmap(await (await fetch(srcOf(path))).blob());
+  const turned = op.rotate % 180 !== 0;
+  const [w, h] = turned ? [img.height, img.width] : [img.width, img.height];
+  const full = new OffscreenCanvas(w, h);
+  const g = full.getContext("2d")!;
+  g.translate(w / 2, h / 2);
+  g.rotate((op.rotate * Math.PI) / 180);
+  g.scale(op.flipH ? -1 : 1, op.flipV ? -1 : 1);
+  g.drawImage(img, -img.width / 2, -img.height / 2);
+  const [x, y, cw, ch] = op.crop ?? [0, 0, 1, 1];
+  const out = new OffscreenCanvas(Math.round(cw * w), Math.round(ch * h));
+  out.getContext("2d")!.drawImage(full, x * w, y * h, cw * w, ch * h, 0, 0, out.width, out.height);
+  return URL.createObjectURL(await out.convertToBlob({ type: "image/jpeg", quality: 0.9 }));
+}
+
 /** A face in each made-up still (who is in it, from mockPictures), the same every time. */
 function mockFaces() {
   const stills = items.filter((i) => i.kind !== "video");
@@ -144,13 +196,40 @@ function mockFaces() {
   });
   return { faces: [...faces, ...mockMarked], scanned: Object.fromEntries(stills.map((i) => [i.key, [i.size, i.modified]])), noCharacters: [] };
 }
+/**
+ * In the demo, the faces Quire's face finder found in the example library (examples/faces.json), each
+ * with whom it was grouped with: that stands in for the finder's numbers, as the made-up pictures' do.
+ */
+let demoFaces: Promise<{ id: number; key: string; kind: "photo"; bbox: [number, number, number, number]; score: number; size: number }[]> | null = null;
+function loadDemoFaces() {
+  demoFaces ??= fetch(`${FILES_BASE}__demo/faces.json`)
+    .then((r) => r.json())
+    .then((d: { faces: { key: string; bbox: [number, number, number, number]; score: number; size: number; who: string | null }[] }) =>
+      d.faces.map((f, n) => {
+        mockFaceLabel.set(n + 1, f.who ?? `alone-${n + 1}`);
+        return { id: n + 1, key: f.key, kind: "photo" as const, bbox: f.bbox, score: f.score, size: f.size };
+      }),
+    );
+  return demoFaces;
+}
+/** Those of them the demo's library knows by name already (one more is left for "Who is this?"). */
+const DEMO_PEOPLE: Record<string, string> = { "ellen-ochoa": "Ellen Ochoa", "jessica-meir": "Jessica Meir", "neil-armstrong": "Neil Armstrong", "peggy-whitson": "Peggy Whitson", "sunita-williams": "Sunita Williams" };
+
+/** Showing on another device, in the mock: since when, and whether its one made-up phone was let in. */
+let cast: { since: number; allowed: boolean | null } | null = null;
 /** Faces marked by hand in the mock: the part marked is the face. */
 const mockMarked: { id: number; key: string; kind: "photo" | "drawn"; bbox: [number, number, number, number]; score: number; size: number; marked: true }[] = [];
 /** `?mock&e2e`: a library with tags, people and an artist already, for the end-to-end tests. */
 const E2E = new URLSearchParams(location.search).has("e2e");
 /** The Home's board kept with the library, in the mock: for the end-to-end tests, a library that opens on Sort (as their scenes start there), its board still to make. */
 /** The demo's Home: the Gallery preset, its slideshow from the photos and its one picture from the art, so each shows a whole picture. */
-const demoHome = () => ({ ...emptyDoc(), blocks: presetBlocks("gallery").map((b) => (b.type === "slideshow" ? { ...b, filter: { folders: ["Photos"] } } : b.type === "picture" ? { ...b, filter: { folders: ["Artworks"] } } : b)) });
+/** The demo's Home: the Gallery preset, with the newest pictures where this day in other years would find none. */
+const demoHome = () => ({
+  ...emptyDoc(),
+  blocks: presetBlocks("gallery").map((b) =>
+    b.type === "slideshow" ? { ...b, filter: { folders: ["Photos"] } } : b.type === "picture" ? { ...b, filter: { folders: ["Artworks"] } } : b.type === "onthisday" ? { ...b, type: "newest" as const } : b,
+  ),
+});
 let mockHome: unknown = E2E ? { version: 1, blocks: [], folders: { mode: "all", list: [] }, opensOn: "sort" } : DEMO ? demoHome() : null;
 /** The library's artists, and files kept with the library (artists' icons), in the mock. */
 let mockArtists: unknown = null;
@@ -209,6 +288,7 @@ for (const e of seed) {
   const src = seed.find((o) => !o.rel.startsWith("Albums/") && o.rel.endsWith("/" + base));
   if (src) origin.set(`${ROOT}/${e.rel}`, `${ROOT}/${src.rel}`);
 }
+for (const f of demoHooks.__demoFiles ?? []) origin.set(`${ROOT}/${f.rel}`, `${ROOT}/${f.from}`);
 
 function toItem(files: string[], primary: string, kind: MediaItem["kind"]): MediaItem {
   const rel = primary.slice(ROOT.length + 1);
@@ -463,7 +543,7 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "edit_apply": {
       const ch = args.onProgress as { onmessage: (p: number) => void };
       const it = args.item as MediaItem;
-      const op = args.op as { rotate: number; flipH: boolean; crop: unknown; upscale: number | null; resizeWidth: number | null; format: string | null; extractFrame: number | null };
+      const op = args.op as { rotate: number; flipH: boolean; flipV: boolean; crop: number[] | null; upscale: number | null; resizeWidth: number | null; format: string | null; extractFrame: number | null };
       for (let i = 1; i <= 5; i++) {
         await new Promise((r) => setTimeout(r, 60));
         ch.onmessage(i / 5);
@@ -480,6 +560,21 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         items = items.filter((i) => i.key !== it.key);
       }
       const ni = { ...toItem([target], target, op.extractFrame != null ? "image" : it.kind), vaultId: it.vaultId ? "mock-" + target : undefined };
+      if (it.kind === "image" && !op.format) {
+        const from = fingerprintOf(it.primary);
+        const picture = await drawEdit(it.primary, op);
+        if (args.replace) {
+          // Overwrite keeps the original out of sight, for Revert.
+          const kept = `${ROOT}/.quire/originals/${it.primary.split("/").pop()}`;
+          origin.set(kept, served(it.primary));
+          if (edited.has(it.primary)) edited.set(kept, edited.get(it.primary)!);
+          keptFor.set(target, kept);
+        }
+        const made = `fp-edit-${editFps.size + 1}`;
+        edited.set(target, picture);
+        editFps.set(target, made);
+        links[made] = { from, fromName: it.primary.split("/").pop()!, madeAt: ni.key, fromAt: it.key, by: "edit", note: "edited", at: Date.now() };
+      }
       items.push(ni);
       origin.set(target, served(it.primary));
       return { item: ni, trashed };
@@ -560,9 +655,9 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return { phash: base.toString(16).padStart(16, "0"), dhash: fakeHash(name + "d").toString(16).padStart(16, "0"), width: 320, height: 200 };
     }
     case "file_fingerprint": {
-      const name = (args.path as string).split("/").pop()!;
-      const same = name === "IMG_1008.png" ? "IMG_1002.png" : name;
-      return "fp-" + same;
+      const path = args.path as string;
+      const name = path.split("/").pop()!;
+      return editFps.get(path) ?? "fp-" + (name === "IMG_1008.png" ? "IMG_1002.png" : name);
     }
     case "media_info":
       return { width: 4000, height: 3000, format: "JPEG", exif: { dateTaken: "2024-05-04 12:33:10", make: "Canon", model: "EOS R6", lens: "RF 35mm F1.8", exposure: "1/250 s", fNumber: "f/2.8", iso: "200", focal: "35 mm", software: null, gps: null, orientation: null } };
@@ -652,7 +747,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     }
     case "load_cache":
       // For the end-to-end tests: every still fingerprinted (as the duplicate check would have).
-      return E2E ? { version: 1, sigs: Object.fromEntries(items.filter((i) => i.kind !== "video").map((i) => [i.key, { size: i.size, modified: i.modified, image: mockSig(i) }])) } : null;
+      // In the demo, the example library's (its copies and look-alikes found at once).
+      return E2E || DEMO ? { version: 1, sigs: Object.fromEntries(items.filter((i) => i.kind !== "video").map((i) => [i.key, { size: i.size, modified: i.modified, image: DEMO ? demoSig(i) : mockSig(i) }])) } : null;
     case "load_history":
       return history;
     case "save_history":
@@ -782,9 +878,12 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     }
     case "find_clear":
       return null;
-    case "faces_load":
-      // The example library's faces aren't known to the preview (the made-up pictures' are drawn where they are).
-      return DEMO ? { faces: [], scanned: {}, noCharacters: [] } : mockFaces();
+    case "faces_load": {
+      if (!DEMO) return mockFaces();
+      // Every picture looked at already: the faces found are all there are.
+      const stills = items.filter((i) => i.kind !== "video");
+      return { faces: [...(await loadDemoFaces()), ...mockMarked], scanned: Object.fromEntries(stills.map((i) => [i.key, [i.size, i.modified]])), noCharacters: [] };
+    }
     case "faces_sort": {
       // Who is in the made-up pictures stands in for the face finder's numbers. The first group has
       // someone else in it, less like the rest (a wrong one to find), and found faces vary in how sure.
@@ -842,6 +941,12 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
         const hers = [...[...mockFaceLabel].filter(([, l]) => l === "p0").slice(0, 8), ...[...mockFaceLabel].filter(([, l]) => l === "p3").slice(0, 1)].map(([id]) => id);
         mockPeople = { version: 1, people: { pelena: { id: "pelena", name: "Lena Marie Johansson-Fairweather", kind: "person", from: null, portrait: null, added: 1 } }, faces: Object.fromEntries(hers.map((f) => [String(f), { p: "pelena" }])), no: [], not: {}, exclude: [], converted: null };
       }
+      if (DEMO && !mockPeople) {
+        const faces = await loadDemoFaces();
+        const people = Object.entries(DEMO_PEOPLE).map(([who, name], n) => ({ id: `p-${who}`, name, kind: "person", from: null, portrait: null, added: n + 1 }));
+        const given = faces.filter((f) => DEMO_PEOPLE[mockFaceLabel.get(f.id)!]).map((f) => [String(f.id), { p: `p-${mockFaceLabel.get(f.id)}`, ok: true }]);
+        mockPeople = { version: 1, people: Object.fromEntries(people.map((p) => [p.id, p])), faces: Object.fromEntries(given), no: [], not: {}, exclude: [], converted: null };
+      }
       return mockPeople;
     case "people_save":
       mockPeople = args.data;
@@ -886,28 +991,44 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return { phash: "a5a5a5a5a5a5a5a5", quads: ["a5a5a5a5a5a5a5a5", "5a5a5a5a5a5a5a5a", "a5a5a5a5a5a5a5a5", "5a5a5a5a5a5a5a5a"], dhash: "0f0f0f0f0f0f0f0f", width: 540, height: 540 };
     }
     case "find_download": {
-      // Each pick's files "downloaded" to the cache (paths only: Import below doesn't read them).
-      const works = args.works as { key: string; files: { name: string }[]; animation?: { name: string } }[];
+      // Each pick's files "downloaded" to the cache (paths only: Import below draws them from the made-up site).
+      const works = args.works as { key: string; files: { name: string; url?: string }[]; animation?: { name: string } }[];
       await new Promise((r) => setTimeout(r, 600));
-      return works.map((w, n) => ({ key: w.key, files: (w.animation ? [w.animation.name] : w.files.map((f) => f.name)).map((name) => `/mock/cache/find/${n}/${name}`), error: null }));
+      return works.map((w, n) => ({
+        key: w.key,
+        files: w.animation
+          ? [`/mock/cache/find/${n}/${w.animation.name}`]
+          : w.files.map((f) => {
+              const at = `/mock/cache/find/${n}/${f.name}`;
+              if (f.url) downloaded.set(at, f.url);
+              return at;
+            }),
+        error: null,
+      }));
     }
     case "import_scan":
       return (args.sources as string[]).map((path, i) => ({ path, size: 2_000_000 + i * 1000, inside: path.startsWith(ROOT + "/") }));
     case "import_fingerprints":
       return (args.paths as string[]).map(() => null);
-    case "import_files":
-      // In the library from now on (shown with one of the volume's pictures).
-      return (args.items as { src: string; dest: string }[]).map((it) => {
-        const to = `${resolve(it.dest)}/${it.src.split("/").pop()}`;
-        origin.set(to, `${ROOT}/DCIM/100CANON/IMG_1003.png`);
-        items.push(toItem([to], to, /\.mp4$/i.test(to) ? "video" : "image"));
-        return to;
-      });
+    case "import_files": {
+      // In the library from now on: a picture from Find as the made-up site draws it, others shown with one of the volume's.
+      const site = await fakeSite;
+      return Promise.all(
+        (args.items as { src: string; dest: string }[]).map(async (it) => {
+          const to = `${resolve(it.dest)}/${it.src.split("/").pop()}`;
+          origin.set(to, `${ROOT}/DCIM/100CANON/IMG_1003.png`);
+          const url = downloaded.get(it.src);
+          if (url && site) edited.set(to, URL.createObjectURL(new Blob([await site.image(url)], { type: "image/png" })));
+          items.push(toItem([to], to, /\.mp4$/i.test(to) ? "video" : "image"));
+          return to;
+        }),
+      );
+    }
     case "plugin_log":
       console.log(`[plugin ${args.id}] ${args.level}: ${args.message}`);
       return null;
     case "read_media_image":
-      return fetch(FILES_BASE + encodeURI(served(String(args.path)).slice(ROOT.length + 1))).then((r) => r.arrayBuffer());
+      return fetch(srcOf(String(args.path))).then((r) => r.arrayBuffer());
     case "write_media_file":
       return `${args.dir}/${args.name}`;
     case "replace_media_file": {
@@ -921,11 +1042,36 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return { item: ni, trashed };
     }
     case "versions_load":
-      return { links: {} };
-    case "version_info":
-      return { fp: null, link: null, kept: null, original: null, versions: [] };
+      return { links };
+    case "version_info": {
+      const path = args.path as string;
+      const fp = fingerprintOf(path);
+      const link = links[fp] ?? null;
+      const at = (f: string) => items.find((i) => fingerprintOf(i.primary) === f)?.primary ?? null;
+      const versions = Object.entries(links)
+        .filter(([, l]) => l.from === fp)
+        .map(([made, l]) => ({ made, link: l, path: at(made) }));
+      if (!link && !versions.length) return { fp: null, link: null, kept: null, original: null, versions: [] };
+      return { fp, link, kept: keptFor.get(path) ?? null, original: link ? at(link.from) : null, versions };
+    }
+    case "version_revert": {
+      const it = args.item as MediaItem;
+      const kept = keptFor.get(it.primary);
+      if (!kept) throw "No original is kept for it";
+      delete links[editFps.get(it.primary)!];
+      for (const m of [edited, editFps, keptFor]) m.delete(it.primary);
+      if (edited.has(kept)) edited.set(it.primary, edited.get(kept)!);
+      const back = toItem([it.primary], it.primary, it.kind);
+      items = [...items.filter((i) => i.key !== it.key), back];
+      return { item: back, moves: [] };
+    }
     case "kept_originals":
-      return { originals: 0, bytes: 0 };
+      return { originals: keptFor.size, bytes: keptFor.size * 2_400_000 };
+    case "kept_originals_forget": {
+      const n = keptFor.size;
+      keptFor.clear();
+      return n;
+    }
     case "raw_preview":
       return fetch(FILES_BASE + "DCIM/100CANON/IMG_1000.jpg").then((r) => r.arrayBuffer());
     case "plugin:dialog|open": {
@@ -973,6 +1119,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const named = (mockPlugins.get(String(args.id))?.manifest.models ?? []) as string[];
       const missing = mockModels.find((m) => named.includes(m.id) && !m.downloaded);
       if (missing) throw `not downloaded: ${missing.id}`;
+      const answer = await demoHooks.__demoEngine?.(args, srcOf(String(args.path)));
+      if (answer) return answer;
       const res = await fetch(FILES_BASE + encodeURI(served(String(args.path)).slice(ROOT.length + 1)));
       const bmp = await createImageBitmap(await res.blob());
       const W = bmp.width, H = bmp.height;
@@ -987,6 +1135,22 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       await new Promise((r) => setTimeout(r, 400));
       return { pngBase64: btoa(bin), width: W, height: H, result: {}, seconds: 0.4 };
     }
+    case "cast_start":
+      cast = { since: Date.now(), allowed: null };
+      return { urls: [{ iface: "en0", url: "https://192.168.1.20:47321/" }], fingerprint: "3F 9A 41 C7 2E 88 D0 15 6B A3 7E 52 0C F9 94 E1" };
+    case "cast_status":
+      // A phone asks to watch a moment after it starts.
+      if (!cast) return { running: false, devices: [], nav: [] };
+      return { running: true, devices: Date.now() - cast.since > 1200 ? [{ id: "phone", name: "Phone", ip: "192.168.1.31", state: cast.allowed == null ? "pending" : cast.allowed ? "allowed" : "denied" }] : [], nav: [] };
+    case "cast_decide":
+      if (cast) cast.allowed = !!args.allow;
+      return null;
+    case "cast_stop":
+      cast = null;
+      return null;
+    case "cast_frame":
+    case "cast_remote":
+      return null;
     case "plugin:event|listen":
       return 1;
     case "plugin:event|unlisten":
@@ -1014,6 +1178,8 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       const it = items.find((i) => i.vaultId === p);
       return it ? FILES_BASE + encodeURI(served(it.primary).slice(ROOT.length + 1)) : "";
     }
+    // An edit's picture is an object URL: what the app adds (?w=…) goes after the # there.
+    if (edited.has(p)) return edited.get(p)! + "#";
     return FILES_BASE + encodeURI(served(p).slice(ROOT.length + 1));
   },
   metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main", windowLabel: "main" } },

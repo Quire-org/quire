@@ -1,0 +1,98 @@
+{
+  "name": "manga",
+  "repository": "https://github.com/Quire-org/quire",
+  "title": {
+    "title": "Quire",
+    "line": "Reading manga and comics"
+  },
+  "parts": [
+    {
+      "caption": "Albums, read page by page.",
+      "line": "Comics and manga from your own drive.",
+      "length": 110,
+      "steps": [
+        {
+          "frame": "albums",
+          "click": 18
+        },
+        {
+          "frame": "reader-1",
+          "at": 28,
+          "enter": "open"
+        },
+        {
+          "frame": "reader-2",
+          "at": 58,
+          "enter": "slide"
+        },
+        {
+          "frame": "reader-3",
+          "at": 84,
+          "enter": "slide"
+        }
+      ]
+    },
+    {
+      "caption": "Japanese? Read it in English.",
+      "line": "Manga Translate letters the pages in your language.",
+      "length": 140,
+      "steps": [
+        {
+          "frame": "page-ja",
+          "click": 16
+        },
+        {
+          "frame": "menu",
+          "at": 24,
+          "click": 12
+        },
+        {
+          "frame": "panel",
+          "at": 42,
+          "click": 14
+        },
+        {
+          "frame": "page-en",
+          "at": 66,
+          "enter": "wipe"
+        },
+        {
+          "frame": "page2-en",
+          "at": 104,
+          "enter": "slide"
+        }
+      ]
+    },
+    {
+      "caption": "The original, one key away.",
+      "line": "O shows the page as it was drawn.",
+      "length": 76,
+      "steps": [
+        {
+          "frame": "page2-en"
+        },
+        {
+          "frame": "page2-ja",
+          "at": 14,
+          "enter": "wipe"
+        },
+        {
+          "frame": "page2-back",
+          "at": 44,
+          "enter": "wipe"
+        }
+      ]
+    }
+  ],
+  "end": {
+    "title": "Quire",
+    "lines": [
+      "Free and open source, for macOS, Windows and Linux",
+      "Translation comes with the Manga Translate plugin."
+    ],
+    "link": "github.com/Quire-org/quire"
+  },
+  "stills": {
+    "manga": "page-en"
+  }
+}

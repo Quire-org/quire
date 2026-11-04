@@ -1,7 +1,8 @@
 // Renders a demo with Remotion into <work>/out/site, what GitHub Pages serves for its README:
 // `node render.mjs video` (<name>-demo.mp4), `stills` (the screenshots, screenshots/*.jpg) or
 // `studio` (to look at it while editing). <work> is this folder, or another demo's with
-// `--work <folder>` (a plugin's: its script.json and the frames its capture kept in public/).
+// `--work <folder>` (a workflow's, or a plugin's: its script.json and the frames its capture kept
+// in public/); `--site <folder>` renders into another site (a workflow's into Quire's own).
 // Remotion's rendering doesn't load when its packages' path has a space in it, so in a checkout
 // whose path has one, it runs from a copy of this folder in the temp folder (cloned, where the
 // disk can), and so does a work folder's public/ whose path has one.
@@ -13,9 +14,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const [what, ...rest] = process.argv.slice(2);
-const flag = rest.indexOf("--work");
-const work = flag >= 0 ? resolve(rest[flag + 1]) : here;
-const site = join(work, "out", "site");
+const option = (name) => (rest.includes(name) ? resolve(rest[rest.indexOf(name) + 1]) : null);
+const work = option("--work") ?? here;
+const site = option("--site") ?? join(work, "out", "site");
 const script = JSON.parse(readFileSync(join(work, "script.json"), "utf8"));
 const scenes = JSON.parse(readFileSync(join(work, "public", "scenes.json"), "utf8"));
 
@@ -50,6 +51,6 @@ if (what === "video") {
 } else if (what === "studio") {
   remotion(["studio", "src/index.ts", props()]);
 } else {
-  console.error("node render.mjs video | stills | studio [--work <folder>]");
+  console.error("node render.mjs video | stills | studio [--work <folder>] [--site <folder>]");
   process.exit(2);
 }
