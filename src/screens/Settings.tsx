@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useStore } from "../store";
 import { api } from "../lib/api";
 import { notForAlbums, notForTarget, pickLibraryFolder } from "../components/FolderBrowser";
@@ -14,7 +14,8 @@ import { bucketOf } from "../lib/filing";
 import { CUES, cue, useSounds } from "../lib/sounds";
 import { formatBytes, tailPath } from "../lib/format";
 import { ArrowCircleUp, ArrowsClockwise, Plugs, SpeakerHigh, BookOpen, CloudArrowUp, Cpu, Eye, FolderMinus, FolderOpen, FolderPlus, Folders, HardDrive, LockKey, MagnifyingGlass, PuzzlePiece, Smiley, Tray, Trash as TrashIcon, X } from "@phosphor-icons/react";
-import { usePeople } from "../peopleStore";
+import { kindFromTags, usePeople } from "../peopleStore";
+import { useTags } from "../tagsStore";
 import { useOnline } from "../lib/online";
 import { useFinders } from "../plugins/find";
 import type { TrashInfo } from "../lib/types";
@@ -54,7 +55,7 @@ const GROUPS: { label: string; pages: { id: Page; label: string; icon: ReactNode
     ],
   },
   { label: "Viewing", pages: [{ id: "viewing", label: "Look and reading", icon: <Eye />, words: "theme image fit fill crop page turns albums animation series together burst opens on home sort where you were start sound sounds audio volume click menu" }] },
-  { label: "People", pages: [{ id: "faces", label: "Faces", icon: <Smiley />, words: "people face scan leave out folders" }] },
+  { label: "People", pages: [{ id: "faces", label: "Faces", icon: <Smiley />, words: "people face scan leave out folders photos drawings characters buckets" }] },
   {
     label: "Add-ons",
     pages: [
@@ -168,7 +169,13 @@ export function Settings() {
           {page === "import" && <ImportPage />}
           {page === "trash" && <TrashPage />}
           {page === "viewing" && <ViewingPage />}
-          {page === "faces" && <FacesPage />}
+          {page === "faces" && (
+            <>
+              <FacesPage />
+              <hr className="rule" />
+              <FolderKinds />
+            </>
+          )}
           {page === "plugins" && <PluginsDialog />}
           {page === "online" && <OnlinePage />}
           {page === "models" && <LocalModels />}
@@ -476,5 +483,99 @@ function FacesPage() {
       />
       <Card icon={<Cpu />} title="Face finders…" text="The models that find and tell faces apart, in Local models." onClick={() => s.set({ modelsOpen: true })} />
     </Cards>
+  );
+}
+
+/**
+ * Buckets and folders that say what their pictures are, for the face finders: photos (the Face
+ * finder) or drawings (the Character finder), whatever the tag index takes them for. Changing one
+ * looks again at the pictures that then go otherwise.
+ */
+function FolderKinds() {
+  const doc = usePeople((p) => p.doc);
+  const targets = useStore((s) => s.library?.targets);
+  const all = useStore((s) => s.allItems);
+  const tags = useTags((t) => t.data);
+  useEffect(() => void usePeople.getState().load(), []);
+  const kinds = doc?.kinds ?? {};
+  // Buckets in the library first, then every folder in it.
+  const buckets = (targets ?? []).filter((t) => t.bucket && !t.path.startsWith("/"));
+  const folders = useMemo(() => {
+    const dirs = new Set<string>();
+    for (const i of all) {
+      const parts = i.dir.split("/").filter(Boolean);
+      for (let n = 1; n <= parts.length; n++) dirs.add(parts.slice(0, n).join("/"));
+    }
+    return [...dirs].sort();
+  }, [all]);
+  const nameOf = (f: string) => buckets.find((b) => b.path === f)?.name;
+  const set = (next: Record<string, "photo" | "drawn">) => void usePeople.getState().setKinds(next);
+  // A folder added says what the tag index takes most of its pictures for (photos, when it can't tell).
+  const add = (f: string) => {
+    let drawn = 0;
+    let photo = 0;
+    for (const i of all) {
+      if (!i.key.startsWith(`${f}/`)) continue;
+      const k = kindFromTags(tags, i.key);
+      if (k === "drawn") drawn++;
+      else if (k === "photo") photo++;
+    }
+    set({ ...kinds, [f]: drawn > photo ? "drawn" : "photo" });
+  };
+  const said = Object.keys(kinds).sort();
+  return (
+    <section className="folder-kinds">
+      <div className="sec-head">
+        <h3>Photos or drawings</h3>
+        <Select
+          compact
+          searchable
+          value=""
+          onChange={(f) => f && add(f)}
+          options={[
+            { value: "", label: "Add a bucket or folder…" },
+            ...buckets.filter((b) => !kinds[b.path]).map((b) => ({ value: b.path, label: `${b.name} · bucket` })),
+            ...folders.filter((f) => !kinds[f] && !buckets.some((b) => b.path === f)).map((f) => ({ value: f, label: f, indent: f.split("/").length - 1 })),
+          ]}
+        />
+      </div>
+      <p className="dim small">
+        Which face finder looks at a picture follows what the tag index takes it for: the Face finder for photos, the Character finder for drawings. Here a bucket or folder can say it for all its pictures instead (the deepest one that says wins). Info's Faces shows what a picture was taken for.
+      </p>
+      {said.length > 0 && (
+        <div className="target-list">
+          {said.map((f) => (
+            <div key={f} className="side-row">
+              <span className="ellipsis grow" title={f}>
+                {nameOf(f) ? (
+                  <>
+                    {nameOf(f)} <span className="faint small">bucket</span>
+                  </>
+                ) : (
+                  <span className="mono small">{f}</span>
+                )}
+              </span>
+              <span className="btn-group">
+                {(["photo", "drawn"] as const).map((k) => (
+                  <button key={k} className={`btn sm ${kinds[f] === k ? "active" : "ghost"}`} onClick={() => kinds[f] !== k && set({ ...kinds, [f]: k })} title={k === "photo" ? "All its pictures are photos: the Face finder looks at them" : "All its pictures are drawings: the Character finder looks at them"}>
+                    {k === "photo" ? "Photos" : "Drawings"}
+                  </button>
+                ))}
+              </span>
+              <button
+                className="btn sm ghost"
+                onClick={() => {
+                  const { [f]: _gone, ...rest } = kinds;
+                  set(rest);
+                }}
+                title="Let the tag index decide for its pictures again"
+              >
+                <X />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

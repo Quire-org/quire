@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import { createPortal } from "react-dom";
 import { Check, CircleNotch, Selection, UserFocus, X } from "@phosphor-icons/react";
 import { selectCurrent, useStore } from "../store";
-import { kindFromTags, kindOfFace, toggleFaceMode, useFaceMode, usePeople, type Person, type PersonKind } from "../peopleStore";
+import { faceKind, kindOfFace, toggleFaceMode, useFaceMode, usePeople, type Person, type PersonKind } from "../peopleStore";
 import { FaceCrop, NameField } from "../screens/People";
 import { usePillsBottom } from "./PluginPanel";
 import { useTags } from "../tagsStore";
@@ -198,8 +198,8 @@ export function FacesPanel({ videoRef }: { videoRef?: RefObject<HTMLVideoElement
   const doc = usePeople((s) => s.doc);
   const scanned = usePeople((s) => (current ? s.scanned[current.key] : undefined));
   const here = useFacesHere(current?.key);
-  // A drawing or a photo as marking takes it: as most of its faces are, else as the tagger saw it.
-  const tagged = useTags((t) => (current ? kindFromTags(t.data, current.key) : null));
+  // A drawing or a photo as marking takes it: as most of its faces are, else as its folder says or the tagger saw it.
+  const tagged = useTags((t) => (current ? faceKind(doc, t.data, current.key) : null));
   const [looking, setLooking] = useState(false);
   const [adding, setAdding] = useState(false);
   const show = on && !editing && screen === "viewer" && canShowFaces(current);

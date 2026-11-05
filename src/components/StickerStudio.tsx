@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { isTypingTarget } from "../lib/hotkeys";
-import { ArrowCounterClockwise, ArrowLeft, ArrowRight, Eraser, Lasso, MagnifyingGlassPlus, PaintBrush, Scissors, Sparkle } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowLeft, ArrowRight, Eraser, Knife, Lasso, MagnifyingGlassPlus, PaintBrush, Scissors, Sparkle } from "@phosphor-icons/react";
 import { Modal } from "./Modal";
 import { MiniBrowser } from "./MiniBrowser";
 import { useStore } from "../store";
@@ -10,7 +10,7 @@ import { blobUrl, useScrapbook } from "../scrapbook/store";
 import { useSourcePictures } from "../scrapbook/pictures";
 import { edgeAround } from "../scrapbook/render";
 import { checkStickerSpace, stickerContext, stickerImageData, stickerSpace } from "../scrapbook/color";
-import { NO_TUNE, findSubjects, insidePolygon, lassoSubject, merge, onSubject, pieceOf, render, tuned, tunedEdge, withCloserLook, withDabs, type Dab, type Piece, type Subject, type Tune } from "../scrapbook/subjects";
+import { NO_TUNE, divided, findSubjects, insidePolygon, lassoSubject, merge, onSubject, pieceOf, render, tuned, tunedEdge, withCloserLook, withDabs, type Dab, type Piece, type Subject, type Tune } from "../scrapbook/subjects";
 import { newId, type CustomSticker, type Target } from "../scrapbook/model";
 import type { MediaItem } from "../lib/types";
 
@@ -138,7 +138,7 @@ const HUES = ["#ff3b6b", "#2ee6a6", "#3aa0ff", "#ffc53d", "#c06bff", "#ff8a3d", 
 const levelOf = (sensitivity: number) => Math.round(230 - sensitivity * 2);
 
 type Point = [number, number];
-type Mode = "pick" | "outline" | "closer";
+type Mode = "pick" | "outline" | "divide" | "closer";
 
 function Finder({ item, onBack, onNext }: { item: MediaItem; onBack: () => void; onNext: (cut: Cut, subjects: Subject[]) => void }) {
   const cutter = useCutter();
@@ -151,6 +151,8 @@ function Finder({ item, onBack, onNext }: { item: MediaItem; onBack: () => void;
   const [chosen, setChosen] = useState<Point[]>([]);
   const [merges, setMerges] = useState<Point[][]>([]);
   const [drawn, setDrawn] = useState<Subject[]>([]);
+  // Lines drawn between subjects that touch, to part them: they hold when the sensitivity moves.
+  const [lines, setLines] = useState<Point[][]>([]);
   const [mode, setMode] = useState<Mode>("pick");
   const [path, setPath] = useState<Point[] | null>(null);
   const [looking, setLooking] = useState(false);
@@ -185,7 +187,7 @@ function Finder({ item, onBack, onNext }: { item: MediaItem; onBack: () => void;
   }, [item, cutter]);
 
   // The parts at this cut; merged ones together; the ones drawn by hand; and which are chosen.
-  const found = useMemo(() => (base ? findSubjects(base.mask, base.W, base.H, 12, level) : null), [base, level]);
+  const found = useMemo(() => (base ? findSubjects(divided(base.mask, base.W, base.H, lines, level), base.W, base.H, 12, level) : null), [base, level, lines]);
   const subjects = useMemo(() => {
     if (!base || !found) return [];
     const loose = [...found.subjects, ...drawn];
@@ -278,7 +280,7 @@ function Finder({ item, onBack, onNext }: { item: MediaItem; onBack: () => void;
       ctx.fillText(isChosen[i] ? "✓" : String(i + 1), cx, cy + 1);
     });
     if (path && path.length > 1) {
-      ctx.strokeStyle = "#ffffff";
+      ctx.strokeStyle = mode === "divide" ? "#ff5a5a" : "#ffffff";
       ctx.setLineDash(mode === "closer" ? [10, 6] : []);
       ctx.lineWidth = Math.max(2, W / 350);
       ctx.beginPath();
@@ -287,7 +289,8 @@ function Finder({ item, onBack, onNext }: { item: MediaItem; onBack: () => void;
         ctx.strokeRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
       } else {
         path.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-        ctx.closePath();
+        // An outline closes round what it cuts out; a dividing line stays a line.
+        if (mode === "outline") ctx.closePath();
         ctx.stroke();
       }
       ctx.setLineDash([]);
@@ -326,6 +329,15 @@ function Finder({ item, onBack, onNext }: { item: MediaItem; onBack: () => void;
       // Chosen at once: by a point inside what was drawn.
       const cy = Math.floor((s.y0 + s.y1) / 2);
       for (let x = s.x0; x < s.x1; x++) if (insidePolygon(s.parts[0].poly!, x + 0.5, cy + 0.5)) return setChosen([...chosen, [x + 0.5, cy + 0.5]]);
+      return;
+    }
+    if (mode === "divide") {
+      if (drawnPath.length < 2) return;
+      // Kept when it parts something: more subjects than before.
+      const next = [...lines, drawnPath];
+      const parted = findSubjects(divided(base.mask, base.W, base.H, next, level), base.W, base.H, 12, level).subjects.length > found.subjects.length;
+      if (parted) setLines(next);
+      else useStore.getState().toast("Still one subject: draw the line right across where the two touch", "warn");
       return;
     }
     if (mode === "closer") void lookCloser(drawnPath[0], drawnPath[drawnPath.length - 1]);
@@ -412,16 +424,30 @@ function Finder({ item, onBack, onNext }: { item: MediaItem; onBack: () => void;
               <button className={`btn sm ${mode === "outline" ? "active" : "ghost"}`} onClick={() => setMode("outline")} title="Draw round something: exactly that shape is cut out">
                 <Lasso /> Outline
               </button>
+              <button className={`btn sm ${mode === "divide" ? "active" : "ghost"}`} onClick={() => setMode("divide")} title="Draw a line where two subjects touch: each side becomes a subject of its own">
+                <Knife /> Divide
+              </button>
               <button className={`btn sm ${mode === "closer" ? "active" : "ghost"}`} onClick={() => setMode("closer")} title="Drag a box: the model looks again at just that part, and adds what it finds">
                 <MagnifyingGlassPlus /> Look closer
               </button>
             </div>
             <div className="dim small">
-              {mode === "pick" ? "Click a subject to pick it or put it back." : mode === "outline" ? "Draw round what to cut out; let go to close the shape." : "Drag a box round something the model missed: what it finds there is added, and nothing already found is lost."}
+              {mode === "pick"
+                ? "Click a subject to pick it or put it back."
+                : mode === "outline"
+                  ? "Draw round what to cut out; let go to close the shape."
+                  : mode === "divide"
+                    ? "Draw a line across where two subjects touch: each side becomes its own. The line carries on to the subject's edge by itself; tidy the cut in Fine-tune."
+                    : "Drag a box round something the model missed: what it finds there is added, and nothing already found is lost."}
             </div>
             {history.length > 0 && (
               <button className="btn sm ghost" onClick={() => (setBase({ ...base, mask: history[history.length - 1] }), setHistory(history.slice(0, -1)))}>
                 <ArrowCounterClockwise /> Undo looking closer
+              </button>
+            )}
+            {lines.length > 0 && (
+              <button className="btn sm ghost" onClick={() => setLines(lines.slice(0, -1))} title="The last line drawn to divide taken back: what it parted is one again">
+                <ArrowCounterClockwise /> Undo dividing
               </button>
             )}
             <div className="row">

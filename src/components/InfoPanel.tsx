@@ -6,7 +6,8 @@ import { api } from "../lib/api";
 import { originalOf, selectCurrent, useStore } from "../store";
 import { useDupes } from "../dupesStore";
 import { useTags, albumKeyOf } from "../tagsStore";
-import { usePeople, type Person } from "../peopleStore";
+import { faceKind, folderKind, kindFromTags, outOfPlace, usePeople, type Person } from "../peopleStore";
+import { DRAWN_MIN, drawnScore } from "../lib/drawn";
 import { albumArtistKey, artistKeyOf, useArtists } from "../artistsStore";
 import { FaceCrop } from "../screens/People";
 import { usePlugins } from "../plugins/store";
@@ -276,6 +277,8 @@ function ItemInfo({ item, onClose }: { item: MediaItem; onClose: () => void }) {
   const albums = useStore((s) => s.albums);
   const sig = useDupes((d) => d.cache[item.key]);
   const tags = useTags((t) => t.data);
+  // Faces: the drawn score is worked out once that part is opened.
+  const [scoring, setScoring] = useState(false);
   const [info, setInfo] = useState<MediaInfo | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
@@ -371,6 +374,11 @@ function ItemInfo({ item, onClose }: { item: MediaItem; onClose: () => void }) {
           </Section>
         )}
         <Suggestions keyOf={item.key} autoKey={item.key} have={itemTags} />
+        {(item.kind === "image" || item.kind === "raw" || item.kind === "video") && (
+          <More label="Faces" onOpen={() => setScoring(true)}>
+            <FaceFinders item={item} scoring={scoring} />
+          </More>
+        )}
         <More label="Fingerprints">
           <Rows
             rows={[
@@ -390,6 +398,87 @@ function ItemInfo({ item, onClose }: { item: MediaItem; onClose: () => void }) {
 }
 
 const fileName = (key: string) => key.split("/").pop() ?? key;
+
+/**
+ * How the picture's faces were looked for: what the tag index takes it for (and its drawn score,
+ * once `scoring`), which finders that gives it (the Face finder for photos, the Character finder for
+ * drawings, both while it isn't known), and what each of them found. To see why a face was missed or
+ * went the wrong way.
+ */
+function FaceFinders({ item, scoring }: { item: MediaItem; scoring: boolean }) {
+  const root = useStore((s) => s.root);
+  const tags = useTags((t) => t.data);
+  const faces = usePeople((s) => s.faces);
+  const doc = usePeople((s) => s.doc);
+  const scanned = usePeople((s) => s.scanned[item.key]);
+  const without = usePeople((s) => s.noCharacters.has(item.key));
+  const characters = usePeople((s) => s.characters);
+  const [score, setScore] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    if (!scoring || !root) return;
+    let alive = true;
+    setScore(undefined);
+    drawnScore(root, item.key).then(
+      (n) => alive && setScore(n),
+      () => alive && setScore(null),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [scoring, root, item.key]);
+  const tagged = kindFromTags(tags, item.key);
+  const said = folderKind(doc?.kinds, item.key);
+  const kind = faceKind(doc, tags, item.key);
+  const as = said
+    ? `${said === "drawn" ? "a drawing" : "a photo"}, as its folder says (Settings, Faces)${tagged && tagged !== said ? `: the tag index took it for ${tagged === "drawn" ? "a drawing" : "a photo"}` : ""}`
+    : kind === "drawn"
+      ? "a drawing"
+      : kind === "photo"
+        ? score != null && score >= DRAWN_MIN
+          ? "a photo: the anime tagger looked, as at a drawing, but named nothing"
+          : "a photo"
+        : tags?.indexed[item.key]
+          ? "not known: the anime tagger hasn't looked at it"
+          : "not known yet: the tag index hasn't looked at it";
+  const finders = without
+    ? "Face finder only: the Character finder wasn't downloaded then"
+    : kind === "photo"
+      ? "Face finder"
+      : kind === "drawn"
+        ? characters
+          ? "Character finder"
+          : "Face finder for now: the Character finder isn't downloaded"
+        : characters
+          ? "Face finder and Character finder"
+          : "Face finder: the Character finder isn't downloaded";
+  const here = faces.filter((f) => f.key === item.key);
+  const byFace = here.filter((f) => f.kind === "photo").length;
+  const byCharacter = here.filter((f) => f.kind === "drawn").length;
+  const marked = here.filter((f) => f.marked).length;
+  // Faces left from when it was taken for something else, or its folder's say changed: looked at again.
+  const relook = doc?.relook?.includes(item.key) || here.some((f) => !f.marked && outOfPlace(f, kind, characters) && !(doc?.faces[String(f.id)] && !doc.faces[String(f.id)].auto));
+  const found = !scanned
+    ? "not looked at yet"
+    : [!here.length ? "no faces" : [byFace && `${byFace} by the Face finder`, byCharacter && `${byCharacter} by the Character finder`, marked && `${marked} marked by hand`].filter(Boolean).join(" · "), relook && "looked at again with the finder it gets now, on the next face scan"].filter(Boolean).join(" · ");
+  return (
+    <Rows
+      rows={[
+        ["Taken for", as],
+        [
+          "Drawn score",
+          !scoring ? null : score === undefined ? "working it out…" : score === null ? "none yet" : (
+            <span title={`Drawings score about 2 to 4, photos about −3 to −11; from ${DRAWN_MIN} up, a picture is taken for a drawing`}>
+              <span className="mono">{`${score < 0 ? "−" : "+"}${Math.abs(score).toFixed(1)}`}</span> <span className="faint">({DRAWN_MIN} and up: drawn)</span>
+            </span>
+          ),
+        ],
+        // What the rule gives the picture as it is taken for now (which finder found each face is in "Faces found").
+        ["Finders for it", finders],
+        ["Faces found", found],
+      ]}
+    />
+  );
+}
 
 /** A work a picture came from (or is crossposted as): in Find, on a platform Find has; else in the browser. */
 function SourceLink({ source }: { source: ItemSource }) {

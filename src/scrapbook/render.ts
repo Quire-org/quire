@@ -137,6 +137,9 @@ export class AssetCache {
   }
 }
 
+/** How see-through a pixel can be and still be taken for dust, not part of what is cut out (of 255). */
+const DUST = 64;
+
 /** A picture with a cut edge `px` wide (in its own pixels) around what it shows, as a sticker has. */
 export function edgeAround(img: Drawable, colour: string, px: number, space?: PredefinedColorSpace): HTMLCanvasElement {
   const { w, h } = sizeOf(img);
@@ -144,6 +147,13 @@ export function edgeAround(img: Drawable, colour: string, px: number, space?: Pr
   const [canvas, ctx] = canvasOf(w + pad * 2, h + pad * 2, space);
   const [sil, sctx] = canvasOf(w, h, space);
   sctx.drawImage(img, 0, 0, w, h);
+  // Only what is clearly there gets an edge: faint dust left round a subject (the last of the cutter's
+  // soft edge, the rim of what was erased) would each come out as a ring of dots, one per stamp below.
+  // What is kept keeps its soft rim, rescaled, so the edge stays smooth.
+  const data = sctx.getImageData(0, 0, sil.width, sil.height);
+  const a = data.data;
+  for (let i = 3; i < a.length; i += 4) a[i] = a[i] <= DUST ? 0 : Math.round(((a[i] - DUST) * 255) / (255 - DUST));
+  sctx.putImageData(data, 0, 0);
   sctx.globalCompositeOperation = "source-in";
   sctx.fillStyle = colour;
   sctx.fillRect(0, 0, w, h);

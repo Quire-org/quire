@@ -65,6 +65,14 @@ export interface PeopleDoc {
   converted: { folder: string; made: string[]; tags: Record<string, string[]>; at: number; settings?: TagSettings; added?: Record<string, number[]>; present?: Record<string, string[]> } | null;
   /** The photos an earlier version looked at as drawings were looked at again (see `toRecheck`). */
   photosRechecked?: boolean;
+  /**
+   * Folders (keys) that say what their pictures are, for the face finders: photos (the Face finder) or
+   * drawings (the Character finder), whatever the tag index takes them for. The deepest one that says
+   * wins (Settings, Faces).
+   */
+  kinds?: Record<string, "photo" | "drawn">;
+  /** Pictures to look at again for faces: their folder says otherwise now than when they were looked at. Gone once looked at. */
+  relook?: string[];
 }
 
 const empty = (): PeopleDoc => ({ version: 1, people: {}, faces: {}, no: [], not: {}, exclude: [], converted: null });
@@ -92,8 +100,29 @@ export function kindFromTags(tags: { auto: Record<string, unknown[]> } | null | 
   return seen === undefined ? null : seen.length ? "drawn" : "photo";
 }
 
-/** Whether a picture is a photo or a drawing, as far as is known: its faces, else the tag index. */
+/** What the deepest folder that says so says a picture in it is (People's `kinds`), if one does. */
+export function folderKind(kinds: PeopleDoc["kinds"], key: string): "photo" | "drawn" | null {
+  let best: string | null = null;
+  for (const f of Object.keys(kinds ?? {})) if (key.startsWith(`${f}/`) && (best === null || f.length > best.length)) best = f;
+  return best === null ? null : kinds![best];
+}
+
+/** What a picture is for the face finders: what its folder says, else what the tag index takes it for. */
+export function faceKind(doc: PeopleDoc | null | undefined, tags: { auto: Record<string, unknown[]> } | null | undefined, key: string): "photo" | "drawn" | null {
+  return folderKind(doc?.kinds, key) ?? kindFromTags(tags, key);
+}
+
+/**
+ * Whether a face doesn't belong to its picture as it is taken for now: one the Character finder found
+ * in a photo, or the Face finder in a drawing (once the Character finder is there to look instead). Left
+ * from when the picture was taken for something else (before the tag index had looked, or its folder said).
+ */
+export const outOfPlace = (face: FaceView, kind: "photo" | "drawn" | null, characters: boolean) => (kind === "photo" && face.kind === "drawn") || (kind === "drawn" && characters && face.kind === "photo");
+
+/** Whether a picture is a photo or a drawing, as far as is known: its folder's say, its faces, else the tag index. */
 async function pictureKind(key: string, faces: FaceView[]): Promise<"photo" | "drawn" | null> {
+  const said = folderKind(usePeople.getState().doc?.kinds, key);
+  if (said) return said;
   const mine = faces.filter((f) => f.key === key);
   if (mine.length) return mine.filter((f) => f.kind === "drawn").length * 2 >= mine.length ? "drawn" : "photo";
   const { useTags } = await import("./tagsStore");
@@ -161,6 +190,14 @@ interface PeopleState {
    * again). None once done, or while the tag index isn't loaded.
    */
   toRecheck(tags: { auto: Record<string, unknown[]> } | null): MediaItem[];
+  /**
+   * Pictures to look at again with the finder they get now: those whose folder's say changed (`relook`),
+   * and those with a face found by the other finder (see `outOfPlace`), unless it is one marked by hand or
+   * given to someone by the user (looking again would drop it).
+   */
+  toRelook(tags: { auto: Record<string, unknown[]> } | null): MediaItem[];
+  /** What folders say their pictures are; the pictures that then go otherwise are looked at again. */
+  setKinds(kinds: Record<string, "photo" | "drawn">): Promise<void>;
   scan(): Promise<void>;
   setOpen(id: string | null): void;
   /** People from a tag folder: each tag a person, a tagged picture's only face theirs; the tags go. */
@@ -443,6 +480,42 @@ export const usePeople = create<PeopleState>((set, get) => {
       return useStore.getState().allItems.filter((it) => scanned[it.key] && !due.has(it.key) && kindFromTags(tags, it.key) === "photo" && !it.key.startsWith(trash) && !d.exclude.some((f) => it.key.startsWith(`${f}/`)));
     },
 
+    toRelook(tags) {
+      const d = get().doc;
+      if (!d) return [];
+      const { scanned, faces, characters } = get();
+      const due = new Set([...get().pending(), ...get().toRecheck(tags)].map((it) => it.key));
+      const asked = new Set(d.relook ?? []);
+      // By picture: whether it has a face out of place that may go, and one the user keeps.
+      const out = new Map<string, { loose: boolean; kept: boolean }>();
+      for (const f of faces) {
+        if (f.marked || !outOfPlace(f, faceKind(d, tags, f.key), characters)) continue;
+        const given = d.faces[String(f.id)];
+        const was = out.get(f.key) ?? { loose: false, kept: false };
+        if (given && !given.auto) was.kept = true;
+        else was.loose = true;
+        out.set(f.key, was);
+      }
+      const trash = (useStore.getState().library?.trashDir ?? "_deleted").replace(/\/+$/, "") + "/";
+      return useStore.getState().allItems.filter((it) => {
+        if (!scanned[it.key] || due.has(it.key) || it.key.startsWith(trash) || d.exclude.some((f) => it.key.startsWith(`${f}/`))) return false;
+        const o = out.get(it.key);
+        return asked.has(it.key) || (!!o?.loose && !o.kept);
+      });
+    },
+
+    async setKinds(kinds) {
+      const d = get().doc;
+      if (!d) return;
+      const { useTags } = await import("./tagsStore");
+      const tags = useTags.getState().data;
+      // The pictures looked at already that are taken for something else now.
+      const now = { ...d, kinds };
+      const changed = Object.keys(get().scanned).filter((k) => faceKind(d, tags, k) !== faceKind(now, tags, k));
+      change((x) => ({ ...x, kinds, relook: [...new Set([...(x.relook ?? []), ...changed])] }));
+      scanSoon(2_000);
+    },
+
     async scan() {
       const root = useStore.getState().root;
       if (!root || get().scanning) return;
@@ -451,17 +524,19 @@ export const usePeople = create<PeopleState>((set, get) => {
       const { useTags } = await import("./tagsStore");
       const tags = useTags.getState().data;
       const recheck = get().toRecheck(tags);
-      const items = [...get().pending(), ...recheck];
+      const relook = get().toRelook(tags);
+      const items = [...get().pending(), ...recheck, ...relook];
       // Noted in the people file once nothing is left to look at again (after the reload below, which
       // would otherwise read the file from before the note was saved).
       let rechecked = !recheck.length && !!tags && !!get().doc && !get().doc!.photosRechecked;
       const note = () => rechecked && change((d) => ({ ...d, photosRechecked: true }));
       if (!items.length) return void note();
       const characters = get().characters;
-      // Which the picture is, from the tag index. A drawn one without the character finder is looked at as
-      // one not known: the face finder alone, and the picture noted to look at again once the finder is here.
+      // Which the picture is: what its folder says, else the tag index. A drawn one without the character
+      // finder is looked at as one not known: the face finder alone, and the picture noted to look at
+      // again once the finder is here.
       const kindOf = (k: string) => {
-        const kind = kindFromTags(tags, k);
+        const kind = faceKind(get().doc, tags, k);
         return kind === "drawn" && !characters ? null : kind;
       };
       set({ scanning: true });
@@ -471,8 +546,12 @@ export const usePeople = create<PeopleState>((set, get) => {
           // A video too: a few frames of it are looked at, each face kept with its moment.
           items.map((it) => ({ key: it.key, path: it.primary, size: it.size, modified: it.modified, kind: kindOf(it.key), raw: it.kind === "raw", video: it.kind === "video" })),
         );
-        // Looked at through to the end: the photos looked at again are done for good.
+        // Looked at through to the end: the photos looked at again are done for good, and so are the pictures asked to be.
         if (recheck.length) rechecked = true;
+        // (And pictures gone since they were asked.)
+        const looked = new Set(relook.map((it) => it.key));
+        const there = new Set(useStore.getState().allItems.map((it) => it.key));
+        if (get().doc?.relook?.some((k) => looked.has(k) || !there.has(k))) change((d) => ({ ...d, relook: (d.relook ?? []).filter((k) => !looked.has(k) && there.has(k)) }));
       } catch (e) {
         if (String(e) !== "stopped") useStore.getState().toast(`Looking for faces stopped: ${String(e).replace(/^Error: /, "")}`, "warn");
       } finally {
@@ -608,6 +687,19 @@ export const usePeople = create<PeopleState>((set, get) => {
         return m ? m[1] + k.slice(m[0].length) : k;
       };
       if (get().doc?.exclude.some((f) => move(f))) change((d) => ({ ...d, exclude: d.exclude.map(moved) }));
+      // What folders say goes with them; a picture moved where another folder says otherwise is looked at again.
+      const kinds = get().doc?.kinds;
+      const relook = get().doc?.relook ?? [];
+      if (kinds || relook.length) {
+        const after = Object.fromEntries(Object.entries(kinds ?? {}).map(([f, k]) => [moved(f), k]));
+        const again = Object.keys(get().scanned)
+          .filter((k) => move(k))
+          .map((k) => [k, moved(k)] as const)
+          .filter(([from, to]) => folderKind(kinds, from) !== folderKind(after, to))
+          .map(([, to]) => to);
+        if (again.length || relook.some((k) => move(k)) || Object.keys(kinds ?? {}).some((f) => move(f)))
+          change((d) => ({ ...d, ...(d.kinds ? { kinds: after } : {}), relook: [...new Set([...(d.relook ?? []).map(moved), ...again])] }));
+      }
       // Who is in a picture with no face to show it goes with the picture.
       if (Object.keys(get().doc?.present ?? {}).some((k) => move(k))) change((d) => ({ ...d, present: Object.fromEntries(Object.entries(d.present ?? {}).map(([k, ids]) => [moved(k), ids])) }));
       // A conversion still to keep or undo: its tags go back on the pictures where they are now.
@@ -675,7 +767,7 @@ export function scanSoon(delay = 15_000) {
     if (!models.find((m) => m.id === "faces")?.downloaded) return;
     await usePeople.getState().load();
     const p = usePeople.getState();
-    if (p.pending().length || p.toRecheck(t.data).length) void p.scan();
+    if (p.pending().length || p.toRecheck(t.data).length || p.toRelook(t.data).length) void p.scan();
   }, delay);
 }
 

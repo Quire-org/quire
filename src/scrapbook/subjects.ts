@@ -107,6 +107,46 @@ export function lassoSubject(mask: Uint8Array, W: number, H: number, poly: [numb
   return { parts: [{ poly, useMask: !exact && seen >= area * 0.2 }], x0, y0, x1, y1, area };
 }
 
+/**
+ * The mask with lines drawn through it (between two subjects that touch, to part them): nothing along
+ * each, `width` pixels wide, so what is on either side comes apart. Each line is first carried on from
+ * both ends, the way it was going, to where the subject ends (under `cut`), so it needn't be drawn
+ * right to the edge. Only for telling the subjects apart: their stickers keep the mask as it was, so
+ * no slit is left where a line ran.
+ */
+export function divided(mask: Uint8Array, W: number, H: number, lines: [number, number][][], cut = MIDDLE, width = Math.max(3, Math.round(Math.max(W, H) / 400))): Uint8Array {
+  if (!lines.length) return mask;
+  const out = new Uint8Array(mask);
+  const r = width / 2;
+  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && mask[Math.floor(y) * W + Math.floor(x)] >= cut;
+  // From the end `a` of a line, the way it went from `b`: on until the subject ends.
+  const onwards = (a: [number, number], b: [number, number]): [number, number][] => {
+    const len = Math.hypot(a[0] - b[0], a[1] - b[1]);
+    if (len < 1) return [];
+    const [dx, dy] = [(a[0] - b[0]) / len, (a[1] - b[1]) / len];
+    const more: [number, number][] = [];
+    for (let k = 1, x = a[0] + dx, y = a[1] + dy; k < W + H && inside(x, y); k++, x += dx, y += dy) more.push([x, y]);
+    return more;
+  };
+  const clear = (cx: number, cy: number) => {
+    for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(H - 1, Math.ceil(cy + r)); y++)
+      for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(W - 1, Math.ceil(cx + r)); x++) if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r) out[y * W + x] = 0;
+  };
+  for (const line of lines) {
+    if (line.length < 2) continue;
+    // The way each end went: from a few points back, so a last wobble doesn't turn it.
+    const back = Math.min(line.length - 1, 4);
+    const pts = [...onwards(line[0], line[back]).reverse(), ...line, ...onwards(line[line.length - 1], line[line.length - 1 - back])];
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, ay] = pts[i - 1];
+      const [bx, by] = pts[i];
+      const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) * 2));
+      for (let k = 0; k <= steps; k++) clear(ax + ((bx - ax) * k) / steps, ay + ((by - ay) * k) / steps);
+    }
+  }
+  return out;
+}
+
 /** Subjects as one: their parts together, their boxes joined. */
 export function merge(subjects: Subject[]): Subject {
   return {

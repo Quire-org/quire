@@ -67,7 +67,7 @@ URL.revokeObjectURL = noop;
 const { useStore, followMoves } = await import("../store");
 const { useTags } = await import("../tagsStore");
 const { useScrapbook } = await import("../scrapbook/store");
-const { findSubjects, lassoSubject, merge, onSubject, pieceOf, tuned, render, withCloserLook, NO_TUNE } = await import("../scrapbook/subjects");
+const { divided, findSubjects, lassoSubject, merge, onSubject, pieceOf, tuned, render, withCloserLook, NO_TUNE } = await import("../scrapbook/subjects");
 const { useEngine } = await import("../plugins/engine");
 const { StickerStudio } = await import("../components/StickerStudio");
 const { layerSize, barAt, drawPage, AssetCache } = await import("../scrapbook/render");
@@ -111,6 +111,36 @@ describe("cutting subjects out for stickers", () => {
       [2, 2, 16, 18, 224],
       [26, 6, 34, 14, 64],
     ]);
+  });
+
+  it("parts two subjects that touch along a line drawn between them, carried on to their edge, with no slit in either", () => {
+    // Two squares joined by a neck, 60 × 30: the model saw one subject.
+    const w = 60;
+    const h = 30;
+    const m = new Uint8Array(w * h);
+    for (let y = 5; y < 25; y++) for (let x = 5; x < 55; x++) if (x < 25 || x >= 35 || (y >= 10 && y < 20)) m[y * w + x] = 255;
+    expect(findSubjects(m, w, h).subjects).toHaveLength(1);
+    // A short line down the neck, not reaching its edges: carried on to them, it parts the two.
+    const line: [number, number][] = [
+      [30, 13],
+      [30, 15],
+      [30.4, 17],
+    ];
+    const cut = divided(m, w, h, [line]);
+    const { labels, subjects } = findSubjects(cut, w, h);
+    expect(subjects.map((s) => [s.x0 < 30, s.x1 > 30])).toEqual([
+      [true, false],
+      [false, true],
+    ]);
+    // A line in the empty part of the picture parts nothing.
+    expect(findSubjects(divided(m, w, h, [[[2, 2], [2, 28]]]), w, h).subjects).toHaveLength(1);
+    // Each sticker keeps the mask as it was: solid right up to the line, nothing cut out of it.
+    const pixels = new Uint8ClampedArray(w * h * 4).fill(255);
+    const left = pieceOf(pixels, m, labels, w, h, subjects.find((s) => s.x0 < 30)!);
+    const at = (x: number, y: number) => left.alpha[(y - left.y0) * left.w + (x - left.x0)];
+    expect(at(10, 15)).toBe(255);
+    expect(at(28, 15)).toBe(255);
+    expect(at(40, 15)).toBe(0);
   });
 
   it("keeps a subject the model was only fairly sure of fully solid, not see-through (no white veil)", () => {

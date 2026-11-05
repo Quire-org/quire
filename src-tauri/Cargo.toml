@@ -1,6 +1,6 @@
 [package]
 name = "quire"
-version = "0.1.1"
+version = "0.1.2"
 description = "Sort, rate and browse photos and videos on an external volume"
 authors = ["Kile"]
 edition = "2024"

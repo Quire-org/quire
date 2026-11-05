@@ -437,3 +437,79 @@ describe("looking again after a yes or a no", () => {
     expect((vi.mocked(api.facesSort).mock.calls[before + 1][1] as { assigned: unknown[] }).assigned).toHaveLength(3);
   });
 });
+
+describe("what a picture is for the face finders: its folder's say, else the tag index", () => {
+  const tagsWith = async (auto: Record<string, unknown[]>) => {
+    const { useTags } = await import("../tagsStore");
+    useTags.setState({ data: { version: 1, types: [], tags: {}, auto, indexed: {}, autoMap: {}, albums: {} }, loaded: true } as never);
+    return useTags.getState().data;
+  };
+  // The People file as kept: what was saved is what loading again reads.
+  const kept = () => vi.mocked(api.peopleLoad).mockImplementation(async () => usePeople.getState().doc);
+  const rechecked = () => usePeople.setState((s) => ({ doc: { ...s.doc!, photosRechecked: true } }));
+
+  it("is what the deepest folder that says so says, else what the tag index takes it for", async () => {
+    const { folderKind, faceKind } = await import("../peopleStore");
+    const kinds = { Art: "drawn", "Art/Cosplay": "photo" } as const;
+    expect(folderKind(kinds, "Art/a.png")).toBe("drawn");
+    expect(folderKind(kinds, "Art/Cosplay/b.jpg")).toBe("photo");
+    expect(folderKind(kinds, "Artworks/c.png")).toBeNull();
+    expect(faceKind({ kinds } as never, { auto: { "Inbox/d.jpg": [[0, 0.9]] } }, "Inbox/d.jpg")).toBe("drawn");
+    expect(faceKind({ kinds } as never, { auto: { "Art/Cosplay/b.jpg": [[0, 0.9]] } }, "Art/Cosplay/b.jpg")).toBe("photo");
+  });
+
+  it("looks again at a picture with a face the other finder found, unless it is marked by hand or named", async () => {
+    kept();
+    const tags = await tagsWith({ "p1.jpg": [], "p2.jpg": [], "p3.jpg": [], "d1.png": [[0, 0.9]] });
+    be.faces = [face(10, "p1.jpg", "drawn"), { ...face(11, "p2.jpg", "drawn"), marked: true }, face(12, "p3.jpg", "drawn"), face(13, "d1.png", "photo")];
+    be.scanned = { "p1.jpg": [10, 1], "p2.jpg": [10, 1], "p3.jpg": [10, 1], "d1.png": [10, 1] };
+    useStore.setState({ allItems: [item("p1.jpg"), item("p2.jpg"), item("p3.jpg"), item("d1.png")] } as never);
+    await usePeople.getState().load(true);
+    rechecked();
+    usePeople.getState().name([12], "Kai");
+    usePeople.setState({ characters: true });
+    expect(usePeople.getState().toRelook(tags).map((i) => i.key)).toEqual(["p1.jpg", "d1.png"]);
+    // Without the character finder, the Face finder's face in a drawing stays: nothing else could look.
+    usePeople.setState({ characters: false });
+    expect(usePeople.getState().toRelook(tags).map((i) => i.key)).toEqual(["p1.jpg"]);
+    vi.mocked(api.facesScan).mockClear();
+    await usePeople.getState().scan();
+    expect(vi.mocked(api.facesScan).mock.lastCall?.[1]).toMatchObject([{ key: "p1.jpg", kind: "photo" }]);
+    vi.mocked(api.peopleLoad).mockReset();
+  });
+
+  it("a folder said to be drawings: its pictures looked at already are looked at again as drawings, once", async () => {
+    kept();
+    await tagsWith({ "Art/a.png": [], "Art/b.png": [[0, 0.9]], "Inbox/c.jpg": [] });
+    be.faces = [];
+    be.scanned = { "Art/a.png": [10, 1], "Art/b.png": [10, 1], "Inbox/c.jpg": [10, 1] };
+    useStore.setState({ allItems: [item("Art/a.png"), item("Art/b.png"), item("Inbox/c.jpg")] } as never);
+    await usePeople.getState().load(true);
+    rechecked();
+    usePeople.setState({ characters: true });
+    await usePeople.getState().setKinds({ Art: "drawn" });
+    // a.png the tag index took for a photo is a drawing now; b.png was one already.
+    expect(usePeople.getState().doc!.relook).toEqual(["Art/a.png"]);
+    vi.mocked(api.facesScan).mockClear();
+    await usePeople.getState().scan();
+    expect(vi.mocked(api.facesScan).mock.lastCall?.[1]).toMatchObject([{ key: "Art/a.png", kind: "drawn" }]);
+    expect(usePeople.getState().doc!.relook).toEqual([]);
+    vi.mocked(api.peopleLoad).mockReset();
+  });
+
+  it("goes with its folder when it moves, and a picture moved where a folder says otherwise is looked at again", async () => {
+    kept();
+    await tagsWith({});
+    be.faces = [];
+    be.scanned = { "Inbox/a.png": [10, 1] };
+    await usePeople.getState().load(true);
+    await usePeople.getState().setKinds({ Art: "drawn" });
+    usePeople.getState().follow([
+      ["Art", "Drawings"],
+      ["Inbox/a.png", "Drawings/a.png"],
+    ]);
+    expect(usePeople.getState().doc!.kinds).toEqual({ Drawings: "drawn" });
+    expect(usePeople.getState().doc!.relook).toEqual(["Drawings/a.png"]);
+    vi.mocked(api.peopleLoad).mockReset();
+  });
+});

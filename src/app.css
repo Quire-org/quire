@@ -3745,6 +3745,9 @@ button.chip:hover {
   flex-direction: column;
   padding: 6px;
   gap: 2px;
+  /* Taller than the window (max-height, set where it is placed): it scrolls. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--hud-bg);
   backdrop-filter: blur(8px);
 }
