@@ -306,6 +306,9 @@ pub fn handle(shared: &Mutex<Shared>, req: &Request, ip: IpAddr) -> Response {
 #[cfg(unix)]
 pub fn local_addresses() -> Vec<(String, Ipv4Addr)> {
     let mut out = vec![];
+    // SAFETY: getifaddrs(3) fills a list the system owns until freeifaddrs; each node and the address
+    // and name it points to are read only while the list lives, after the null checks, and an AF_INET
+    // address is a sockaddr_in. The list is freed once, at the end.
     unsafe {
         let mut ifap: *mut libc::ifaddrs = std::ptr::null_mut();
         if libc::getifaddrs(&mut ifap) != 0 {

@@ -3,6 +3,7 @@ name = "quire-tags"
 version = "0.1.0"
 authors = ["Kile"]
 edition = "2024"
+rust-version = "1.89"
 description = "The tag index and each tag's learning: apart from the app so they are optimised in dev builds too"
 publish = false
 
@@ -10,3 +11,7 @@ publish = false
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
+
+# No unsafe code here: none is needed.
+[lints.rust]
+unsafe_code = "forbid"

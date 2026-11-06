@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 
 vi.mock("../lib/api", () => ({
   api: new Proxy({} as Record<string, unknown>, { get: () => async () => null }),
-  mediaUrl: () => "",
+  mediaUrl: (m: { primary: string }) => m.primary,
   rawPreviewUrl: async () => "",
   thumbUrl: () => "",
   canThumb: () => false,
@@ -72,6 +72,28 @@ describe("a video's sound", () => {
     const at = Number(localStorage.getItem("quire.soundOnAt"));
     expect(soundLetOn(at + 59 * 60_000)).toBe(true);
     expect(soundLetOn(at + 61 * 60_000)).toBe(false);
+  });
+
+  it("stops and lets go of a video once it is gone: the next one shown, or the screen left", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {});
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    const ref = createRef<HTMLVideoElement>();
+    await act(async () => root.render(createElement(MediaStage, { item: video("a.mp4") as never, videoRef: ref })));
+    const first = ref.current!;
+    await act(async () => root.render(createElement(MediaStage, { item: video("b.mp4") as never, videoRef: ref })));
+    const next = ref.current!;
+    const paused = () => vi.mocked(HTMLMediaElement.prototype.pause).mock.contexts;
+    expect(next).not.toBe(first);
+    expect(paused()).toContain(first);
+    expect(first.hasAttribute("src")).toBe(false);
+    expect(next.hasAttribute("src")).toBe(true);
+    await act(async () => root.unmount());
+    expect(paused()).toContain(next);
+    expect(next.hasAttribute("src")).toBe(false);
+    expect(ref.current).toBe(null);
+    host.remove();
   });
 
   it("plays muted when the webview refuses to start it with sound, and keeps the sound let on for the next", async () => {

@@ -92,6 +92,13 @@ const SAME_PART: f32 = 0.92;
 /// corner is found, but the whole picture wins when both match.
 pub const PART_MARGIN: f32 = 0.01;
 
+/// How like a unit vector an item is: its whole picture, or one of its crops or frames
+/// (`PART_MARGIN` less), whichever is more.
+fn best_of(e: &Emb, parts: Option<&Vec<Emb>>, q: &[f32]) -> f32 {
+    let whole = e.dot(q);
+    parts.map_or(whole, |ps| ps.iter().map(|p| p.dot(q) - PART_MARGIN).fold(whole, f32::max))
+}
+
 #[derive(Clone)]
 pub struct Emb {
     q: Vec<i8>,
@@ -129,6 +136,9 @@ impl Emb {
 pub enum Query {
     Vector(Vec<f32>),
     Keys(Vec<String>),
+    /// A key by each of its crops or frames (a video by its frames, not their mean, which is more like
+    /// other videos' means than like any picture), or by its whole when it has none.
+    Parts(String),
 }
 
 /// The items of an album tag key ("album:…"): their mean stands for the album.
@@ -456,9 +466,18 @@ impl Index {
         unit(sum?)
     }
 
+    /// The vectors a query asks with: a key's parts each (`Parts`), or the one.
+    fn query_vecs(&self, q: &Query, groups: &Groups) -> Vec<Vec<f32>> {
+        match q {
+            Query::Parts(key) if self.parts.get(key).is_some_and(|ps| !ps.is_empty()) => self.parts_of(key),
+            _ => self.query(q, groups).into_iter().collect(),
+        }
+    }
+
     fn query(&self, q: &Query, groups: &Groups) -> Option<Vec<f32>> {
         match q {
             Query::Vector(v) => unit(v.clone()),
+            Query::Parts(key) => self.vector(key, groups),
             Query::Keys(keys) if keys.len() == 1 => self.vector(&keys[0], groups),
             Query::Keys(keys) => {
                 // Album keys among them count by their pages.
@@ -475,11 +494,9 @@ impl Index {
         }
     }
 
-    /// How like a unit vector an item is: the whole picture, or one of its crops or frames
-    /// (`PART_MARGIN` less), whichever is more.
+    /// How like a unit vector an item is (`best_of`), its crops or frames looked up.
     fn best(&self, key: &str, e: &Emb, q: &[f32]) -> f32 {
-        let whole = e.dot(q);
-        self.parts.get(key).map_or(whole, |ps| ps.iter().map(|p| p.dot(q) - PART_MARGIN).fold(whole, f32::max))
+        best_of(e, self.parts.get(key), q)
     }
 
     /// How like a vector (say, words) a key is: an album by its pages, an item by its whole picture or
@@ -497,14 +514,19 @@ impl Index {
     /// `parts`: an item's crops and frames count too (for words: something small in it is found).
     #[allow(clippy::too_many_arguments)]
     pub fn rank(&self, queries: &[Query], candidates: Option<&[String]>, groups: &Groups, skip: &HashSet<String>, min: f32, limit: usize, parts: bool) -> Vec<(String, f32)> {
-        let qs: Vec<Vec<f32>> = queries.iter().filter_map(|q| self.query(q, groups)).collect();
+        let qs: Vec<Vec<f32>> = queries.iter().flat_map(|q| self.query_vecs(q, groups)).collect();
         if qs.is_empty() {
             return Vec::new();
         }
-        let best_direct = |k: &str, e: &Emb| qs.iter().map(|q| if parts { self.best(k, e, q) } else { e.dot(q) }).fold(f32::MIN, f32::max);
+        // An item's crops or frames looked up once, not once for each query.
+        let best_direct = |k: &str, e: &Emb| {
+            let ps = if parts { self.parts.get(k) } else { None };
+            qs.iter().map(|q| best_of(e, ps, q)).fold(f32::MIN, f32::max)
+        };
         let best_vec = |v: &[f32]| qs.iter().map(|q| v.iter().zip(q).map(|(a, b)| a * b).sum::<f32>()).fold(f32::MIN, f32::max);
-        let mut out: Vec<(String, f32)> = match candidates {
-            None => self.vecs.iter().filter(|(k, _)| !skip.contains(*k)).map(|(k, e)| (k.clone(), best_direct(k, e))).filter(|(_, s)| *s >= min).collect(),
+        // In order, then only the first `limit` keys copied out (not every one at least `min`).
+        let mut out: Vec<(&String, f32)> = match candidates {
+            None => self.vecs.iter().filter(|(k, _)| !skip.contains(*k)).map(|(k, e)| (k, best_direct(k, e))).filter(|(_, s)| *s >= min).collect(),
             Some(keys) => keys
                 .iter()
                 .filter(|k| !skip.contains(*k))
@@ -513,13 +535,12 @@ impl Index {
                         Some(_) => best_vec(&self.vector(k, groups)?),
                         None => best_direct(k, self.vecs.get(k)?),
                     };
-                    (s >= min).then(|| (k.clone(), s))
+                    (s >= min).then_some((k, s))
                 })
                 .collect(),
         };
         out.sort_by(|a, b| b.1.total_cmp(&a.1));
-        out.truncate(limit);
-        out
+        out.into_iter().take(limit).map(|(k, s)| (k.clone(), s)).collect()
     }
 
     /// For each key, its cosine with each of `vectors` (None: not indexed).
@@ -598,6 +619,22 @@ mod tests {
         assert!((back.parts_of("b")[0][1] - 1.0).abs() < 0.01);
         assert!((back.anime_vector("b", &Groups::new()).unwrap()[1] - 0.8).abs() < 0.01);
         assert_eq!(back.anime_dim(), 2);
+    }
+
+    #[test]
+    fn a_video_asks_by_its_frames_and_finds_a_picture_like_one_before_a_video_like_its_mean() {
+        let mut i = ix();
+        // "v" and "w": videos, their wholes the mean of their frames, those nearly alike; "p" a picture like one of v's frames.
+        i.put("v", Some(&[1.0, 1.0, 0.0]), &[vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]], None, None, S);
+        i.put("w", Some(&[1.0, 1.0, 0.3]), &[vec![0.2, 0.0, 1.0], vec![0.6, 0.6, 0.5]], None, None, S);
+        put(&mut i, "p", &[1.0, 0.0, 0.0]);
+        let skip = HashSet::from(["v".to_string()]);
+        let order = |q: Query, parts: bool| i.rank(&[q], None, &Groups::new(), &skip, 0.0, 10, parts).into_iter().map(|h| h.0).collect::<Vec<_>>();
+        assert_eq!(order(Query::Keys(vec!["v".into()]), false), ["w", "p"]);
+        assert_eq!(order(Query::Parts("v".into()), true), ["p", "w"]);
+        // A picture has no frames: it asks by its whole, and finds the video with a frame like it.
+        let by_p = i.rank(&[Query::Parts("p".into())], None, &Groups::new(), &HashSet::from(["p".to_string()]), 0.0, 10, true);
+        assert_eq!(by_p[0].0, "v");
     }
 
     #[test]

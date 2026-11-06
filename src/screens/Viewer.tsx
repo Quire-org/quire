@@ -8,7 +8,9 @@ import { useStore, originalOf, selectCurrent, selectRating } from "../store";
 import { VersionSwitch } from "../components/VersionSwitch";
 import { PageTurn } from "../components/PageTurn";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
-import { ArrowCounterClockwise, ArrowLeft, Books, CaretDown, Info, Tag as TagIcon, CaretLeft, CaretRight, Copy, FolderOpen, GearSix, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash, Scissors, BookOpen, UsersThree, PaintBrush, MagnifyingGlass } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowLeft, Books, CaretDown, Info, Tag as TagIcon, CaretLeft, CaretRight, Copy, FolderOpen, GearSix, Pause, PencilSimple, Play, Question, Shuffle, Sparkle, SquaresFour, Trash, Scissors, BookOpen, UsersThree, PaintBrush, MagnifyingGlass, Stack } from "@phosphor-icons/react";
+import { canShowSimilar, showSimilar } from "../similarStore";
+import { openSeriesAdd } from "../seriesStore";
 import { useScrapbook } from "../scrapbook/store";
 import { Popover } from "../components/Popover";
 import { ContextMenu } from "../components/ContextMenu";
@@ -39,6 +41,7 @@ import { mediaUrl } from "../lib/api";
 import { notForTarget, pickLibraryFolder } from "../components/FolderBrowser";
 import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
 import { basename, ext, tailPath } from "../lib/format";
+import { releaseVideo } from "../lib/video";
 
 export function Viewer() {
   // Find's platforms, each with its own icon, as in the top bar; Back names the one Find shows.
@@ -59,6 +62,9 @@ export function Viewer() {
     e.preventDefault();
     setPathMenu({ x: e.clientX, y: e.clientY });
   };
+  // Right-click on the picture: more like it, its series, where it is.
+  const [stageMenu, setStageMenu] = useState<{ x: number; y: number } | null>(null);
+  const inSeries = useStore((st) => !!current && !!st.library?.series?.some((x) => x.includes(current.key)));
   // ⇧ and a key (or ⇧-click) of a target that files by the day: which folder of yours in it.
   const [chooseIn, setChooseIn] = useState<Target | null>(null);
   const infoShown = useStore((x) => !!x.infoItem) && !s.editMode;
@@ -137,10 +143,7 @@ export function Viewer() {
     v.preload = "metadata";
     v.src = mediaUrl(current);
     v.onloadedmetadata = () => setVideoDuration(isFinite(v.duration) ? v.duration : 0);
-    return () => {
-      v.removeAttribute("src");
-      v.load();
-    };
+    return () => releaseVideo(v);
   }, [current?.key]);
 
   // Keep the stage clear of the HUD bars whatever their height (target buttons may wrap).
@@ -360,7 +363,25 @@ export function Viewer() {
           }}
         />
       )}
-      <div className="stage">
+      <div
+        className="stage"
+        onContextMenu={(e) => {
+          if (!current || s.editMode) return;
+          e.preventDefault();
+          setStageMenu({ x: e.clientX, y: e.clientY });
+        }}
+      >
+        {current && !s.editMode && (
+          <ContextMenu
+            at={stageMenu}
+            items={[
+              ...(canShowSimilar(current) ? [{ label: <><Sparkle /> Show similar</>, onClick: () => showSimilar(current) }] : []),
+              ...(inSeries ? [{ label: <><Stack /> Add to series…</>, onClick: () => openSeriesAdd(current.key) }] : []),
+              { label: <><FolderOpen /> Show in Files</>, onClick: () => s.showInFiles(current.primary) },
+            ]}
+            onClose={() => setStageMenu(null)}
+          />
+        )}
         {current && s.editMode ? (
           <EditStage item={current} />
         ) : current ? (
@@ -643,8 +664,8 @@ function SeriesBadge({ item }: { item: MediaItem }) {
   const inQueue = queue.filter((q) => series.includes(q.key));
   const at = inQueue.findIndex((q) => q.key === item.key);
   return (
-    <span className="badge accent" title={together ? "One of a series kept together: a target key files all of it" : "One of a series (kept apart: Settings, Look and reading)"}>
+    <button className="badge accent badge-button" onClick={() => openSeriesAdd(item.key)} title={`${together ? "One of a series kept together: a target key files all of it" : "One of a series (kept apart: Settings, Look and reading)"}. Click: the series, and more to add to it`}>
       SERIES {together && inQueue.length > 1 ? `${at + 1}/${inQueue.length}` : `· ${seriesCount(series, trashDir)}`}
-    </span>
+    </button>
   );
 }

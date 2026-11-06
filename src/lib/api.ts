@@ -222,8 +222,12 @@ export const api = {
   /** Files whose size or time changed but not their content: what was indexed of them still holds. */
   tagsIndexRestamp: (root: string, stamps: [string, number, number][]) => invoke<void>("tags_index_restamp", { root, stamps }),
   tagsIndexRename: (root: string, pairs: [string, string][]) => invoke<void>("tags_index_rename", { root, pairs }),
-  /** The items most like any of the queries (candidates: these keys, else everything indexed), best first. */
-  tagsRank: (root: string, req: { queries: ({ keys: string[] } | { vector: number[] })[]; candidates: string[] | null; groups: Record<string, string[]>; skip: string[]; min: number; limit: number }) =>
+  /**
+   * The items most like any of the queries (candidates: these keys, else everything indexed), best
+   * first. `parts`: an item's crops and frames count too; a `{ parts: key }` query asks by that item's
+   * frames (a video's, not their mean).
+   */
+  tagsRank: (root: string, req: { queries: ({ keys: string[] } | { vector: number[] } | { parts: string })[]; candidates: string[] | null; groups: Record<string, string[]>; skip: string[]; min: number; limit: number; parts?: boolean }) =>
     invoke<[string, number][]>("tags_rank", { root, ...req }),
   /** Each item's likeness to each vector (null: not indexed). */
   tagsScores: (root: string, keys: string[], vectors: number[][], groups: Record<string, string[]>) => invoke<(number[] | null)[]>("tags_scores", { root, keys, vectors, groups }),

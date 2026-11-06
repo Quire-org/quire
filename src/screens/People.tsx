@@ -1,12 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Check, FolderMinus, GitMerge, Image as ImageIcon, MagnifyingGlass, PencilSimple, Scissors, UserMinus, Users, X } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, Check, FolderMinus, GitMerge, Image as ImageIcon, MagnifyingGlass, PencilSimple, Scissors, SortAscending, SortDescending, UserMinus, Users, X } from "@phosphor-icons/react";
 import { TopNav } from "../components/TopNav";
 import { ContextMenu, type MenuItem } from "../components/ContextMenu";
 import { Modal } from "../components/Modal";
 import { OnePicture } from "../components/ComparePair";
 import { FolderPicker } from "../components/FolderPicker";
 import { StickerBanner } from "../components/StickerBanner";
-import { useStore } from "../store";
+import { loadPref, savePref, useStore } from "../store";
 import { useTags } from "../tagsStore";
 import { asTag, characterGuess, characterTagOf, kindOfFace, nameMatches, niceTag, scanSoon, seenIn, seriesOfTag, useFaceMode, usePeople, type Person, type PersonKind } from "../peopleStore";
 import { canThumb, faceUrl, mediaUrl, thumbUrl } from "../lib/api";
@@ -14,6 +14,7 @@ import { formatTime } from "../lib/format";
 import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
 import { allSources } from "../lib/sources";
 import { useScrollMemory } from "../lib/scrollMemory";
+import { useRunPick } from "../lib/useRunPick";
 import type { FaceView, MediaItem } from "../lib/types";
 
 type Filter = "all" | PersonKind;
@@ -375,8 +376,11 @@ export function atItsMoment(face: FaceView) {
 
 export function portraitOf(person: Person, faces: FaceView[]): FaceView | null {
   const chosen = person.portrait != null ? faces.find((f) => f.id === person.portrait) : null;
-  return chosen ?? faces.reduce<FaceView | null>((best, f) => (!best || f.size * f.score > best.size * best.score ? f : best), null);
+  return chosen ?? bestFace(faces);
 }
+
+/** The face that shows someone best: the largest, as surely a face as it is. */
+const bestFace = (faces: FaceView[]) => faces.reduce<FaceView | null>((best, f) => (!best || f.size * f.score > best.size * best.score ? f : best), null);
 
 /** Each person's faces. */
 function useFacesOf(): Map<string, FaceView[]> {
@@ -403,6 +407,9 @@ const CHECK_PAGE = 120;
 /** How many of each person's pictures were shown (Show more), and whose faces to check were open, for coming back to their page. */
 const shownUpTo = new Map<string, number>();
 const checking = new Set<string>();
+
+/** Suggested faces the surest first, or the least sure first (those teach the matching the most): kept on this computer. */
+const SUREST_KEY = "quire.people.surestFirst";
 
 function WhoStrip() {
   const p = usePeople();
@@ -732,13 +739,21 @@ function PersonPage({ person }: { person: Person }) {
   const doubted = useDoubts().get(person.id);
   const doubtSet = useMemo(() => new Set(doubted ?? []), [doubted]);
   const yearOf = (f: FaceView) => new Date(items.get(f.key)?.modified ?? 0).getFullYear();
+  // Pictures, not faces: one they are in twice counts once.
   const years = useMemo(() => {
     const out = new Map<number, number>();
-    for (const f of mine) if (items.get(f.key)) out.set(yearOf(f), (out.get(yearOf(f)) ?? 0) + 1);
+    const seen = new Set<string>();
+    for (const f of mine) if (items.get(f.key) && !seen.has(f.key)) (seen.add(f.key), out.set(yearOf(f), (out.get(yearOf(f)) ?? 0) + 1));
     return [...out.entries()].sort((a, b) => a[0] - b[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mine, items]);
   const shown = useMemo(() => mine.filter((f) => items.get(f.key) && (year === null || yearOf(f) === year)).sort((a, b) => (items.get(b.key)?.modified ?? 0) - (items.get(a.key)?.modified ?? 0)), [mine, items, year]);
+  // A picture once, with all their faces in it (a video: its faces are at different moments, so one tile, its first face marked).
+  const tiles = useMemo(() => {
+    const byKey = new Map<string, FaceView[]>();
+    for (const f of shown) byKey.set(f.key, [...(byKey.get(f.key) ?? []), f]);
+    return [...byKey.values()].map((faces) => (faces[0].at != null ? [faces.reduce((a, b) => ((b.at ?? 0) < (a.at ?? 0) ? b : a))] : faces));
+  }, [shown]);
   const max = Math.max(1, ...years.map(([, n]) => n));
   // Who else is in their pictures, most often first.
   const withThem = useMemo(() => {
@@ -751,7 +766,9 @@ function PersonPage({ person }: { person: Person }) {
     return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([id]) => p.doc!.people[id]).filter(Boolean);
   }, [mine, p.doc, p.byId, person.id]);
   const others = Object.values(p.doc!.people).filter((x) => x.kind === person.kind && x.id !== person.id).sort((a, b) => a.name.localeCompare(b.name));
-  const one = picked.size === 1 ? [...picked][0] : null;
+  // One picture picked: its best face of theirs can be their portrait.
+  const pickedFaces = mine.filter((f) => picked.has(f.id));
+  const one = pickedFaces.length && pickedFaces.every((f) => f.key === pickedFaces[0].key) ? bestFace(pickedFaces)!.id : null;
   const face = portraitOf(person, mine);
   // Pictures they are in with no face known to be theirs (said so, or from a tag): counted with the rest.
   const noFace = useMemo(() => Object.entries(p.doc!.present ?? {}).filter(([k, ids]) => ids.includes(person.id) && items.get(k)).map(([k]) => k), [p.doc, person.id, items]);
@@ -781,19 +798,22 @@ function PersonPage({ person }: { person: Person }) {
     },
     [shown, items],
   );
-  const togglePick = useCallback((id: number) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; }), []);
+  // A picture picked is all of their faces in it.
+  const togglePick = useCallback((ids: number[]) => setPicked((s) => { const n = new Set(s); const on = ids.every((id) => n.has(id)); for (const id of ids) if (on) n.delete(id); else n.add(id); return n; }), []);
   // Right-click: the picture, or all those picked if it's one of them.
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; items: MenuItem[] } | null>(null);
   const onMenu = useCallback(
-    (e: React.MouseEvent, f: FaceView) => {
+    (e: React.MouseEvent, faces: FaceView[]) => {
       e.preventDefault();
-      const ids = picked.has(f.id) && picked.size > 1 ? [...picked] : [f.id];
+      const f = faces[0];
+      const mineHere = faces.map((x) => x.id);
+      const ids = mineHere.every((id) => picked.has(id)) && picked.size > mineHere.length ? [...picked] : mineHere;
       const these = ids.length === 1 ? "" : ` these ${ids.length}`;
       setMenu({
         at: { x: e.clientX, y: e.clientY },
         items: [
           { label: "Open", onClick: () => openPictures(f) },
-          ...(ids.length === 1 ? [{ label: "Use as portrait", onClick: () => usePeople.getState().setPortrait(person.id, f.id) }] : []),
+          ...(ids === mineHere ? [{ label: "Use as portrait", onClick: () => usePeople.getState().setPortrait(person.id, bestFace(faces)!.id) }] : []),
           { label: `Someone else${these}…`, onClick: () => (setPicked(new Set(ids)), setSplitting(true)) },
           { separator: true },
           { label: `Remove${these} from ${person.name}`, danger: true, onClick: () => (usePeople.getState().notThem(ids, person.id), setPicked(new Set())) },
@@ -899,7 +919,7 @@ function PersonPage({ person }: { person: Person }) {
       <div className="person-pics-head keyed">
         <div className="label">
           {drawn ? "Pictures" : "Photos"}
-          {year !== null && ` · ${year}`} · their face marked · {shown.length.toLocaleString("en-GB")}
+          {year !== null && ` · ${year}`} · their face marked · {tiles.length.toLocaleString("en-GB")}
         </div>
         {year !== null && (
           <button className="btn sm ghost" onClick={() => setYear(null)}>
@@ -944,14 +964,14 @@ function PersonPage({ person }: { person: Person }) {
         )}
       </div>
       <div className="person-pics">
-        {shown.slice(0, limit).map((f) => (
-          <PictureTile key={f.id} face={f} mark={doubtSet.has(f.id) ? "doubt" : ""} picked={picked.has(f.id)} onPick={togglePick} onOpen={openPictures} onMenu={onMenu} />
+        {tiles.slice(0, limit).map((faces) => (
+          <PictureTile key={faces[0].key} faces={faces} doubts={doubtSet} picked={faces.every((f) => picked.has(f.id))} onPick={togglePick} onOpen={openPictures} onMenu={onMenu} />
         ))}
       </div>
-      {shown.length > limit && (
+      {tiles.length > limit && (
         <div className="row person-more">
           <button className="btn sm" onClick={() => setLimit(limit + 300)}>
-            Show more ({(shown.length - limit).toLocaleString("en-GB")} left)
+            Show more ({(tiles.length - limit).toLocaleString("en-GB")} left)
           </button>
         </div>
       )}
@@ -1204,8 +1224,9 @@ function NoFaceFound({ person, keys }: { person: Person; keys: string[] }) {
 /**
  * Their faces to check, a page at a time: those given them (from a tag, or with a group) that are like
  * none of their others, which don't count for them until checked; and faces that look like them
- * (two of theirs agreeing), least sure first, theirs only once said yes to. No, not them, keeps it
- * from being suggested for them again.
+ * (two of theirs agreeing), each with how alike, the surest or the least sure first, theirs only once
+ * said yes to. No, not them, keeps it from being suggested for them again. Picked with clicks (shift:
+ * a run), many are said yes or no to at once.
  */
 function CheckFaces({ person, doubted }: { person: Person; doubted: number[] }) {
   const p = usePeople();
@@ -1223,7 +1244,26 @@ function CheckFaces({ person, doubted }: { person: Person; doubted: number[] }) 
   const suggested = useSuggestions().get(person.id);
   const found = useMemo(() => (suggested ?? []).map(({ face, s }) => ({ face: p.byId.get(face), s })).filter((x): x is { face: FaceView; s: number } => !!x.face), [suggested, p.byId]);
   const doubts = useMemo(() => doubted.map((id) => p.byId.get(id)).filter((f): f is FaceView => !!f), [doubted, p.byId]);
+  const [surest, setSurestNow] = useState(() => loadPref(SUREST_KEY, { v: true }).v);
+  const setSurest = (on: boolean) => (savePref(SUREST_KEY, { v: on }), setSurestNow(on));
+  const ordered = useMemo(() => (surest ? [...found].reverse() : found), [found, surest]);
+  // What shows, in order (the faces given them first): picking a run goes by it.
+  const shownDoubts = doubts.slice(0, limit);
+  const shownFound = ordered.slice(0, Math.max(0, limit - doubts.length));
+  const shown = [...shownDoubts.map((f) => f.id), ...shownFound.map((x) => x.face.id)];
+  const { picked, pick, setPicked } = useRunPick(shown);
   if (!found.length && !doubts.length) return null;
+  const pickedNow = shown.filter((id) => picked.has(id));
+  const doubtIds = new Set(doubts.map((f) => f.id));
+  /** The picked faces theirs: those given them checked, those suggested taken. */
+  const yesPicked = () => {
+    const given = pickedNow.filter((id) => doubtIds.has(id));
+    const suggested = pickedNow.filter((id) => !doubtIds.has(id));
+    if (given.length) p.confirm(given);
+    if (suggested.length) p.accept(suggested, person.id);
+    setPicked(new Set());
+  };
+  const noPicked = () => (p.notThem(pickedNow, person.id), setPicked(new Set()));
   const kind = (doubts[0] ?? found[0].face).kind;
   const unsure = found.filter((x) => x.s < SURE_SUGGESTED[kind]).length;
   const what = [doubts.length ? `${doubts.length} like none of their others` : "", found.length ? `${found.length.toLocaleString("en-GB")} suggested` : ""].filter(Boolean).join(" · ");
@@ -1247,14 +1287,24 @@ function CheckFaces({ person, doubted }: { person: Person; doubted: number[] }) 
       ],
     });
   };
-  const face = (f: FaceView, yes: () => void, cls = "") => (
-    <div key={f.id} className={`found-face ${cls} ${naming?.id === f.id ? "naming" : ""}`} onDoubleClick={() => setLooking({ face: f, yes })} onContextMenu={(e) => faceMenu(e, f, yes)} title="Double-click: the whole picture it is in; right-click for more">
+  const face = (f: FaceView, i: number, yes: () => void, cls = "", s?: number) => (
+    <div key={f.id} className={`found-face ${cls} ${picked.has(f.id) ? "picked" : ""} ${naming?.id === f.id ? "naming" : ""}`} onClick={(e) => pick(i, e)} onDoubleClick={() => setLooking({ face: f, yes })} onContextMenu={(e) => faceMenu(e, f, yes)} title="Click: pick it (shift: a run); double-click: the whole picture it is in; right-click for more">
       <FaceCrop face={f} size={104} />
+      {s != null && (
+        <span className={`match-score mono ${s < SURE_SUGGESTED[f.kind] ? "unsure" : ""}`} title={`${Math.round(s * 100)}% like the closest of their faces${s < SURE_SUGGESTED[f.kind] ? ": less sure, look closer" : ""}`}>
+          {Math.round(s * 100)}%
+        </span>
+      )}
+      {picked.has(f.id) && (
+        <span className="tile-check">
+          <Check />
+        </span>
+      )}
       <span className="found-actions">
-        <button className="btn sm" title={`Yes, ${person.name}`} onClick={yes}>
+        <button className="btn sm" title={`Yes, ${person.name}`} onClick={(e) => (e.stopPropagation(), yes())}>
           <Check />
         </button>
-        <button className="btn sm" title={`Not ${person.name}`} onClick={() => p.notThem([f.id], person.id)}>
+        <button className="btn sm" title={`Not ${person.name}`} onClick={(e) => (e.stopPropagation(), p.notThem([f.id], person.id))}>
           <X />
         </button>
       </span>
@@ -1267,6 +1317,25 @@ function CheckFaces({ person, doubted }: { person: Person; doubted: number[] }) 
           Faces to check: {what}
           {unsure ? <span className="dim">, {unsure} less sure</span> : null}
         </b>
+        {open && pickedNow.length > 0 && (
+          <>
+            <span className="small mono">{pickedNow.length} picked</span>
+            <button className="btn sm primary" onClick={yesPicked} title={`Every one picked is ${person.name}`}>
+              <Check /> Yes, {person.name}
+            </button>
+            <button className="btn sm" onClick={noPicked} title={`None of those picked is ${person.name}: not suggested for them again`}>
+              <X /> Not {person.name}
+            </button>
+            <button className="btn sm ghost" onClick={() => setPicked(new Set())}>
+              Unpick
+            </button>
+          </>
+        )}
+        {open && pickedNow.length < shown.length && (
+          <button className="btn sm ghost" onClick={() => setPicked(new Set(shown))} title="Pick every face shown, to say yes or no to all of them">
+            Pick all {shown.length.toLocaleString("en-GB")} shown
+          </button>
+        )}
         <button className="btn sm" onClick={() => setOpen(!open)}>
           {open ? "Done" : "Check them"}
         </button>
@@ -1279,18 +1348,21 @@ function CheckFaces({ person, doubted }: { person: Person; doubted: number[] }) 
       {open && doubts.length > 0 && (
         <>
           <div className="small dim">Given them (by a tag, or with a group) but like none of their other faces: perhaps someone else in the picture. They don't count for them until you say yes.</div>
-          <div className="found-grid">{doubts.slice(0, limit).map((f) => face(f, () => p.confirm([f.id]), "doubt"))}</div>
+          <div className="found-grid">{shownDoubts.map((f, i) => face(f, i, () => p.confirm([f.id]), "doubt"))}</div>
         </>
       )}
       {open && found.length > 0 && (
         <>
           <div className="row found-sub">
-            <span className="small dim">Suggested: faces in other pictures that look like them, the least sure first. None is theirs until you say yes; no keeps it from being suggested for them again.</span>
+            <span className="small dim">Suggested: faces in other pictures that look like them, each with how alike it is to the closest of theirs. None is theirs until you say yes; no keeps it from being suggested for them again. Click faces to pick them (shift for a run), double-click for the whole picture. Least sure first teaches the matching the most: a yes there shows it a new side of them (another angle, outfit or style), and a no a look-alike to keep apart, while a yes to a sure one adds little.</span>
+            <button className="btn sm ghost" onClick={() => setSurest(!surest)} title={surest ? "The surest first: click for the least sure first (the ones that teach the matching the most)" : "The least sure first: click for the surest first"}>
+              {surest ? <SortDescending /> : <SortAscending />} {surest ? "Surest first" : "Least sure first"}
+            </button>
             <button className="btn sm primary" onClick={() => p.accept(found.map((x) => x.face.id), person.id)} title={`Every one of these is ${person.name}`}>
               <Check /> Yes, all {found.length.toLocaleString("en-GB")}
             </button>
           </div>
-          <div className="found-grid">{found.slice(0, Math.max(0, limit - doubts.length)).map(({ face: f, s }) => face(f, () => p.accept([f.id], person.id), s < SURE_SUGGESTED[kind] ? "unsure" : ""))}</div>
+          <div className="found-grid">{shownFound.map(({ face: f, s }, i) => face(f, shownDoubts.length + i, () => p.accept([f.id], person.id), s < SURE_SUGGESTED[kind] ? "unsure" : "", s))}</div>
         </>
       )}
       {open && doubts.length + found.length > limit && (
@@ -1330,10 +1402,14 @@ function CheckFaces({ person, doubted }: { person: Person; doubted: number[] }) 
   );
 }
 
-/** A picture of theirs with their face marked (dotted: like none of their others), drawn again only when it changes: a click picks it, a double click opens it. */
-const PictureTile = memo(function PictureTile({ face, mark, picked, onPick, onOpen, onMenu }: { face: FaceView; mark: "" | "doubt"; picked: boolean; onPick: (id: number) => void; onOpen: (f: FaceView) => void; onMenu: (e: React.MouseEvent, f: FaceView) => void }) {
+/**
+ * A picture of theirs with each of their faces in it marked (dotted: like none of their others), drawn
+ * again only when it changes: a click picks it (all their faces in it), a double click opens it.
+ */
+const PictureTile = memo(function PictureTile({ faces, doubts, picked, onPick, onOpen, onMenu }: { faces: FaceView[]; doubts: ReadonlySet<number>; picked: boolean; onPick: (ids: number[]) => void; onOpen: (f: FaceView) => void; onMenu: (e: React.MouseEvent, faces: FaceView[]) => void }) {
   const items = useItems();
   const root = useStore((s) => s.root);
+  const face = faces[0];
   const item = items.get(face.key);
   const box = useRef<HTMLButtonElement>(null);
   const [fit, setFit] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
@@ -1347,8 +1423,12 @@ const PictureTile = memo(function PictureTile({ face, mark, picked, onPick, onOp
   }, [seen]);
   if (!item || !root) return null;
   const src = canThumb(item) ? thumbUrl(root, item, 320) : mediaUrl(item);
-  const [x0, y0, x1, y1] = face.bbox;
-  // The picture fills its box, moved so that the face is in view, and the mark goes on the face: in
+  // All their faces in it together, kept in view.
+  const x0 = Math.min(...faces.map((f) => f.bbox[0]));
+  const y0 = Math.min(...faces.map((f) => f.bbox[1]));
+  const x1 = Math.max(...faces.map((f) => f.bbox[2]));
+  const y1 = Math.max(...faces.map((f) => f.bbox[3]));
+  // The picture fills its box, moved so that the faces are in view, and the marks go on the faces: in
   // hundredths of the box, which keeps its shape (so they hold when the grid is resized).
   const place = (img: HTMLImageElement) => {
     const b = box.current?.getBoundingClientRect();
@@ -1361,9 +1441,12 @@ const PictureTile = memo(function PictureTile({ face, mark, picked, onPick, onOp
   };
   const pct = (n: number) => `${n}%`;
   return (
-    <button ref={box} className={`thumb person-pic ${picked ? "selected" : ""}`} onClick={() => onPick(face.id)} onDoubleClick={() => onOpen(face)} onContextMenu={(e) => onMenu(e, face)} title="Click to pick; double-click to open; right-click for more">
+    <button ref={box} className={`thumb person-pic ${picked ? "selected" : ""}`} onClick={() => onPick(faces.map((f) => f.id))} onDoubleClick={() => onOpen(face)} onContextMenu={(e) => onMenu(e, faces)} title="Click to pick; double-click to open; right-click for more">
       {seen && <img src={src} alt="" draggable={false} onLoad={(e) => place(e.currentTarget)} style={fit ? { position: "absolute", maxWidth: "none", left: pct(fit.left), top: pct(fit.top), width: pct(fit.width), height: pct(fit.height) } : undefined} />}
-      {fit && <span className={`facebox ${mark}`} style={{ left: pct(fit.left + x0 * fit.width), top: pct(fit.top + y0 * fit.height), width: pct((x1 - x0) * fit.width), height: pct((y1 - y0) * fit.height) }} />}
+      {fit &&
+        faces.map(({ id, bbox: [a, b, c, d] }) => (
+          <span key={id} className={`facebox ${doubts.has(id) ? "doubt" : ""}`} style={{ left: pct(fit.left + a * fit.width), top: pct(fit.top + b * fit.height), width: pct((c - a) * fit.width), height: pct((d - b) * fit.height) }} />
+        ))}
       {picked && (
         <span className="tile-check">
           <Check />

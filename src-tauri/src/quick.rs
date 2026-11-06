@@ -216,6 +216,9 @@ fn authenticate(reason: &str) -> Result<(), String> {
     use std::sync::mpsc::channel;
 
     let (tx, rx) = channel::<Result<(), String>>();
+    // SAFETY: LocalAuthentication's calls on an LAContext made here and kept alive for them; the reply
+    // block is a heap block the system retains until it calls it, and it reads `error` only after
+    // checking it isn't null (the framework passes a valid NSError or null).
     unsafe {
         let ctx = LAContext::new();
         ctx.setLocalizedCancelTitle(Some(&NSString::from_str("Use passphrase")));

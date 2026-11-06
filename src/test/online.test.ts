@@ -6,6 +6,7 @@ vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p, invok
 const { useOnline, mayGoOnline } = await import("../lib/online");
 const { dispatch } = await import("../plugins/host");
 const { findImage } = await import("../findStore");
+const { useStore } = await import("../store");
 
 const plugin = { id: "demo", dir: "/x", manifest: { id: "demo", name: "Demo", version: "1.0.0", description: "", author: "", entry: "index.js", permissions: ["network:img.example.com"], settings: [] }, state: { enabled: true, allowVault: false, granted: ["network:img.example.com"], source: "", installedAt: 0 } } as never;
 
@@ -15,6 +16,16 @@ beforeEach(() => {
 });
 
 describe("asking before going online", () => {
+  it("asks again once the vault has been locked, even for a platform kept connected", () => {
+    useOnline.getState().set({ ask: true, each: true, keep: true });
+    useStore.setState({ vault: { exists: true, unlocked: true } } as never);
+    useOnline.getState().connect("look");
+    expect(mayGoOnline("look")).toBe(true);
+    useStore.setState({ vault: { exists: true, unlocked: false } } as never);
+    expect(mayGoOnline("look")).toBe(false);
+    useOnline.getState().set({ ask: false, each: false, keep: false });
+  });
+
   it("lets everything out while it doesn't ask; asking, nothing until Connect, for all at once or each platform on its own", () => {
     expect(mayGoOnline("p1")).toBe(true);
     useOnline.getState().set({ ask: true });

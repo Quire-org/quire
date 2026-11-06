@@ -201,6 +201,30 @@ describe("the Home's board", () => {
   });
 });
 
+describe("a block's Shuffle", () => {
+  it("keeps the pick shuffled to when Home is left and come back to, and changes only that block's", async () => {
+    const { useSalt } = await import("../home/blocks");
+    const salts: Record<string, number> = {};
+    const Probe = ({ id }: { id: string }) => ((salts[id] = useSalt(block(id, 0, 0, 6, 4))[0]), null);
+    const show = async () => {
+      const root = createRoot(document.createElement("div"));
+      await act(async () => root.render(createElement("div", null, createElement(Probe, { id: "a" }), createElement(Probe, { id: "b" }))));
+      return root;
+    };
+    let root = await show();
+    const first = { ...salts };
+    await act(async () => useHome.getState().shuffle("a"));
+    const shuffled = salts.a;
+    expect(shuffled).not.toBe(first.a);
+    expect(salts.b).toBe(first.b);
+    // Home left, and come back to.
+    root.unmount();
+    root = await show();
+    expect(salts.a).toBe(shuffled);
+    root.unmount();
+  });
+});
+
 describe("opening a library", () => {
   beforeEach(() => {
     be.home = null;

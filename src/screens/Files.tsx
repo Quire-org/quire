@@ -12,7 +12,8 @@ import { Tag as TagIcon } from "@phosphor-icons/react";
 import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
 import { formatBytes, formatDate } from "../lib/format";
 import type { DirEntryInfo, VaultProgress } from "../lib/types";
-import { ArrowUp, CaretRight, FolderOpen, DownloadSimple, Tray, File as FileIcon, FileAudio, FileCode, FilePdf, FileText, FileZip, FilmStrip, Folder, FolderPlus, House, List, LockKey, PencilSimple, Play, SquaresFour, Trash } from "@phosphor-icons/react";
+import { ArrowUp, CaretRight, FolderOpen, DownloadSimple, Tray, File as FileIcon, FileAudio, FileCode, FilePdf, FileText, FileZip, FilmStrip, Folder, FolderPlus, House, List, LockKey, PencilSimple, Play, Sparkle, SquaresFour, Trash } from "@phosphor-icons/react";
+import { canShowSimilar, showSimilar } from "../similarStore";
 import { mediaUrl, rawPreviewUrl } from "../lib/api";
 import { videoPoster } from "../lib/poster";
 import { classifyName } from "../lib/kinds";
@@ -79,6 +80,7 @@ export function Files() {
       at: { x: e.clientX, y: e.clientY },
       items: [
         { label: x.isDir ? <><FolderOpen /> Open</> : <><FileIcon /> Open</>, onClick: () => (x.isDir ? setDir(x.path) : openFile(x)), disabled: many },
+        ...(!x.isDir && !many && classifyName(x.name) ? [{ label: <><Sparkle /> Show similar</>, onClick: () => void similarTo(x) }] : []),
         { label: <><PencilSimple /> Rename…</>, onClick: () => setRenaming(x.path), disabled: many },
         { label: <><ArrowUp /> Move to…</>, onClick: () => void chooseAndMove(paths) },
         ...(x.isDir && !many ? [{ label: <><TagIcon /> Tag everything in this folder…</>, onClick: () => setTagging(x.path) }] : []),
@@ -254,13 +256,29 @@ export function Files() {
     }
   };
 
+  /** The folder's items, and where a file's is among them (-1: none). */
+  const itemsAt = async (x: DirEntryInfo) => {
+    const items = await api.scanDir(root, dir);
+    return { items, at: items.findIndex((i) => i.primary === x.path || i.files.includes(x.path)) };
+  };
   // Double-clicking a media file opens it in the viewer with its folder as the queue.
   const openFile = async (x: DirEntryInfo) => {
     if (!root || !classifyName(x.name)) return;
     try {
-      const items = await api.scanDir(root, dir);
-      const idx = Math.max(0, items.findIndex((i) => i.primary === x.path || i.files.includes(x.path)));
-      s.openViewer(items, idx, { kind: "browse" });
+      const { items, at } = await itemsAt(x);
+      s.openViewer(items, Math.max(0, at), { kind: "browse" });
+    } catch (e) {
+      s.toast(String(e), "error");
+    }
+  };
+  /** Browse, with the pictures most like this file's first (an album's page isn't in Browse: said so). */
+  const similarTo = async (x: DirEntryInfo) => {
+    if (!root) return;
+    try {
+      const { items, at } = await itemsAt(x);
+      const it = items[at];
+      if (it && canShowSimilar(it)) showSimilar(it);
+      else if (it) s.toast("An album's pages aren't in Browse: Show similar works on pictures outside albums", "warn");
     } catch (e) {
       s.toast(String(e), "error");
     }

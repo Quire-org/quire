@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatTime } from "../lib/format";
+import { releaseVideo } from "../lib/video";
 
 /**
  * Thumbnail of the frame under the cursor while hovering a video's progress
@@ -36,8 +37,7 @@ export function ScrubPreview({ src, time, x }: { src: string; time: number | nul
     videoRef.current = v;
     setReady(false);
     return () => {
-      v.removeAttribute("src");
-      v.load();
+      releaseVideo(v);
       videoRef.current = null;
     };
   }, [src]);

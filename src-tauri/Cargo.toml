@@ -1,9 +1,10 @@
 [package]
 name = "quire"
-version = "0.1.3"
+version = "0.1.4"
 description = "Sort, rate and browse photos and videos on an external volume"
 authors = ["Kile"]
 edition = "2024"
+rust-version = "1.89"
 
 [lib]
 name = "quire_lib"
@@ -93,3 +94,11 @@ opt-level = 3
 # A panic in a background task now ends that task, not the app.
 panic = "unwind"
 strip = true
+
+# Every unsafe block says why it is sound, and an unsafe fn's body doesn't make its calls unsafe unseen.
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

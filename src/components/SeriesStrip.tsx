@@ -1,19 +1,14 @@
 import { useEffect, useState } from "react";
 import { Check, Stack, X } from "@phosphor-icons/react";
-import { canThumb, mediaUrl, thumbUrl } from "../lib/api";
 import { useStore } from "../store";
 import { lookForSeries, useSuggestedSeries } from "../seriesStore";
-import type { MediaItem } from "../lib/types";
-
-/** A picture as a small square. */
-function Mini({ root, item }: { root: string; item: MediaItem }) {
-  return <img src={canThumb(item) ? thumbUrl(root, item, 64) : mediaUrl(item)} alt="" draggable={false} loading="lazy" />;
-}
+import { Mini } from "./Thumb";
 
 /**
  * Sort's suggestion: the picture on show and the ones waiting that look like it, as a series to keep
- * (each can be left out with a click), or not (they aren't suggested with it again). The pictures
- * waiting are looked at once, in Activity, so there is something to suggest.
+ * (each ticked, untick the ones that aren't: they aren't suggested with it again), or not (none of
+ * them is suggested with it again). The pictures waiting are looked at once, in Activity, so there is
+ * something to suggest.
  */
 export function SeriesStrip() {
   const root = useStore((s) => s.root);
@@ -31,6 +26,12 @@ export function SeriesStrip() {
   if (!sorting || !current || !root || !others.length) return null;
   const byKey = new Map(queue.map((q) => [q.key, q]));
   const picked = others.filter((k) => !left.has(k));
+  const keep = () => {
+    const kept = [current.key, ...picked];
+    const st = useStore.getState();
+    st.makeSeries(kept);
+    for (const k of others) if (left.has(k)) st.notSeries(k, kept);
+  };
   const toggle = (k: string) =>
     setLeft((l) => {
       const next = new Set(l);
@@ -44,23 +45,23 @@ export function SeriesStrip() {
         <Stack /> Looks like a series
       </span>
       <span className="series-strip-pics">
-        <span className="series-mini current" title={`${current.name}: on show`}>
-          <Mini root={root} item={current} />
+        <span className="series-mini current" title={`${current.name}: on show, in it`}>
+          <Mini item={current} size={64} />
         </span>
         {others.map((k) => {
           const it = byKey.get(k);
           if (!it) return null;
           const on = !left.has(k);
           return (
-            <button key={k} className={`series-mini ${on ? "on" : "off"}`} onClick={() => toggle(k)} title={`${it.name}: ${on ? "in it (click to leave it out)" : "left out (click to take it in)"}`}>
-              <Mini root={root} item={it} />
-              {on && <Check className="series-mini-mark" />}
+            <button key={k} className={`series-mini ${on ? "on" : "off"}`} onClick={() => toggle(k)} aria-pressed={on} title={`${it.name}: ${on ? "in it (click to leave it out)" : "left out (click to take it in)"}`}>
+              <Mini item={it} size={64} />
+              <span className="series-mini-tick">{on && <Check weight="bold" />}</span>
             </button>
           );
         })}
       </span>
-      <button className="btn sm primary" disabled={!picked.length} onClick={() => useStore.getState().makeSeries([current.key, ...picked])} title="Keep these together as a series: kept together, one key files all of it">
-        <Stack /> Keep as a series
+      <button className="btn sm primary" disabled={!picked.length} onClick={keep} title="Keep the ticked ones together as a series: kept together, one key files all of it. The unticked aren't suggested with it again">
+        <Stack /> Keep {picked.length + 1} as a series
       </button>
       <button className="btn sm ghost" onClick={() => useStore.getState().notSeries(current.key, others)} title="Not a series: these aren't suggested with this picture again">
         <X /> Not a series

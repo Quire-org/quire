@@ -41,10 +41,7 @@ export function Thumb({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(!!eager);
-  const [url, setUrl] = useState<string | null>(null);
-  const root = useStore((s) => s.root);
-  // A thumbnail the backend couldn't make: the original instead.
-  const [full, setFull] = useState(false);
+  const [url, failed] = useThumbSrc(item, () => ref.current?.clientWidth || 240, visible);
 
   useEffect(() => {
     if (eager) return;
@@ -54,24 +51,6 @@ export function Thumb({
     io.observe(el);
     return () => io.disconnect();
   }, [eager]);
-
-  useEffect(() => {
-    if (!visible) return;
-    let alive = true;
-    setUrl(null);
-    const small = !full && root && canThumb(item);
-    const p = small
-      ? Promise.resolve(thumbUrl(root, item, ref.current?.clientWidth || 240))
-      : item.kind === "image"
-        ? Promise.resolve(mediaUrl(item))
-        : item.kind === "raw"
-          ? rawPreviewUrl(item.primary)
-          : videoPoster(mediaUrl(item));
-    p.then((u) => alive && setUrl(u)).catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [visible, item.kind, item.primary, item.modified, root, full]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ratio = aspect && aspect > 0 ? aspect : 4 / 3;
   return (
@@ -83,7 +62,7 @@ export function Thumb({
             alt=""
             decoding="async"
             draggable={false}
-            onError={() => url.startsWith("thumb:") || url.includes("thumb.localhost") ? setFull(true) : undefined}
+            onError={failed}
             onLoad={(e) => {
               const im = e.currentTarget;
               if (onAspect && im.naturalWidth && im.naturalHeight) onAspect(item.key, im.naturalWidth / im.naturalHeight);
@@ -125,4 +104,40 @@ export function Thumb({
       </div>
     </div>
   );
+}
+
+/**
+ * What to show of an item, small: the backend's thumbnail `width()` wide (the original when it can't
+ * make one: call the second value as the image fails), a RAW's preview, a video's first frame. Null
+ * until `visible`, and while it comes.
+ */
+function useThumbSrc(item: MediaItem, width: () => number, visible = true): [string | null, () => void] {
+  const root = useStore((s) => s.root);
+  const [url, setUrl] = useState<string | null>(null);
+  // A thumbnail the backend couldn't make: the original instead.
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    if (!visible) return;
+    let alive = true;
+    setUrl(null);
+    const small = !full && root && canThumb(item);
+    const p = small
+      ? Promise.resolve(thumbUrl(root, item, width()))
+      : item.kind === "image"
+        ? Promise.resolve(mediaUrl(item))
+        : item.kind === "raw"
+          ? rawPreviewUrl(item.primary)
+          : videoPoster(mediaUrl(item));
+    p.then((u) => alive && setUrl(u)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [visible, item.kind, item.primary, item.modified, root, full]); // eslint-disable-line react-hooks/exhaustive-deps
+  return [url, () => void (url && (url.startsWith("thumb:") || url.includes("thumb.localhost")) && setFull(true))];
+}
+
+/** An item as a small picture, `size` pixels wide at most (a video by its first frame, a RAW by its preview). */
+export function Mini({ item, size, className }: { item: MediaItem; size: number; className?: string }) {
+  const [src, failed] = useThumbSrc(item, () => size);
+  return src ? <img className={className} src={src} alt="" draggable={false} onError={failed} /> : null;
 }

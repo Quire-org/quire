@@ -4,6 +4,15 @@ version = "0.1.0"
 description = "What a Quire plugin's pipeline (compiled to WebAssembly, run by the engine) can ask of the engine"
 authors = ["Kile"]
 edition = "2024"
+rust-version = "1.89"
 publish = false
 
 [dependencies]
+
+# Every unsafe call into the engine says why it is sound.
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
+missing_safety_doc = "deny"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

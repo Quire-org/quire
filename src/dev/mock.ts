@@ -728,12 +728,12 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "tags_rank": {
       // How pictures look, made up: the same person or character very alike, the same kind (photo,
       // drawing) somewhat, the rest not.
-      const r = args as unknown as { queries: { keys?: string[] }[]; candidates: string[] | null; skip: string[]; min: number; limit: number };
+      const r = args as unknown as { queries: { keys?: string[]; parts?: string }[]; candidates: string[] | null; skip: string[]; min: number; limit: number };
       const look = (key: string) => {
         const it = items.find((i) => i.key === key);
         return it ? mockPicture(served(it.primary).slice(ROOT.length + 1)).who : null;
       };
-      const qs = r.queries.flatMap((q) => q.keys ?? []).map((k) => [k, look(k)] as const).filter((q) => q[1]);
+      const qs = r.queries.flatMap((q) => q.keys ?? (q.parts ? [q.parts] : [])).map((k) => [k, look(k)] as const).filter((q) => q[1]);
       const skip = new Set(r.skip);
       const pool = r.candidates ?? items.filter((i) => i.kind !== "video").map((i) => i.key);
       const wobble = (k: string) => ([...k].reduce((a, c) => a + c.charCodeAt(0), 0) % 10) / 100;

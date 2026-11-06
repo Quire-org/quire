@@ -16,6 +16,8 @@ vi.mock("../lib/api", () => ({
   canThumb: () => false,
 }));
 vi.mock("../lib/smallJpeg", () => ({ smallJpeg: vi.fn(async () => "SMALL") }));
+const asked = vi.hoisted(() => ({ answer: true, titles: [] as string[] }));
+vi.mock("../components/Confirm", () => ({ ask: vi.fn(async (a: { title: string }) => (asked.titles.push(a.title), asked.answer)) }));
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p, invoke: vi.fn() }));
 
 const { useStore } = await import("../store");
@@ -23,6 +25,7 @@ const { finder, useFinders } = await import("../plugins/find");
 const { usePlugins } = await import("../plugins/store");
 const { findSources, acceptMatch, notIt, useSources, MAYBE } = await import("../findSource");
 const { useJobs } = await import("../lib/jobs");
+const { useOnline } = await import("../lib/online");
 
 const pic = (key: string, kind = "image") => ({ key, primary: `/vol/${key}`, files: [`/vol/${key}`], name: key, kind, dir: "", size: 1, modified: 0, hasRaw: false, hasVideo: false }) as unknown as MediaItem;
 const work = (id: string, similarity: number) => ({
@@ -35,6 +38,9 @@ beforeEach(() => {
   useFinders.setState({ finders: { look: { pluginId: "look", platform: "example", name: "Example", lookup: true } as never, plain: { pluginId: "plain", platform: "plain", name: "Plain", lookup: false } as never } });
   usePlugins.setState({ list: [{ id: "look", state: { enabled: true, allowVault: false } }] } as never);
   useSources.setState({ found: [], open: false, running: false });
+  useOnline.setState({ settings: { ask: false, each: false, keep: false }, connected: { all: false, platforms: [] } } as never);
+  asked.answer = true;
+  asked.titles = [];
 });
 
 describe("Find source", () => {
@@ -63,6 +69,21 @@ describe("Find source", () => {
     const src = useStore.getState().library!.sources!["a.jpg"];
     expect(src).toMatchObject({ platform: "example", id: "8", url: "https://example.org/posts/8", author: { name: "Kaze" } });
     expect(src.tags[0].kind).toBe("character");
+  });
+
+  it("asks before your pictures go online, and sends nothing on a no", async () => {
+    const lookup = vi.spyOn(finder, "lookup").mockResolvedValue([]);
+    asked.answer = false;
+    await findSources([pic("a.jpg"), pic("b.jpg")]);
+    expect(asked.titles).toEqual(["Send 2 pictures to Example?"]);
+    expect(lookup).not.toHaveBeenCalled();
+    expect(useSources.getState().running).toBe(false);
+    // Not connected (asking before going online): nothing could be sent, so nothing is asked.
+    useOnline.setState({ settings: { ask: true, each: false, keep: false }, connected: { all: false, platforms: [] } } as never);
+    asked.titles = [];
+    await findSources([pic("a.jpg")]);
+    expect(asked.titles).toEqual([]);
+    lookup.mockRestore();
   });
 
   it("stops at a platform that can't (signed out), and says so", async () => {

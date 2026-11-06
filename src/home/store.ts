@@ -18,8 +18,8 @@ interface HomeState {
   picked: string | null;
   /** The board as it was before each change made while arranging, latest last. */
   history: HomeDoc[];
-  /** Changes with every Shuffle, for the blocks that pick at random. */
-  seed: number;
+  /** Each block's Shuffles this session (by its id): its pick stays as shuffled until the app closes, Home left and come back to or not. */
+  salts: Record<string, number>;
   /** Read for the library open, or for `root` as it opens. */
   load(force?: boolean, root?: string): Promise<HomeDoc | null>;
   start(preset: PresetId): void;
@@ -42,7 +42,8 @@ interface HomeState {
   setFit(on: boolean): void;
   /** The screen left, remembered for "Where you were". */
   leftFor(screen: string): void;
-  shuffle(): void;
+  /** A block's next pick (its Shuffle). */
+  shuffle(id: string): void;
   follow(pairs: [string, string][]): void;
   /** Folders, albums and pictures gone for good, out of its filters and pins. */
   forget(gone: (key: string) => boolean): void;
@@ -70,7 +71,7 @@ export const useHome = create<HomeState>((set, get) => {
     arranging: false,
     picked: null,
     history: [],
-    seed: Date.now() % 100_000,
+    salts: {},
 
     async load(force, opening) {
       const root = opening ?? useStore.getState().root;
@@ -176,8 +177,9 @@ export const useHome = create<HomeState>((set, get) => {
       change((d) => ({ ...d, last: { screen, at: Date.now() } }), false);
     },
 
-    shuffle() {
-      set({ seed: get().seed + 1 });
+    shuffle(id) {
+      const salts = get().salts;
+      set({ salts: { ...salts, [id]: (salts[id] ?? 0) + 1 } });
     },
 
     follow(pairs) {

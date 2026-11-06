@@ -9,6 +9,7 @@
  * sequence is reported as contained in it.
  */
 import type { MediaItem } from "./types";
+import { releaseVideo } from "./video";
 
 export type H64 = readonly [number, number];
 
@@ -178,8 +179,7 @@ export async function hashVideoUrl(url: string, isCancelled: () => boolean, onFr
     onFrame?.(i + 1, n);
   }
   const sig = { frames, informative, duration, width: v.videoWidth, height: v.videoHeight };
-  v.removeAttribute("src");
-  v.load();
+  releaseVideo(v);
   return sig;
 }
 
@@ -972,8 +972,7 @@ export async function videoStrip(url: string, times: number[], width = 120): Pro
   } catch {
     return [];
   } finally {
-    v.removeAttribute("src");
-    v.load();
+    releaseVideo(v);
   }
 }
 

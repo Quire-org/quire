@@ -23,7 +23,7 @@ use koharu_ml::{
     lama::{HDStrategy, InpaintRequest, LaMa},
     torch::{CModule, Device, Kind, Tensor},
 };
-use wasmtime::{Caller, Config, Engine, Linker, Memory, Module, Store};
+use wasmtime::{Caller, Config, Engine, Linker, Memory, Module, Store, StoreLimits, StoreLimitsBuilder};
 
 use crate::{models, text};
 
@@ -84,7 +84,18 @@ struct State {
     progress: Progress,
     /// The picture as the text tools see it, made on their first call.
     page: Option<text::Page>,
+    /// How much memory the module may take (`MAX_MEMORY`).
+    limits: StoreLimits,
 }
+
+/// The most memory a plugin's pipeline may grow to: as much as a 32-bit module can address, so a
+/// 64-bit one can't take the whole machine's.
+const MAX_MEMORY: usize = 4 << 30;
+
+/// The longest a pipeline may run on a picture, in seconds (`Host::run`'s ticker counts them): less
+/// than the app waits for a page (30 minutes), so a pipeline that never ends is stopped and the engine,
+/// with its models loaded, goes on.
+const MAX_RUN: u64 = 25 * 60;
 
 /// The device the models run on: the GPU when there is one and the CPU wasn't asked for.
 fn device_for(cpu: bool) -> Device {
@@ -102,7 +113,17 @@ impl Host {
         let engine = match &self.engine {
             Some(e) => e.clone(),
             None => {
-                let e = Engine::new(&Config::new()).map_err(|e| anyhow!("the WebAssembly runtime couldn't start: {e:?}"))?;
+                let mut config = Config::new();
+                config.epoch_interruption(true);
+                let e = Engine::new(&config).map_err(|e| anyhow!("the WebAssembly runtime couldn't start: {e:?}"))?;
+                // The engine's clock for the runs' deadlines: a tick a second, for as long as the engine runs.
+                let ticking = e.clone();
+                std::thread::spawn(move || {
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        ticking.increment_epoch();
+                    }
+                });
                 self.engine = Some(e.clone());
                 e
             }
@@ -117,8 +138,11 @@ impl Host {
             }
         };
         let device = device_for(request.cpu);
-        let state = State { request, device, kept: std::mem::take(&mut self.kept), last: Vec::new(), output: None, failed: None, started: std::time::Instant::now(), progress, page: None };
+        let limits = StoreLimitsBuilder::new().memory_size(MAX_MEMORY).build();
+        let state = State { request, device, kept: std::mem::take(&mut self.kept), last: Vec::new(), output: None, failed: None, started: std::time::Instant::now(), progress, page: None, limits };
         let mut store = Store::new(&engine, state);
+        store.limiter(|s| &mut s.limits);
+        store.set_epoch_deadline(MAX_RUN);
         let mut linker = linker(&engine).map_err(|e| anyhow!("{e:?}"))?;
         // Imports the engine doesn't offer (glue some crates bring for a JavaScript host, which a
         // pipeline never calls) fail if called, rather than keep the module from starting.
@@ -126,7 +150,9 @@ impl Host {
         let outcome = (|| -> Result<i32> {
             let instance = linker.instantiate(&mut store, &compiled).map_err(|e| anyhow!("the plugin's pipeline couldn't start: {e:?}"))?;
             let run = instance.get_typed_func::<(), i32>(&mut store, "ms_run").map_err(|e| anyhow!("the plugin's pipeline has no ms_run: {e:?}"))?;
-            koharu_ml::torch::no_grad(|| run.call(&mut store, ())).map_err(|e| anyhow!("the plugin's pipeline stopped: {e:#}"))
+            // A panic in a host call it made (a model given what it can't take) ends this run, not the engine.
+            let called = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| koharu_ml::torch::no_grad(|| run.call(&mut store, ()))));
+            called.map_err(|_| anyhow!("the plugin's pipeline made the engine fail, and was stopped"))?.map_err(|e| anyhow!("the plugin's pipeline stopped: {e:#}"))
         })();
         let state = store.into_data();
         self.kept = state.kept;
@@ -149,9 +175,12 @@ fn memory(caller: &mut Caller<'_, State>) -> Wr<Memory> {
 }
 
 fn read(caller: &mut Caller<'_, State>, ptr: u32, len: u32) -> Wr<Vec<u8>> {
-    let mut out = vec![0u8; len as usize];
-    memory(caller)?.read(&caller, ptr as usize, &mut out).map_err(|_| trap("the module asked for memory it doesn't have"))?;
-    Ok(out)
+    // Within the module's memory before anything is set aside for it (a length it made up can't make
+    // the engine allocate gigabytes).
+    let mem = memory(caller)?;
+    let at = ptr as usize;
+    let end = at.checked_add(len as usize).filter(|&e| e <= mem.data_size(&caller)).ok_or_else(|| trap("the module asked for memory it doesn't have"))?;
+    Ok(mem.data(&caller)[at..end].to_vec())
 }
 
 fn write(caller: &mut Caller<'_, State>, ptr: u32, bytes: &[u8]) -> Wr<()> {
@@ -320,8 +349,9 @@ fn files<'a>(request: &'a Request, model: &str) -> Result<&'a [PathBuf]> {
 fn unpack(bytes: &[u8]) -> Result<Vec<(Vec<i64>, Vec<f32>)>> {
     let mut at = 0usize;
     let mut take = |n: usize| -> Result<&[u8]> {
-        let s = bytes.get(at..at + n).context("the tensors given couldn't be read")?;
-        at += n;
+        let end = at.checked_add(n).context("the tensors given couldn't be read")?;
+        let s = bytes.get(at..end).context("the tensors given couldn't be read")?;
+        at = end;
         Ok(s)
     };
     let count = u32::from_le_bytes(take(4)?.try_into()?) as usize;
@@ -329,8 +359,10 @@ fn unpack(bytes: &[u8]) -> Result<Vec<(Vec<i64>, Vec<f32>)>> {
     for _ in 0..count {
         let rank = u32::from_le_bytes(take(4)?.try_into()?) as usize;
         let shape: Vec<i64> = (0..rank).map(|_| take(8).and_then(|b| Ok(i64::from_le_bytes(b.try_into()?)))).collect::<Result<_>>()?;
-        let n = shape.iter().product::<i64>().max(0) as usize;
-        let data = take(n * 4)?.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect();
+        // Every size given (none negative: the shape is the data's own, not one to work out), and as
+        // many values as they make, counted without overflowing.
+        let n = shape.iter().try_fold(1usize, |n, &d| n.checked_mul(usize::try_from(d).ok()?)).context("the tensors given have a size that can't be")?;
+        let data = take(n.checked_mul(4).context("the tensors given are too large")?)?.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect();
         out.push((shape, data));
     }
     Ok(out)
@@ -364,7 +396,7 @@ fn run_model(state: &mut State, model: &str, file: &str, input: &[u8]) -> Result
         state.kept.models.insert(key.clone(), module);
     }
     let module = &state.kept.models[&key];
-    let inputs: Vec<Tensor> = unpack(input)?.into_iter().map(|(shape, data)| Tensor::from_slice(&data).view(shape.as_slice()).to_device(device)).collect();
+    let inputs: Vec<Tensor> = unpack(input)?.into_iter().map(|(shape, data)| Ok(Tensor::from_slice(&data).f_view(shape.as_slice())?.to_device(device))).collect::<Result<_>>()?;
     let output = module.forward_ts(&inputs)?;
     let out = output.to_kind(Kind::Float).to_device(Device::Cpu).contiguous();
     let shape = out.size();
@@ -397,4 +429,30 @@ fn inpaint(state: &mut State, rgb: Vec<u8>, mask: Vec<u8>, width: u32, height: u
     let mask = GrayImage::from_raw(width, height, mask).context("the mask isn't the size given")?;
     let request = InpaintRequest { hd_strategy: HDStrategy::Original, ..InpaintRequest::default() };
     Ok(lama.inference(&image::DynamicImage::ImageRgb8(crop), &mask, &request)?.into_raw())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{pack, unpack};
+
+    /// Tensors as a pipeline gives them: a count, then each one's rank, sizes and values.
+    fn given(shape: &[i64], values: usize) -> Vec<u8> {
+        let mut b = 1u32.to_le_bytes().to_vec();
+        b.extend_from_slice(&(shape.len() as u32).to_le_bytes());
+        shape.iter().for_each(|d| b.extend_from_slice(&d.to_le_bytes()));
+        b.extend(std::iter::repeat_n(0u8, values * 4));
+        b
+    }
+
+    #[test]
+    fn tensors_given_are_read_only_when_their_sizes_can_be() {
+        let ok = pack(&[(vec![2, 3], vec![1.0; 6])]);
+        assert_eq!(unpack(&ok).unwrap(), vec![(vec![2, 3], vec![1.0; 6])]);
+        // A negative size, one worked out from the rest, and sizes whose product overflows: errors, not a panic later.
+        assert!(unpack(&given(&[-2], 0)).is_err());
+        assert!(unpack(&given(&[-1, -1], 0)).is_err());
+        assert!(unpack(&given(&[1 << 62, 4], 0)).is_err());
+        // Fewer values than the sizes make.
+        assert!(unpack(&given(&[4], 3)).is_err());
+    }
 }

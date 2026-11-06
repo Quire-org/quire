@@ -57,6 +57,27 @@ export function pageNumber(name: string): number | null {
   return runs ? Number(runs[runs.length - 1]) : null;
 }
 
+/**
+ * The pages of two versions of an album (a translation) that are one page, as index in `a` → index in
+ * `b`: the one numbered as it is (a page missing on one side shifts the rest, so the place alone would
+ * land a page off), else the one in its place (`sure`: only when the two have as many pages).
+ */
+export function samePages(a: readonly { name: string }[], b: readonly { name: string }[], sure = false): Map<number, number> {
+  const byNumber = new Map<number, number>();
+  b.forEach((p, j) => {
+    const n = pageNumber(p.name);
+    if (n != null && !byNumber.has(n)) byNumber.set(n, j);
+  });
+  const byPlace = b.length > 0 && !(sure && a.length !== b.length);
+  const out = new Map<number, number>();
+  a.forEach((p, i) => {
+    const n = pageNumber(p.name);
+    const j = (n != null ? byNumber.get(n) : undefined) ?? (byPlace ? Math.min(i, b.length - 1) : undefined);
+    if (j !== undefined) out.set(i, j);
+  });
+  return out;
+}
+
 export function basename(path: string): string {
   return path.split(/[/\\]/).pop() ?? path;
 }

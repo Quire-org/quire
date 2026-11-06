@@ -13,6 +13,8 @@ import { finder, useFinders, type Finder, type FindMatch } from "./plugins/find"
 import { usePlugins } from "./plugins/store";
 import { useStore } from "./store";
 import { allSources } from "./lib/sources";
+import { mayGoOnline } from "./lib/online";
+import { ask } from "./components/Confirm";
 
 /** How alike a work must be to be offered at all, and to be surely it. */
 export const MAYBE = 0.5;
@@ -52,6 +54,21 @@ export async function findSources(items: MediaItem[]) {
   const todo = pictures.filter((i) => !allSources(sources[i.key]).some((s) => allowed.some((f) => f.platform === s.platform)));
   const had = pictures.length - todo.length;
   if (!todo.length) return st.toast(pictures.length ? `${had === 1 ? "It has" : "They all have"} a source there already` : "Find source looks pictures up, not videos", "warn");
+
+  // Your own pictures leave this computer: asked first, wherever it was started (a slip of the
+  // finger sends nothing). A platform not connected (Going online) sends nothing anyway.
+  const online = allowed.filter((f) => mayGoOnline(f.pluginId));
+  const count = `${todo.length} picture${todo.length === 1 ? "" : "s"}`;
+  if (
+    online.length &&
+    !(await ask({
+      title: `Send ${count} to ${online.map((f) => f.name).join(" and ")}?`,
+      message: `A small copy of ${todo.length === 1 ? "it" : "each"} goes over the internet to ${online.map((f) => f.name).join(" and ")}, to find where ${todo.length === 1 ? "it was" : "they were"} posted. Nothing else of your library is sent.`,
+      confirm: `Send ${count}`,
+      safeDefault: true,
+    }))
+  )
+    return;
 
   useSources.setState({ running: true });
   const names = allowed.map((f) => f.name).join(" and ");

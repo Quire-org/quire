@@ -13,6 +13,7 @@ import type { FaceView, FacesSorted, MediaItem, TagName } from "./lib/types";
 import { useStore } from "./store";
 import type { TagSettings } from "./tagsStore";
 import { allSources } from "./lib/sources";
+import { carriedToTwins, faceTwins, mirrored } from "./lib/faceTwins";
 
 export type PersonKind = "person" | "character";
 
@@ -224,17 +225,34 @@ const peopleSave = debounced("people", 300, async (root) => {
 });
 
 export const usePeople = create<PeopleState>((set, get) => {
-  /** A change to the doc, kept with the library soon; `what` makes it the one ⌘Z takes back. */
+  // Faces' twins on the other version of their albums (lib/faceTwins): worked out again only when the
+  // faces, the pictures or the albums' links change.
+  let twinsWere: { faces: FaceView[]; items: MediaItem[]; links: Record<string, string> | undefined; twins: Map<number, number[]> } | null = null;
+  const twins = () => {
+    const s = useStore.getState();
+    const links = s.library?.albumTranslations;
+    const faces = get().faces;
+    if (twinsWere?.faces !== faces || twinsWere.items !== s.allItems || twinsWere.links !== links) twinsWere = { faces, items: s.allItems, links, twins: faceTwins(faces, s.allItems, links ?? {}) };
+    return twinsWere.twins;
+  };
+  /**
+   * A change to the doc, kept with the library soon; `what` makes it the one ⌘Z takes back. What it
+   * says of a face it says of the same face on the other version of its album (a translation).
+   */
   const change = (fn: (d: PeopleDoc) => PeopleDoc, what?: string) => {
     const d = get().doc;
     if (!d || get().docRoot !== useStore.getState().root) return;
-    set({ doc: fn(d), ...(what ? { undo: { doc: d, what } } : {}) });
+    set({ doc: mirrored(d, fn(d), twins()), ...(what ? { undo: { doc: d, what } } : {}) });
     peopleSave.schedule(get().docRoot!);
   };
   const resort = () => void get().sort();
   let sorting: Promise<void> | null = null;
   let sortAgain = false;
   const sortOnce = async () => {
+    // What was said of a face before its twin was known (or made), said of the twin too.
+    const was = get().doc;
+    const carried = was && carriedToTwins(was, twins());
+    if (carried) change((d) => ({ ...d, ...carried }));
     const { doc, docRoot } = get();
     if (!doc || !docRoot || !get().faces.length) return set({ sorted: { matches: [], groups: [] } });
     // Only the faces the user gave stand for each person: the found ones are found again from those.
@@ -321,8 +339,9 @@ export const usePeople = create<PeopleState>((set, get) => {
 
     accept(faces, person) {
       if (!get().doc?.people[person]) return;
+      const gone = new Set(faces);
       change(
-        (d) => ({ ...d, faces: { ...d.faces, ...Object.fromEntries(faces.map((f) => [String(f), { p: person, ok: true }])) }, no: d.no.filter((n) => !faces.includes(n)), present: withoutPresent(d.present, faces.map((f) => get().byId.get(f)?.key).filter((k): k is string => !!k), person) }),
+        (d) => ({ ...d, faces: { ...d.faces, ...Object.fromEntries(faces.map((f) => [String(f), { p: person, ok: true }])) }, no: d.no.filter((n) => !gone.has(n)), present: withoutPresent(d.present, faces.map((f) => get().byId.get(f)?.key).filter((k): k is string => !!k), person) }),
         `${faces.length} face${faces.length === 1 ? "" : "s"} added to ${get().doc!.people[person].name}`,
       );
       resort();
@@ -369,18 +388,20 @@ export const usePeople = create<PeopleState>((set, get) => {
     },
 
     dismiss(faces) {
-      change((d) => ({ ...d, no: [...new Set([...d.no, ...faces])], faces: Object.fromEntries(Object.entries(d.faces).filter(([id]) => !faces.includes(Number(id)))) }), `${faces.length} face${faces.length === 1 ? "" : "s"} put aside`);
+      const gone = new Set(faces);
+      change((d) => ({ ...d, no: [...new Set([...d.no, ...faces])], faces: Object.fromEntries(Object.entries(d.faces).filter(([id]) => !gone.has(Number(id)))) }), `${faces.length} face${faces.length === 1 ? "" : "s"} put aside`);
       set({ sorted: get().sorted && { ...get().sorted!, groups: get().sorted!.groups.filter((g) => !g.faces.some((f) => faces.includes(f))) } });
     },
 
     notThem(faces, person) {
       const who = get().doc?.people[person]?.name ?? "them";
+      const gone = new Set(faces);
       change(
         (d) => {
           const not = { ...d.not };
           for (const f of faces) not[String(f)] = [...new Set([...(not[String(f)] ?? []), person])];
           const portrait = d.people[person]?.portrait;
-          return { ...d, not, faces: Object.fromEntries(Object.entries(d.faces).filter(([id, a]) => !(a.p === person && faces.includes(Number(id))))), people: portrait != null && faces.includes(portrait) ? { ...d.people, [person]: { ...d.people[person], portrait: null } } : d.people };
+          return { ...d, not, faces: Object.fromEntries(Object.entries(d.faces).filter(([id, a]) => !(a.p === person && gone.has(Number(id))))), people: portrait != null && gone.has(portrait) ? { ...d.people, [person]: { ...d.people[person], portrait: null } } : d.people };
         },
         `${faces.length} face${faces.length === 1 ? "" : "s"} not ${who}`,
       );

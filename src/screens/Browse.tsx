@@ -16,6 +16,9 @@ import { useTags } from "../tagsStore";
 import { useStore, type BrowseFilters } from "../store";
 import { revertAll, useVersions } from "../versionsStore";
 import { seriesIndex, stacks } from "../lib/series";
+import { showSimilar, useSimilarOrder } from "../similarStore";
+import { openSeriesAdd } from "../seriesStore";
+import { SimilarBar } from "../components/SimilarBar";
 import { FiltersButton, FiltersPanel, type Filter } from "../components/Filters";
 import { NO_FILTER, filterPictures, useFilterData, usePictureFilterSections, type PictureFilter } from "../components/PictureFilters";
 import { Thumb } from "../components/Thumb";
@@ -80,6 +83,8 @@ export function Browse() {
       at: { x: e.clientX, y: e.clientY },
       items: [
         { label: <><Info /> Info</>, onClick: () => s.set({ infoItem: it }) },
+        ...(many ? [] : [{ label: <><Sparkle /> Show similar</>, onClick: () => showSimilar(it) }]),
+        ...(!many && seriesOf.has(it.key) ? [{ label: <><Stack /> Add to series…</>, onClick: () => openSeriesAdd(it.key) }] : []),
         ...(it.kind === "image" || it.kind === "raw" ? [{ label: <><Scissors /> Make a sticker…</>, onClick: () => void useScrapbook.getState().openStudio({ item: it }) }] : []),
         ...(lookups.length && group.some((g) => g.kind === "image") ? [{ label: <><MagnifyingGlass /> Find source{many ? `s of ${group.length}` : ""} on {lookups.map((f) => f.name).join(" and ")}</>, onClick: () => void findSources(group) }] : []),
         { content: <><span className="label">Tags{many ? ` on ${group.length}` : ""}</span><TagEditor keys={keys} /></> },
@@ -109,8 +114,16 @@ export function Browse() {
   // A rating or a view is a reason to put the list in order again only when it is ordered by them.
   const ratingsForSort = sortBy === "rating" ? ratings : null;
   const viewedForSort = location === "recent" ? viewed : null;
+  // Show similar: the most alike first, as far as the filters let them through.
+  const similar = useSimilarOrder(all, filterData);
+  const seedKey = similar?.keys[0];
+  const seedItem = useMemo(() => (seedKey ? all.find((i) => i.key === seedKey) : undefined), [all, seedKey]);
   const items = useMemo(() => {
     const list = filterPictures(all, picked, filterData);
+    if (similar) {
+      const at = new Map(similar.keys.map((k, i) => [k, i]));
+      return list.filter((i) => at.has(i.key)).sort((a, b) => at.get(a.key)! - at.get(b.key)!);
+    }
     if (random) return shuffled(list, seed);
     if (location === "recent") return list.slice().sort((a, b) => (viewed[b.key] ?? 0) - (viewed[a.key] ?? 0));
     const cmp: Record<SortSel, (a: MediaItem, b: MediaItem) => number> = {
@@ -122,7 +135,7 @@ export function Browse() {
     const out = list.slice().sort(cmp[sortBy]);
     return desc ? out.reverse() : out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, picked, filterData, random, seed, sortBy, desc, ratingsForSort, viewedForSort]);
+  }, [all, picked, filterData, similar, random, seed, sortBy, desc, ratingsForSort, viewedForSort]);
 
   // The filters, as every screen shows them: a section each in the panel, chips for what is on.
   const filters: Filter[] = usePictureFilterSections({ ...picked, query }, setF, all);
@@ -156,7 +169,9 @@ export function Browse() {
   }, [aspects]);
 
   const scrollerRef = useRef<HTMLDivElement>(null);
-  useScrollMemory(`browse:${location}:${kind}:${query}:${sortBy}:${desc}:${random}:${minRating}:${unratedOnly}:${tagged}:${[...(folders ?? [])].join(",")}`, scrollerRef, true);
+  // Show similar has a place of its own, put back once its pictures are there (not while only the seed shows).
+  const similarAt = seedKey ? `similar:${seedKey}` : "";
+  useScrollMemory(`browse:${location}:${kind}:${query}:${sortBy}:${desc}:${random}:${minRating}:${unratedOnly}:${tagged}:${[...(folders ?? [])].join(",")}:${similarAt}`, scrollerRef, !similar?.looking);
   const [gridW, setGridW] = useState(0);
   const [viewport, setViewport] = useState({ top: 0, h: 0 });
   useEffect(() => {
@@ -323,19 +338,22 @@ export function Browse() {
         <input className="input" placeholder="Search name or folder…" value={query} onChange={(e) => setQuery(e.target.value)} />
         <FiltersButton filters={filters} open={filtersOpen} onToggle={() => setFiltersOpen(!filtersOpen)} onClear={() => setF({ ...FILTERS_OFF })} />
 
-        <div className="label">Order</div>
+        <div className="label">Order{similar ? ": the most alike first" : ""}</div>
         <div className="chips">
           {(["name", "date", "size", "rating"] as SortSel[]).map((k) => (
             <button
               key={k}
-              className={chip(!random && sortBy === k && location !== "recent")}
+              disabled={!!similar}
+              title={similar ? "In order of likeness while Show similar is on (× over the pictures ends it)" : undefined}
+              className={chip(!similar && !random && sortBy === k && location !== "recent")}
               onClick={() => setF({ sortBy: k, desc: sortBy === k && !random ? !desc : desc, random: false })}
             >
               {k} {!random && sortBy === k ? (desc ? "↓" : "↑") : ""}
             </button>
           ))}
           <button
-            className={chip(random)}
+            className={chip(!similar && random)}
+            disabled={!!similar}
             onClick={() => {
               setF({ random: true });
               setSeed();
@@ -376,6 +394,7 @@ export function Browse() {
       {filtersOpen && <FiltersPanel filters={filters} onClose={() => setFiltersOpen(false)} onClear={() => setF({ ...FILTERS_OFF })} />}
       <ContextMenu at={ctx?.at ?? null} items={ctx?.items ?? []} onClose={() => setCtx(null)} />
       <main className="browse-main">
+        {similar && <SimilarBar seed={seedItem} alike={items[0]?.key === seedKey ? items.length - 1 : items.length} looking={similar.looking} />}
         {selected.size > 0 ? (
           <div className="browse-head selection-bar">
             <span className="mono accent-text">{selected.size} selected</span>

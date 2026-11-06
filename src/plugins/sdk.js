@@ -458,8 +458,12 @@
             text: function () {
               return Promise.resolve(r.body != null ? r.body : atob(r.bodyBase64 || ""));
             },
+            // A body that isn't JSON (a site's error page) is a rejected promise, as fetch's is, not a
+            // throw: the plugin's .catch() hears it.
             json: function () {
-              return Promise.resolve(JSON.parse(r.body || "null"));
+              return new Promise(function (resolve) {
+                resolve(JSON.parse(r.body || "null"));
+              });
             },
             bytes: function () {
               return Promise.resolve(r.bodyBase64 ? fromBase64(r.bodyBase64) : new TextEncoder().encode(r.body || ""));

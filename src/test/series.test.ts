@@ -31,12 +31,18 @@ vi.mock("../lib/api", () => ({
   fileSrc: (p: string) => p,
 }));
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p, invoke: vi.fn(async () => null), Channel: class {} }));
+(globalThis as Record<string, unknown>).IntersectionObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
 
 const { joined, without, together, stacks, lookAlikes, seriesIndex, pairKey } = await import("../lib/series");
 const { useStore, followMoves } = await import("../store");
 const { useDupes, withoutIgnored } = await import("../dupesStore");
 const { SeriesStrip } = await import("../components/SeriesStrip");
-const { lookForSeries } = await import("../seriesStore");
+const { lookForSeries, openSeriesAdd, useSeriesAdd } = await import("../seriesStore");
+const { SeriesAddDialog } = await import("../components/SeriesAdd");
 const { useJobs } = await import("../lib/jobs");
 
 const pic = (key: string): MediaItem => {
@@ -141,8 +147,12 @@ describe("series in Sort", () => {
     expect(host.querySelectorAll(".series-mini")).toHaveLength(3);
     // c left out, then kept: a and b are a series, and c goes on.
     await act(async () => (host.querySelectorAll("button.series-mini")[1] as HTMLButtonElement).click());
-    await act(async () => (Array.from(host.querySelectorAll("button")).find((b) => b.textContent?.includes("Keep as a series")) as HTMLButtonElement).click());
+    const keep = () => Array.from(host.querySelectorAll("button")).find((b) => b.textContent?.includes("as a series")) as HTMLButtonElement;
+    expect(keep().textContent).toContain("Keep 2 as a series");
+    await act(async () => keep().click());
     expect(useStore.getState().library!.series).toEqual([["in/a.jpg", "in/b.jpg"]]);
+    // c, left out, isn't suggested with them again.
+    expect(useStore.getState().library!.seriesNot).toEqual([pairKey("in/a.jpg", "in/c.jpg"), pairKey("in/b.jpg", "in/c.jpg")]);
     expect(host.querySelector(".series-strip")).toBeNull();
     // Taken apart again, b has a and c alike; turned down, they aren't suggested with it again.
     await act(async () => useStore.setState({ library: library(), index: 1 }));
@@ -152,6 +162,32 @@ describe("series in Sort", () => {
     expect(useStore.getState().library!.seriesNot).toEqual([pairKey("in/a.jpg", "in/b.jpg"), pairKey("in/b.jpg", "in/c.jpg")]);
     expect(host.querySelector(".series-strip")).toBeNull();
     root.unmount();
+  });
+});
+
+describe("adding to a series", () => {
+  it("suggests the library's look-alikes, unticked; the ones ticked join it", async () => {
+    const items = ["in/a.jpg", "in/b.jpg", "in/c.jpg", "in/d.jpg", "in/e.jpg"].map(pic);
+    useStore.setState({ root: "/vol", allItems: items, loadAll: async () => items, library: library({ series: [["in/a.jpg", "in/b.jpg"]], seriesNot: [pairKey("in/a.jpg", "in/e.jpg")] }) } as never);
+    // c and e look like a; d doesn't; e was said not to be with a.
+    useDupes.setState({ cacheRoot: "/vol", running: false, loadCache: async () => {}, cache: { "in/a.jpg": sig("0000000000000000", "1"), "in/b.jpg": sig("0000000000000001", "2"), "in/c.jpg": sig("0000000000000003", "3"), "in/d.jpg": sig("ffffffffffffffff", "4"), "in/e.jpg": sig("0000000000000001", "5") } } as never);
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(SeriesAddDialog)));
+    await act(async () => openSeriesAdd("in/b.jpg"));
+    // The dialog shows over everything (on the page, not in the host).
+    const picks = () => Array.from(document.querySelectorAll<HTMLElement>(".series-add-grid .thumb"));
+    expect(picks().map((b) => b.title)).toEqual(["/vol/in/c.jpg"]);
+    expect(document.querySelectorAll(".series-add-grid .thumb.selected")).toHaveLength(0);
+    await act(async () => picks()[0].click());
+    expect(document.querySelectorAll(".series-add-grid .thumb.selected")).toHaveLength(1);
+    await act(async () => (Array.from(document.querySelectorAll("button")).find((b) => b.textContent?.includes("to the series")) as HTMLButtonElement).click());
+    expect(useStore.getState().library!.series).toEqual([["in/a.jpg", "in/b.jpg", "in/c.jpg"]]);
+    expect(useSeriesAdd.getState().of).toBeNull();
+    root.unmount();
+    host.remove();
   });
 });
 

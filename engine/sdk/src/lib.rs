@@ -44,6 +44,7 @@ fn result(len: i32) -> Result<Vec<u8>, String> {
     let n = len.unsigned_abs() as usize;
     let mut out = vec![0u8; n];
     if n > 0 {
+        // SAFETY: the engine writes its last answer, whose length it gave (n bytes), into `out`, which has n.
         unsafe { result_read(out.as_mut_ptr()) };
     }
     if len < 0 { Err(String::from_utf8_lossy(&out).into_owned()) } else { Ok(out) }
@@ -51,7 +52,9 @@ fn result(len: i32) -> Result<Vec<u8>, String> {
 
 /// The request: the plugin's options as it sent them (JSON).
 pub fn request() -> String {
+    // SAFETY: request_len only answers a number.
     let mut out = vec![0u8; unsafe { request_len() } as usize];
+    // SAFETY: the engine writes the request, as many bytes as request_len said, into `out`, made that long.
     unsafe { request_read(out.as_mut_ptr()) };
     String::from_utf8_lossy(&out).into_owned()
 }
@@ -66,8 +69,10 @@ pub struct Picture {
 /// The request's picture.
 pub fn input() -> Picture {
     let mut size = [0u32; 2];
+    // SAFETY: the engine writes two u32s (width, height) into `size`, which holds two.
     unsafe { input_size(size.as_mut_ptr()) };
     let mut rgb = vec![0u8; size[0] as usize * size[1] as usize * 3];
+    // SAFETY: the engine writes width * height * 3 bytes into `rgb`, made that long from those sizes.
     unsafe { input_read(rgb.as_mut_ptr()) };
     Picture { width: size[0], height: size[1], rgb }
 }
@@ -106,8 +111,9 @@ pub fn unpack(bytes: &[u8]) -> Result<Vec<Tensor>, String> {
     let bad = || "a model's answer couldn't be read".to_string();
     let mut at = 0usize;
     let mut take = |n: usize| -> Result<&[u8], String> {
-        let s = bytes.get(at..at + n).ok_or_else(bad)?;
-        at += n;
+        let end = at.checked_add(n).ok_or_else(bad)?;
+        let s = bytes.get(at..end).ok_or_else(bad)?;
+        at = end;
         Ok(s)
     };
     let count = u32::from_le_bytes(take(4)?.try_into().map_err(|_| bad())?) as usize;
@@ -118,8 +124,8 @@ pub fn unpack(bytes: &[u8]) -> Result<Vec<Tensor>, String> {
         for _ in 0..rank {
             shape.push(i64::from_le_bytes(take(8)?.try_into().map_err(|_| bad())?));
         }
-        let n = shape.iter().product::<i64>().max(0) as usize;
-        let data = take(n * 4)?.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().expect("four bytes"))).collect();
+        let n = shape.iter().try_fold(1usize, |n, &d| n.checked_mul(usize::try_from(d).ok()?)).ok_or_else(bad)?;
+        let data = take(n.checked_mul(4).ok_or_else(bad)?)?.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect();
         out.push(Tensor { shape, data });
     }
     Ok(out)
@@ -129,6 +135,7 @@ pub fn unpack(bytes: &[u8]) -> Result<Vec<Tensor>, String> {
 /// inputs, on the engine's device; its outputs. The model is loaded once and kept between pages.
 pub fn run_model(model: &str, file: &str, inputs: &[Tensor]) -> Result<Vec<Tensor>, String> {
     let packed = pack(inputs);
+    // SAFETY: each pointer is a live slice's, with its length; the engine only reads them during the call.
     let len = unsafe { model_run(model.as_ptr(), model.len() as u32, file.as_ptr(), file.len() as u32, packed.as_ptr(), packed.len() as u32) };
     unpack(&result(len)?)
 }
@@ -139,6 +146,7 @@ pub fn inpaint_lama(rgb: &[u8], mask: &[u8], width: u32, height: u32) -> Result<
     if rgb.len() != width as usize * height as usize * 3 || mask.len() != width as usize * height as usize {
         return Err("the crop and its mask aren't the size given".into());
     }
+    // SAFETY: `rgb` and `mask` are live and the sizes checked above; the engine only reads them during the call.
     result(unsafe { inpaint(rgb.as_ptr(), mask.as_ptr(), width, height) })
 }
 
@@ -146,29 +154,35 @@ pub fn inpaint_lama(rgb: &[u8], mask: &[u8], width: u32, height: u32) -> Result<
 /// far along when it can count: the app shows it.
 pub fn report(stage: &str, state: &str, step: Option<(u32, u32)>) {
     let (done, total) = step.map_or((-1, -1), |(d, t)| (d as i32, t as i32));
+    // SAFETY: two live strings with their lengths; the engine only reads them during the call.
     unsafe { progress(stage.as_ptr(), stage.len() as u32, state.as_ptr(), state.len() as u32, done, total) };
 }
 
 /// A line for the engine's log (stderr).
 pub fn say(message: &str) {
+    // SAFETY: a live string with its length; the engine only reads it during the call.
     unsafe { log(message.as_ptr(), message.len() as u32) };
 }
 
 /// A setting from the engine's environment, for debugging a pipeline: only names starting with `MS_`.
 pub fn var(name: &str) -> Option<String> {
+    // SAFETY: a live string with its length; the engine only reads it during the call.
     let len = unsafe { env(name.as_ptr(), name.len() as u32) };
     if len < 0 { None } else { result(len).ok().map(|b| String::from_utf8_lossy(&b).into_owned()) }
 }
 
 /// Seconds since the run began (WebAssembly has no clock of its own), for timing a pipeline's steps.
 pub fn seconds() -> f64 {
+    // SAFETY: clock takes nothing and only answers a number.
     unsafe { clock() }
 }
 
 /// The result: a picture (RGB, the input's size or another) or none, and what the plugin is told (JSON).
 pub fn output(picture: Option<&Picture>, json: &str) {
     match picture {
+        // SAFETY: the picture's bytes and the JSON are live, with their lengths; the engine copies them during the call.
         Some(p) => unsafe { put_output(p.rgb.as_ptr(), p.rgb.len() as u32, p.width, p.height, json.as_ptr(), json.len() as u32) },
+        // SAFETY: no picture (a null pointer with length 0, which the engine takes for none) and a live JSON string.
         None => unsafe { put_output(std::ptr::null(), 0, 0, 0, json.as_ptr(), json.len() as u32) },
     }
 }
@@ -194,6 +208,7 @@ pub mod text {
     /// the original text out. The models of `need`'s stages are checked with these, so a page that
     /// can't be finished fails before any work, naming every model missing ("not downloaded: …").
     pub fn stages(json: &str) -> Result<String, String> {
+        // SAFETY: a live string with its length; the engine only reads it during the call.
         let len = unsafe { super::text_stages(json.as_ptr(), json.len() as u32) };
         super::result(len).map(|b| String::from_utf8_lossy(&b).into_owned())
     }
@@ -201,6 +216,7 @@ pub mod text {
     /// Take regions off the page (a JSON list of their ids): their text isn't read, translated or
     /// lettered, though the original text found there is still painted out.
     pub fn drop(ids_json: &str) -> Result<String, String> {
+        // SAFETY: a live string with its length; the engine only reads it during the call.
         let len = unsafe { super::text_drop(ids_json.as_ptr(), ids_json.len() as u32) };
         super::result(len).map(|b| String::from_utf8_lossy(&b).into_owned())
     }
@@ -209,6 +225,7 @@ pub mod text {
     /// ["Comic Sans MS", …]}`, installed fonts most preferred first (fonts most computers have when
     /// left out).
     pub fn letter(json: &str) -> Result<super::Picture, String> {
+        // SAFETY: a live string with its length; the engine only reads it during the call.
         let bytes = super::result(unsafe { super::text_letter(json.as_ptr(), json.len() as u32) })?;
         if bytes.len() < 8 {
             return Err("the lettered page couldn't be read".into());
@@ -226,6 +243,7 @@ pub mod text {
 /// Why it failed, for the plugin.
 #[doc(hidden)]
 pub fn failed(message: &str) {
+    // SAFETY: a live string with its length; the engine only reads it during the call.
     unsafe { fail(message.as_ptr(), message.len() as u32) };
 }
 

@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { debounced, flushAll } from "./lib/pending";
-import { pageNumber } from "./lib/format";
 import { api, setCurrentRoot, storedPath } from "./lib/api";
 import { closeViews, loadViews, setView, view } from "./lib/views";
 import { isPdfPage } from "./lib/pdf";
@@ -12,7 +11,7 @@ import { suggestHotkey } from "./lib/hotkeys";
 import { findMoves, identityOf, nextSnapshot, readSnapshot, seenIn, snapshotSig, type Orphan } from "./lib/reconcile";
 import { folderMoves, mover, rekeyRecord, type MovePair } from "./lib/moves";
 import { applyLook, loadModeId, resolveMode, watchSystemMode, type Mode, type ResolvedMode, loadThemeId } from "./themes";
-import { basename, shuffled, uid, naturalCompare, plainCompare } from "./lib/format";
+import { basename, samePages, shuffled, uid, naturalCompare, plainCompare } from "./lib/format";
 import type { Album, AlbumRename, History, ItemSource, Library, LibrarySettings, MediaItem, Target, VaultStatus } from "./lib/types";
 import type { Fix } from "./scrapbook/model";
 import { useEdit, type Pipeline } from "./editStore";
@@ -20,6 +19,7 @@ import { steppedJob } from "./lib/jobs";
 import { PART, bucketOf, filedFolder, folderName, fromRoot, inTarget, isFilingName, ownFolderOf, partOf, targetFor, within } from "./lib/filing";
 import { invoke } from "@tauri-apps/api/core";
 import { cue } from "./lib/sounds";
+import { useOnline } from "./lib/online";
 import { IS_MAC } from "./lib/platform";
 
 export type Screen = "welcome" | "home" | "viewer" | "browse" | "dupes" | "albums" | "files" | "tags" | "people" | "artists" | "find" | "activity" | "scrapbook" | "cover";
@@ -74,7 +74,7 @@ const DEFAULT_BROWSE: BrowseFilters = { location: "all", kind: "all", folders: n
 const DEFAULT_ALBUMS: AlbumFilters = { query: "", rootSel: "all", kind: "all", minRating: 0, unratedOnly: false, sortBy: "name", desc: false, random: false, zoom: 260, tags: [], tagsMode: "or", tagsOut: [], tagsOutMode: "or", artists: [], people: [] };
 
 /** Preferences remembered on this computer: the bars folded away, and the last used of the library's settings (see lib/librarySettings), for before a library opens. */
-function loadPref<T extends object>(key: string, def: T): T {
+export function loadPref<T extends object>(key: string, def: T): T {
   try {
     const v = JSON.parse(localStorage.getItem(key) ?? "null");
     return v && typeof v === "object" ? { ...def, ...v } : def;
@@ -82,7 +82,7 @@ function loadPref<T extends object>(key: string, def: T): T {
     return def;
   }
 }
-function savePref(key: string, v: unknown) {
+export function savePref(key: string, v: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(v));
   } catch {
@@ -599,7 +599,8 @@ export const useStore = create<Store>((set, get) => ({
   mode: resolveMode(loadModeId()),
   slideshow: { playing: false, hidByShow: false, ...loadPref<{ interval: number; hideUi: boolean }>("quire.slideshow", { interval: 5, hideUi: true }) },
   browseFilters: DEFAULT_BROWSE,
-  browseSeed: 1,
+  // Random order is new each time the app opens, and stays until Random is pressed again.
+  browseSeed: Math.floor(Math.random() * 2 ** 31) + 1,
   infoItem: null,
   filesShow: null,
   infoAlbum: null,
@@ -1037,11 +1038,8 @@ export const useStore = create<Store>((set, get) => ({
     try {
       const items = await albumPages(root, other);
       if (!items.length) return get().toast(`${other.name} is empty`, "warn");
-      // The same page: the one numbered as this one is (a page missing on one side shifts the
-      // rest, so the place alone would land a page off); by place when the pages aren't numbered.
-      const n = pageNumber(cur.name);
-      const byNumber = n == null ? -1 : items.findIndex((i) => pageNumber(i.name) === n);
-      set({ queue: items, index: byNumber >= 0 ? byNumber : Math.min(index, items.length - 1) });
+      // The same page (by its number, else its place).
+      set({ queue: items, index: samePages(queue, items).get(index) ?? 0 });
     } catch (e) {
       get().toast(String(e), "error");
     }
@@ -2007,6 +2005,10 @@ async function reconcileNow(items: MediaItem[]): Promise<void> {
 export function followMoves(pairs: MovePair[]) {
   const move = mover(pairs);
   if (!pairs.some(([a, b]) => a !== b)) return;
+  // Show similar's picture, and those it found, moved while its likes show.
+  void import("./similarStore")
+    .then(({ followSimilar }) => followSimilar(move))
+    .catch(() => {});
   const s = useStore.getState();
   const lib = s.library;
   if (lib) {
@@ -2279,6 +2281,12 @@ async function undoTop() {
     void import("./versionsStore").then(({ useVersions }) => useVersions.getState().load(true));
   }
 }
+
+// The vault locked (by Lock, or by the app): what was connected (Going online) is no longer, so after
+// it is unlocked again every platform asks before it goes online, even one kept connected.
+useStore.subscribe((st, prev) => {
+  if (prev.vault?.unlocked && !st.vault?.unlocked) useOnline.getState().disconnect();
+});
 
 // The system switching between light and dark: the look follows when it is set to the system's.
 watchSystemMode(() => {

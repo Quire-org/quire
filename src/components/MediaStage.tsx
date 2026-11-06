@@ -8,6 +8,7 @@ import { DeviceMobile, Gauge, Pause, Play, SpeakerHigh, SpeakerSlash } from "@ph
 import { useCast } from "./Cast";
 import { useOriginalShown } from "../versionsStore";
 import { VideoFaceLayer } from "./FacesInPicture";
+import { useStopWhenGone } from "../lib/video";
 
 export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -104,6 +105,7 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
   const [hover, setHover] = useState<{ t: number; x: number } | null>(null);
   const [controlsOn, setControlsOn] = useState(true);
   const overControls = useRef(false);
+  const videoAt = useStopWhenGone(videoRef);
   // Shown on a phone or tablet (Show on another device): it plays there, not here as well.
   const elsewhere = useCast((x) => (x.info ? (x.devices.find((d) => d.state === "allowed")?.name ?? null) : null));
   useEffect(() => {
@@ -155,7 +157,7 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
     <div className="fitbox video-wrap" ref={setBox} onMouseMove={poke}>
       <video
         key={item.primary}
-        ref={videoRef}
+        ref={videoAt}
         className={`stage-media ${size ? "sized" : ""}`}
         style={size ?? undefined}
         src={mediaUrl(item)}

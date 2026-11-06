@@ -811,11 +811,13 @@ fn base64_png(image: &image::DynamicImage, icc: Option<Vec<u8>>) -> Result<Strin
 
 fn write_png(image: &image::RgbImage, icc: Option<Vec<u8>>, path: &Path) -> Result<()> {
     use image::ImageEncoder as _;
-    let file = std::io::BufWriter::new(std::fs::File::create(path)?);
-    let mut encoder = image::codecs::png::PngEncoder::new(file);
+    let mut file = std::io::BufWriter::new(std::fs::File::create(path)?);
+    let mut encoder = image::codecs::png::PngEncoder::new(&mut file);
     if let Some(icc) = icc {
         let _ = encoder.set_icc_profile(icc);
     }
     encoder.write_image(image.as_raw(), image.width(), image.height(), image::ExtendedColorType::Rgb8)?;
+    // The last of it written, or the error said (a dropped BufWriter would lose it silently).
+    std::io::Write::flush(&mut file)?;
     Ok(())
 }

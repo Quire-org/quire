@@ -22,6 +22,7 @@ import { finder as finders_, useFinders, type Finder, type FindArtist, type Find
 import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
 import type { MediaItem } from "../lib/types";
 import { pageGroups, sameSite, shortUrl } from "../lib/artistPages";
+import { useRunPick } from "../lib/useRunPick";
 
 
 type Order = "pictures" | "name" | "newest";
@@ -697,7 +698,7 @@ function FoundWorks({ artist }: { artist: LocalArtist }) {
             return (
               <div key={`${f.key}|${f.work}`} className={`artist-found-tile ${f.score < SURE_MATCH ? "unsure" : ""}`}>
                 <Thumb item={it} aspect={1} onClick={() => (Object.values(finders).some((x) => x.platform === f.platform) ? setComparing(f) : inViewer(f))} />
-                <span className="artist-found-score mono" title={f.score < SURE_MATCH ? "Less sure: look closer" : "Surely the same picture"}>
+                <span className={`match-score mono ${f.score < SURE_MATCH ? "unsure" : ""}`} title={f.score < SURE_MATCH ? "Less sure: look closer" : "Surely the same picture"}>
                   {Math.round(f.score * 100)}%
                 </span>
                 <span className="artist-found-work small ellipsis" title={`${f.title} on ${f.platform}${(f.matches ?? 1) > 1 ? `, and ${(f.matches ?? 1) - 1} more of their works that look like it (the same work in other languages, say)` : ""}`}>
@@ -765,8 +766,8 @@ function LikeTheirStyle({ artist }: { artist: LocalArtist }) {
   const byKey = useMemo(() => new Map(all.map((i) => [i.key, i])), [all]);
   const [got, setGot] = useState<StyleLike[] | string | null>(() => styleCache.get(artist.id) ?? null);
   const [busy, setBusy] = useState(false);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [last, setLast] = useState<number | null>(null);
+  const list = Array.isArray(got) ? got.filter((g) => byKey.has(g.item)) : [];
+  const { picked, pick, setPicked } = useRunPick(list.map((g) => g.key));
   const ask = async () => {
     setBusy(true);
     const r = await useArtists.getState().likeTheirs(artist.id);
@@ -775,7 +776,6 @@ function LikeTheirStyle({ artist }: { artist: LocalArtist }) {
     setPicked(new Set());
     setBusy(false);
   };
-  const list = Array.isArray(got) ? got.filter((g) => byKey.has(g.item)) : [];
   const drop = (keys: string[]) => {
     const left = list.filter((g) => !keys.includes(g.key));
     styleCache.set(artist.id, left);
@@ -784,17 +784,6 @@ function LikeTheirStyle({ artist }: { artist: LocalArtist }) {
   };
   const yes = (keys: string[]) => (useArtists.getState().assign(keys, artist.id), drop(keys));
   const no = (keys: string[]) => (useArtists.getState().notTheirs(artist.id, keys), drop(keys));
-  const pick = (i: number, e: React.MouseEvent) => {
-    const k = list[i].key;
-    setPicked((s) => {
-      const n = new Set(s);
-      if (e.shiftKey && last !== null) for (let j = Math.min(last, i); j <= Math.max(last, i); j++) n.add(list[j].key);
-      else if (n.has(k)) n.delete(k);
-      else n.add(k);
-      return n;
-    });
-    setLast(i);
-  };
   const open = (i: number) => {
     const items = list.map((g) => byKey.get(g.item)).filter((x): x is MediaItem => !!x);
     useStore.getState().openViewer(items, i, { kind: "browse" });
@@ -835,7 +824,7 @@ function LikeTheirStyle({ artist }: { artist: LocalArtist }) {
             return (
               <div key={g.key} className={`artist-style-tile ${picked.has(g.key) ? "picked" : ""}`} onDoubleClick={() => open(i)}>
                 <Thumb item={it} aspect={g.key.startsWith("album:") ? ALBUM_RATIO : 1} selected={picked.has(g.key)} onClick={(e) => pick(i, e)} album={g.key.startsWith("album:")} />
-                <span className="artist-found-score mono">{Math.round(g.score * 100)}%</span>
+                <span className="match-score mono">{Math.round(g.score * 100)}%</span>
               </div>
             );
           })}

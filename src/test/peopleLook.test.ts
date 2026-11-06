@@ -99,6 +99,53 @@ describe("a face suggested for someone", () => {
     root.unmount();
   });
 
+  it("show how alike each is, the surest first or the least sure, and many picked are said yes or no to at once", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    localStorage.removeItem("quire.people.surestFirst");
+    const face = (id: number) => ({ id, key: `in/${id}.jpg`, kind: "photo" as const, bbox: [0.1, 0.1, 0.3, 0.3] as [number, number, number, number], score: 0.9, size: 200 });
+    const faces = [1, 2, 3, 4].map(face);
+    usePeople.setState({
+      doc: { version: 1, people: { pe1: { id: "pe1", name: "Kaze", kind: "person", from: null, portrait: null, added: 0 } }, faces: {}, no: [], not: {}, exclude: [], converted: null },
+      docRoot: "/vol",
+      faces,
+      byId: new Map(faces.map((f) => [f.id, f])),
+      sorted: { matches: [{ face: 1, person: "pe1", score: 0.5 }, { face: 2, person: "pe1", score: 0.9 }, { face: 3, person: "pe1", score: 0.7 }, { face: 4, person: "pe1", score: 0.42 }], doubts: [], groups: [] },
+      open: "pe1",
+    } as never);
+    const accept = vi.spyOn(usePeople.getState(), "accept").mockImplementation(() => {});
+    const notThem = vi.spyOn(usePeople.getState(), "notThem").mockImplementation(() => {});
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(People)));
+    const button = (text: string) => Array.from(document.body.querySelectorAll("button")).find((b) => b.textContent?.includes(text)) as HTMLButtonElement;
+    // Open already, when an earlier test left them open.
+    const check = button("Check them");
+    if (check) await act(async () => check.click());
+    const scores = () => Array.from(document.body.querySelectorAll(".match-score")).map((e) => e.textContent);
+    expect(scores()).toEqual(["90%", "70%", "50%", "42%"]);
+    // The least sure first, and kept so.
+    await act(async () => button("Surest first").click());
+    expect(scores()).toEqual(["42%", "50%", "70%", "90%"]);
+    expect(JSON.parse(localStorage.getItem("quire.people.surestFirst")!)).toEqual({ v: false });
+    await act(async () => button("Least sure first").click());
+    // The surest two picked as a run, then said to be them.
+    const tiles = () => Array.from(document.body.querySelectorAll<HTMLElement>(".found-face"));
+    await act(async () => tiles()[0].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => tiles()[2].dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: true })));
+    expect(document.body.querySelectorAll(".found-face.picked")).toHaveLength(3);
+    await act(async () => tiles()[1].dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await act(async () => button("Yes, Kaze").click());
+    expect(accept).toHaveBeenCalledWith([2, 1], "pe1");
+    // The rest picked all at once, and none of them is.
+    await act(async () => button("Pick all").click());
+    await act(async () => button("Not Kaze").click());
+    expect(notThem).toHaveBeenCalledWith([2, 3, 1, 4], "pe1");
+    accept.mockRestore();
+    notThem.mockRestore();
+    root.unmount();
+  });
+
   it("said not to be them, is gone at once, before the matching has looked again", async () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     const face = { id: 9, key: "in/a.jpg", kind: "photo" as const, bbox: [0.1, 0.1, 0.3, 0.3] as [number, number, number, number], score: 0.9, size: 200 };
@@ -122,6 +169,38 @@ describe("a face suggested for someone", () => {
     expect(document.body.querySelectorAll(".found-face")).toHaveLength(0);
     sort.mockRestore();
     root.unmount();
+  });
+});
+
+describe("a person's pictures", () => {
+  it("show a picture they are in twice once, picked whole", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    const pic = (key: string) => ({ key, primary: `/vol/${key}`, files: [`/vol/${key}`], name: key, kind: "image", dir: "in", size: 1, modified: 0, hasRaw: false, hasVideo: false });
+    useStore.setState({ root: "/vol", screen: "people", allItems: [pic("in/two.jpg"), pic("in/one.jpg")], albums: [], library: { version: 1, targets: [], ratings: {}, ids: {}, trashDir: "_deleted", albumRoots: [], albumRatings: {} } } as never);
+    const face = (id: number, key: string, x: number) => ({ id, key, kind: "drawn" as const, bbox: [x, 0.1, x + 0.2, 0.3] as [number, number, number, number], score: 0.9, size: 100 + id });
+    const faces = [face(1, "in/two.jpg", 0.1), face(2, "in/two.jpg", 0.6), face(3, "in/one.jpg", 0.4)];
+    usePeople.setState({
+      doc: { version: 1, people: { pe1: { id: "pe1", name: "Aoi", kind: "character", from: null, portrait: null, added: 0 } }, faces: { 1: { p: "pe1", ok: true }, 2: { p: "pe1", ok: true }, 3: { p: "pe1", ok: true } }, no: [], not: {}, exclude: [], converted: null },
+      docRoot: "/vol",
+      faces,
+      byId: new Map(faces.map((f) => [f.id, f])),
+      sorted: { matches: [], doubts: [], groups: [] },
+      open: "pe1",
+    } as never);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    await act(async () => root.render(createElement(People)));
+    const tiles = Array.from(document.body.querySelectorAll<HTMLElement>(".person-pics .person-pic"));
+    expect(tiles).toHaveLength(2);
+    expect(document.body.querySelector(".person-pics-head .label")?.textContent).toContain("· 2");
+    const two = tiles.find((t) => t.querySelector("img")?.getAttribute("src")?.includes("two.jpg") ?? false) ?? tiles[0];
+    await act(async () => two.click());
+    expect(document.body.querySelector(".person-pics-head")?.textContent).toContain("2 picked");
+    // One picture picked: its largest face can be their portrait.
+    expect(Array.from(document.body.querySelectorAll("button")).some((b) => b.textContent?.includes("Use as portrait"))).toBe(true);
+    root.unmount();
+    host.remove();
   });
 });
 

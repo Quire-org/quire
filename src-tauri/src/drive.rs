@@ -360,6 +360,7 @@ fn open_uncached(p: &Path) -> std::io::Result<std::fs::File> {
     #[cfg(target_os = "macos")]
     {
         use std::os::unix::io::AsRawFd;
+        // SAFETY: fcntl(2) on a descriptor `f` owns and keeps open for the call; F_NOCACHE only sets a flag.
         unsafe {
             libc::fcntl(f.as_raw_fd(), libc::F_NOCACHE, 1);
         }
@@ -367,6 +368,7 @@ fn open_uncached(p: &Path) -> std::io::Result<std::fs::File> {
     #[cfg(target_os = "linux")]
     {
         use std::os::unix::io::AsRawFd;
+        // SAFETY: posix_fadvise(2) on a descriptor `f` owns and keeps open for the call; it only advises the cache.
         unsafe {
             libc::posix_fadvise(f.as_raw_fd(), 0, 0, libc::POSIX_FADV_DONTNEED);
         }

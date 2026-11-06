@@ -726,12 +726,14 @@ function OnThisDayBlock({ block, salt }: { block: Block; salt: number }) {
   );
 }
 
-/** A salt per block, so its Shuffle changes only it. */
+/** New each time the app opens, for the blocks that pick at random: a new pick each session. */
+const SESSION_SEED = Date.now() % 100_000;
+
+/** A salt per block, so its Shuffle changes only it; kept in the Home store, so the pick shuffled to stays when Home is left. */
 export function useSalt(block: Block): [number, () => void] {
-  const seed = useHome((h) => h.seed);
-  const [salt, setSalt] = useState(0);
+  const salt = useHome((h) => h.salts[block.id] ?? 0);
   const own = [...block.id].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
-  return [seed + own + salt * 7919, () => setSalt((s) => s + 1)];
+  return [SESSION_SEED + own + salt * 7919, () => useHome.getState().shuffle(block.id)];
 }
 
 /** A header button: a new pick. */

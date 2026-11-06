@@ -4,6 +4,7 @@ import type { MediaItem } from "../lib/types";
 import { useEdit } from "../editStore";
 import { useFitSize, type Natural } from "./FitImage";
 import { ZoomBox } from "./ZoomBox";
+import { useStopWhenGone } from "../lib/video";
 
 type Rect = [number, number, number, number];
 type Handle = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -49,12 +50,13 @@ function Original({ item }: { item: MediaItem }) {
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const [nat, setNat] = useState<Natural | null>(null);
   const size = useFitSize(box, nat, "fit");
+  const videoAt = useStopWhenGone();
   if (!url) return <div className="fitbox" />;
   return (
     <div className="fitbox" ref={setBox}>
       <ZoomBox fitted={size} natural={nat}>
         {item.kind === "video" ? (
-          <video className={`stage-media ${size ? "sized" : ""}`} style={size ?? undefined} src={url} muted loop autoPlay playsInline onLoadedMetadata={(e) => setNat({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight })} />
+          <video ref={videoAt} className={`stage-media ${size ? "sized" : ""}`} style={size ?? undefined} src={url} muted loop autoPlay playsInline onLoadedMetadata={(e) => setNat({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight })} />
         ) : (
           <img className={`stage-media ${size ? "sized" : ""}`} style={size ?? undefined} src={url} alt="" draggable={false} onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
         )}
@@ -76,6 +78,7 @@ function Preview({ item }: { item: MediaItem }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoAt = useStopWhenGone(videoRef);
   const rotated = p.rotate === 90 || p.rotate === 270;
   const isVideo = item.kind === "video";
   // While cropping an image, the whole (uncropped) frame is shown with the window on top.
@@ -266,7 +269,7 @@ function Preview({ item }: { item: MediaItem }) {
       <div ref={frameRef} className={`edit-frame ${cropping ? "cropping" : ""}`} style={size ? { width: size.width, height: size.height } : undefined}>
         {isVideo ? (
           <video
-            ref={videoRef}
+            ref={videoAt}
             className="stage-media sized edit-video"
             style={{
               width: size ? (rotated ? size.height : size.width) : undefined,

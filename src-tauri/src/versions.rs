@@ -38,11 +38,22 @@ pub struct Versions {
 }
 
 /// The links; an unreadable document is an error, never taken for an empty one (and written over).
+/// A link whose original isn't named by a fingerprint isn't one this app made (the file is on the
+/// drive, for anyone to write): it is left out, so its name is never made into a path.
 pub fn load(ctx: &Ctx) -> Result<Versions, String> {
-    match ctx.load_meta(DOC)? {
-        Some(text) => serde_json::from_str(&text).map_err(|e| format!("the versions file can't be read: {e}")),
-        None => Ok(Versions::default()),
-    }
+    let mut v: Versions = match ctx.load_meta(DOC)? {
+        Some(text) => serde_json::from_str(&text).map_err(|e| format!("the versions file can't be read: {e}"))?,
+        None => return Ok(Versions::default()),
+    };
+    v.links.retain(|_, l| is_fingerprint(&l.from));
+    Ok(v)
+}
+
+/// A fingerprint as `dupes::fingerprint_with` makes one: the size in hex, a dash, 16 hex digits.
+/// Nothing else names a kept original's folder.
+fn is_fingerprint(s: &str) -> bool {
+    let hex = |p: &str| p.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    s.split_once('-').is_some_and(|(size, hash)| (1..=16).contains(&size.len()) && hash.len() == 16 && hex(size) && hex(hash))
 }
 
 /// Changes to the links one at a time: plain folders take commands side by side.
@@ -68,8 +79,10 @@ fn sized(size: u64) -> String {
     format!("{size:x}-")
 }
 
+/// The kept original's folder: in `KEPT_DIR`, named by its fingerprint. Anything that isn't one (see
+/// `load`) is a folder that never exists there, never a path out of it.
 pub fn kept_dir(root: &Path, from: &str) -> PathBuf {
-    root.join(KEPT_DIR).join(from)
+    root.join(KEPT_DIR).join(if is_fingerprint(from) { from } else { ".not-a-fingerprint" })
 }
 
 /// The kept original's files (on disk or in the vault); none when it isn't kept.
@@ -338,6 +351,16 @@ mod tests {
         r
     }
 
+    #[test]
+    fn a_kept_original_named_by_anything_but_a_fingerprint_stays_in_the_kept_folder() {
+        let lib = Path::new("/library");
+        assert!(is_fingerprint("1a2b-0123456789abcdef"));
+        for name in ["../..", "../../Documents", "/Users/someone", "1a2b-0123456789abcdeg", "1a2b-0123", "-0123456789abcdef", ""] {
+            assert!(!is_fingerprint(name), "{name}");
+            assert_eq!(kept_dir(lib, name).parent(), Some(lib.join(KEPT_DIR).as_path()), "{name}");
+        }
+    }
+
     /// An edit's result written beside its original, as edit.rs and the plugin host do.
     fn replace(ctx: &mut Ctx, original: &[PathBuf], made: &Path, bytes: &[u8], trash: &Path) -> String {
         let from = ctx.fingerprint(&original[0]).unwrap();
@@ -446,9 +469,9 @@ mod tests {
         assert!(ctx.subdirs(&r).iter().all(|d| !d.to_string_lossy().contains(KEPT_DIR)));
         assert_eq!(kept(&ctx).originals, 1);
         // One kept plain (replaced before the vault had it) is still among the files to encrypt.
-        fs::create_dir_all(kept_dir(&r, "9-plain")).unwrap();
-        fs::write(kept_dir(&r, "9-plain").join("013.jpg"), b"plain page").unwrap();
-        assert!(crate::fsx::plaintext_files(&r).iter().any(|f| f.path == kept_dir(&r, "9-plain").join("013.jpg")));
+        fs::create_dir_all(kept_dir(&r, "9-0123456789abcdef")).unwrap();
+        fs::write(kept_dir(&r, "9-0123456789abcdef").join("013.jpg"), b"plain page").unwrap();
+        assert!(crate::fsx::plaintext_files(&r).iter().any(|f| f.path == kept_dir(&r, "9-0123456789abcdef").join("013.jpg")));
         assert_eq!(kept(&ctx).originals, 2);
         assert_eq!(forget_kept(&mut ctx).unwrap(), 2);
         assert_eq!(kept(&ctx).bytes, 0);
@@ -472,7 +495,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let ctx = Ctx::new(&root, None);
-        let link = |made: &str, from: &str| Link { from: "fp".into(), from_name: "a.jpg".into(), made_at: made.into(), from_at: from.into(), by: "edit".into(), note: "edited".into(), at: 1 };
+        let link = |made: &str, from: &str| Link { from: "1a-0123456789abcdef".into(), from_name: "a.jpg".into(), made_at: made.into(), from_at: from.into(), by: "edit".into(), note: "edited".into(), at: 1 };
         let mut v = Versions::default();
         v.links.insert("v1".into(), link("Pics/a edited.jpg", "Pics/a.jpg"));
         v.links.insert("v2".into(), link("Other/b.png", "Other/b.jpg"));

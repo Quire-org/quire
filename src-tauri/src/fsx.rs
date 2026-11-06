@@ -87,17 +87,22 @@ pub fn fs_kind(p: &Path) -> Option<String> {
     {
         use std::os::unix::ffi::OsStrExt;
         let c = std::ffi::CString::new(p.as_os_str().as_bytes()).ok()?;
+        // SAFETY: statfs is a plain C struct of integers and char arrays, for which all zeroes is a valid value.
         let mut st: libc::statfs = unsafe { std::mem::zeroed() };
+        // SAFETY: `c` is a NUL-terminated path that outlives the call, and `st` is a valid struct for it to fill.
         if unsafe { libc::statfs(c.as_ptr(), &mut st) } != 0 {
             return None;
         }
+        // SAFETY: statfs succeeded, so f_fstypename holds a NUL-terminated name within its array.
         Some(unsafe { std::ffi::CStr::from_ptr(st.f_fstypename.as_ptr()) }.to_string_lossy().into_owned())
     }
     #[cfg(target_os = "linux")]
     {
         use std::os::unix::ffi::OsStrExt;
         let c = std::ffi::CString::new(p.as_os_str().as_bytes()).ok()?;
+        // SAFETY: statfs is a plain C struct of integers and char arrays, for which all zeroes is a valid value.
         let mut st: libc::statfs = unsafe { std::mem::zeroed() };
+        // SAFETY: `c` is a NUL-terminated path that outlives the call, and `st` is a valid struct for it to fill.
         if unsafe { libc::statfs(c.as_ptr(), &mut st) } != 0 {
             return None;
         }

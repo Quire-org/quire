@@ -3,9 +3,11 @@ import { create } from "zustand";
 import { api } from "./lib/api";
 import { steppedJob } from "./lib/jobs";
 import { cacheValid } from "./lib/dupes";
-import { lookAlikes, pairKey, seriesIndex } from "./lib/series";
+import { SERIES_LOOKS, addable, lookAlikes, pairKey, seriesIndex, type Series } from "./lib/series";
 import { CACHE_VERSION, signItem, useDupes } from "./dupesStore";
+import type { CachedSig } from "./lib/dupes";
 import { useVersions } from "./versionsStore";
+import { useArtists } from "./artistsStore";
 import { useStore } from "./store";
 import type { MediaItem } from "./lib/types";
 
@@ -56,6 +58,16 @@ export async function lookForSeries(items: MediaItem[]): Promise<void> {
   }
 }
 
+/** Whether two pictures may never be a series: said not to be one, or a picture and its version (linked by their files' fingerprints). */
+function turnedDown(seriesNot: readonly string[] | undefined, cache: Record<string, CachedSig | undefined>, links: Record<string, { from?: string } | undefined>) {
+  const not = new Set(seriesNot ?? []);
+  return (a: string, b: string) => {
+    if (not.has(pairKey(a, b))) return true;
+    const [fa, fb] = [cache[a]?.fp, cache[b]?.fp];
+    return !!fa && !!fb && (links[fa]?.from === fb || links[fb]?.from === fa);
+  };
+}
+
 /**
  * The pictures of the queue that would make a series with `item`, closest first; none when it is in
  * a series already or isn't a picture. Pictures in a series of their own, pairs turned down, and a
@@ -70,15 +82,38 @@ export function useSuggestedSeries(item: MediaItem | undefined, queue: MediaItem
     if (!item || !isPicture(item)) return [];
     const index = seriesIndex(library?.series);
     if (index.has(item.key)) return [];
-    const not = new Set(library?.seriesNot ?? []);
-    const fpOf = (k: string) => cache[k]?.fp;
-    const versionOf = (a: string, b: string) => {
-      const [fa, fb] = [fpOf(a), fpOf(b)];
-      return !!fa && !!fb && (links[fa]?.from === fb || links[fb]?.from === fa);
-    };
     const others = queue.filter((q) => isPicture(q) && !index.has(q.key)).map((q) => q.key);
-    return lookAlikes(item.key, others, cache, (a, b) => not.has(pairKey(a, b)) || versionOf(a, b));
+    return lookAlikes(item.key, others, cache, turnedDown(library?.seriesNot, cache, links));
     // `looked`: the cache is filled in place as pictures are looked at.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.key, queue, library?.series, library?.seriesNot, cache, links, looked]);
+}
+
+/** A series being added to (Add, from the viewer's SERIES badge or a series' tile in Browse): one of its pictures. */
+export const useSeriesAdd = create<{ of: string | null }>(() => ({ of: null }));
+
+export const openSeriesAdd = (key: string) => useSeriesAdd.setState({ of: key });
+
+/**
+ * What might belong in `series`, from the whole library, most likely first: what looks like one of it
+ * (the tag index's embeddings, and the look-alikes the duplicate check's cache finds), raised by its
+ * artist and by being made near it in time. Pictures in a series, said not to be in this one, or a
+ * version of one of it are left out.
+ */
+export async function suggestForSeries(series: Series): Promise<string[]> {
+  const st = useStore.getState();
+  const root = st.root;
+  if (!root) return [];
+  // The tag index is asked while the pictures and the duplicate check's cache are read.
+  const asking = api.tagsRank(root, { queries: series.map((k) => ({ keys: [k] })), candidates: null, groups: {}, skip: series, min: SERIES_LOOKS, limit: 200 }).catch(() => [] as [string, number][]);
+  const [all] = await Promise.all([st.loadAll(), useDupes.getState().loadCache()]);
+  const items = all.filter(isPicture);
+  const cache = useDupes.getState().cache;
+  const library = useStore.getState().library;
+  const index = seriesIndex(library?.series);
+  const never = turnedDown(library?.seriesNot, cache, useVersions.getState().links);
+  const keys = items.map((i) => i.key);
+  const alike = new Set(series.flatMap((k) => lookAlikes(k, keys, cache, never)));
+  const near = await asking;
+  return addable(series, keys, { looks: new Map(near), alike, artistItems: useArtists.getState().doc?.items, modified: new Map(items.map((i) => [i.key, i.modified])) }, (k) => index.has(k) || series.some((m) => never(m, k)));
 }

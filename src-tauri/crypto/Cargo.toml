@@ -3,9 +3,14 @@ name = "quire-crypto"
 version = "0.1.0"
 authors = ["Kile"]
 edition = "2024"
+rust-version = "1.89"
 description = "The vault's cipher and passphrase hashing: apart from the app so they are optimised in dev builds too"
 publish = false
 
 [dependencies]
 chacha20poly1305 = "0.10"
 argon2 = "0.5"
+
+# No unsafe code here: none is needed.
+[lints.rust]
+unsafe_code = "forbid"

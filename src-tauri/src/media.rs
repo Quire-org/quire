@@ -91,13 +91,30 @@ fn is_sidecar(p: &Path) -> bool {
 /// on every platform (the library file travels with the volume).
 pub fn rel_key(root: &Path, p: &Path) -> String {
     match p.strip_prefix(root) {
-        Ok(rel) => rel
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy().into_owned())
-            .collect::<Vec<_>>()
-            .join("/"),
+        Ok(rel) => rel.components().map(|c| name_key(c.as_os_str())).collect::<Vec<_>>().join("/"),
         Err(_) => p.to_string_lossy().into_owned(),
     }
+}
+
+/// A file or folder name as a key: itself; a name that isn't UTF-8 (Linux allows any bytes) with each
+/// byte that isn't as U+FFFD and its hex, so two such names never share a key (and what one has kept,
+/// a rating, tags, never goes to the other).
+fn name_key(name: &std::ffi::OsStr) -> String {
+    if let Some(s) = name.to_str() {
+        return s.to_owned();
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let mut out = String::new();
+        for chunk in name.as_bytes().utf8_chunks() {
+            out.push_str(chunk.valid());
+            chunk.invalid().iter().for_each(|b| out.push_str(&format!("\u{FFFD}{b:02x}")));
+        }
+        out
+    }
+    #[cfg(not(unix))]
+    name.to_string_lossy().into_owned()
 }
 
 /// Rank used to decide which file of a group is displayed: a developed image
@@ -172,6 +189,18 @@ pub fn build_items(root: &Path, dir: &Path, files: Vec<FileRef>) -> Vec<MediaIte
 mod tests {
     use super::*;
     use std::fs;
+
+    #[cfg(unix)]
+    #[test]
+    fn names_that_are_not_utf8_never_share_a_key() {
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+        let root = Path::new("/lib");
+        let a = root.join(OsStr::from_bytes(b"pic\xff.jpg"));
+        let b = root.join(OsStr::from_bytes(b"pic\xfe.jpg"));
+        assert_ne!(rel_key(root, &a), rel_key(root, &b));
+        assert_eq!(rel_key(root, &root.join("Album/a b.jpg")), "Album/a b.jpg");
+    }
 
     fn tmp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("quire-test-{name}-{}", std::process::id()));

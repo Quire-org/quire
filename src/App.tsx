@@ -29,6 +29,7 @@ import { OrganiseDialog } from "./components/OrganiseDialog";
 import { useScrapbook } from "./scrapbook/store";
 import { KeepDialog } from "./components/KeepDialog";
 import { FindSourceDialog } from "./components/FindSourceDialog";
+import { SeriesAddDialog } from "./components/SeriesAdd";
 import { InfoPanel } from "./components/InfoPanel";
 import { ActivityScreen } from "./components/Activity";
 import { Settings } from "./screens/Settings";
@@ -41,6 +42,7 @@ import { Toasts } from "./components/Toasts";
 import { ConfirmHost } from "./components/Confirm";
 import { FolderBrowserHost } from "./components/FolderBrowser";
 import { listenForSounds } from "./lib/sounds";
+import { listen } from "@tauri-apps/api/event";
 import { useUpdates } from "./lib/updates";
 
 export default function App() {
@@ -141,6 +143,13 @@ export default function App() {
   // it opens (see lib/librarySettings).
   useEffect(() => void useUpdates.getState().loadBuild(), []);
 
+  // A change in an open vault went through, but the vault's list of its files couldn't be written
+  // (the backend tries again with the next change): said, not kept quiet.
+  useEffect(() => {
+    const off = listen<string>("vault-unsaved", (e) => useStore.getState().toast(`The vault's list of files couldn't be saved (${e.payload}). It is tried again with your next change.`, "error"));
+    return () => void off.then((f) => f());
+  }, []);
+
   // Open a folder passed on the command line / QUIRE_ROOT, else the library open last time
   // when its drive is there; else the Welcome card stays.
   useEffect(() => {
@@ -173,6 +182,7 @@ export default function App() {
       <PluginHost />
       <KeepDialog />
       <FindSourceDialog />
+      <SeriesAddDialog />
       {/* The viewer has its own, docked between its bars. */}
       <InfoPanel />
       {pendingRoot && <VaultUnlock />}

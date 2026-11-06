@@ -1,3 +1,4 @@
+import { releaseVideo } from "./video";
 /**
  * First-frame posters for video tiles outside a vault (a vault's videos have
  * theirs made by the backend and kept in the vault, see canThumb). WebKit does
@@ -92,8 +93,7 @@ export function videoPoster(url: string): Promise<string> {
         ctx.drawImage(v, 0, 0, w, h);
         if (!isBlank(ctx, w, h)) break;
       }
-      v.removeAttribute("src");
-      v.load();
+      releaseVideo(v);
       const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.8));
       if (!blob) throw new Error("poster encode failed");
       return URL.createObjectURL(blob);

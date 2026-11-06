@@ -351,7 +351,7 @@ impl FaceIndex {
             }
         }
         for faces in rejected.values_mut() {
-            faces.sort_by(|a, b| b.size.cmp(&a.size));
+            faces.sort_by_key(|f| std::cmp::Reverse(f.size));
             faces.truncate(REFERENCE);
         }
         let named: HashMap<u64, HashSet<&str>> = labels.named.iter().map(|(f, ps)| (*f, ps.iter().map(String::as_str).collect())).collect();
@@ -402,7 +402,7 @@ impl FaceIndex {
             faces.truncate(GROUPED);
             out.groups.extend(group(&faces, kind));
         }
-        out.groups.sort_by(|a, b| b.faces.len().cmp(&a.faces.len()));
+        out.groups.sort_by_key(|g| std::cmp::Reverse(g.faces.len()));
         out
     }
 
@@ -550,7 +550,7 @@ mod tests {
 
     /// A unit vector mostly along `axis`, a little along `twist`.
     fn vec_of(axis: usize, twist: usize, by: f32) -> Vec<f32> {
-        let mut v = vec![0.0; 16];
+        let mut v = [0.0f32; 16];
         v[axis] = 1.0;
         v[twist] += by;
         let n = v.iter().map(|x| x * x).sum::<f32>().sqrt();

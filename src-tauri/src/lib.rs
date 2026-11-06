@@ -61,6 +61,10 @@ impl VaultState {
 
 type VS<'a> = State<'a, VaultState>;
 
+/// The app, for what a command says in the window without having been given it (a vault index that
+/// couldn't be saved).
+static APP: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+
 fn with_ctx<T>(vs: &VaultLock, root: &Path, f: impl FnOnce(&mut Ctx) -> T) -> T {
     // A folder with no open vault is plain files: no lock, so commands run in parallel
     // instead of queueing behind whatever scan or save holds it.
@@ -70,9 +74,15 @@ fn with_ctx<T>(vs: &VaultLock, root: &Path, f: impl FnOnce(&mut Ctx) -> T) -> T 
     }
     let mut guard = vs.write().unwrap_or_else(|p| p.into_inner());
     let out = f(&mut Ctx::new(root, guard.as_mut()));
-    // Renames made by the command go to the vault's index in one write.
-    if let Some(v) = guard.as_mut() {
-        let _ = v.flush();
+    // Renames made by the command go to the vault's index in one write: tried again once if it fails,
+    // and still unsaved (so the next command writes it) if that fails too.
+    if let Some(v) = guard.as_mut()
+        && let Err(e) = v.flush().or_else(|_| v.flush())
+    {
+        eprintln!("the vault's index couldn't be saved (it will be tried again): {e}");
+        if let Some(app) = APP.get() {
+            let _ = tauri::Emitter::emit(app, "vault-unsaved", e);
+        }
     }
     out
 }
@@ -1589,20 +1599,25 @@ async fn cast_stop(state: tauri::State<'_, CastState>) -> Result<(), String> {
 /// streamed as the device's player asks), or nothing.
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
-async fn cast_frame(app: tauri::AppHandle, state: tauri::State<'_, CastState>, seq: u64, jpeg_base64: Option<String>, name: String, video: bool, index: usize, total: usize, none: bool, video_path: Option<String>, root: Option<String>) -> Result<(), String> {
-    use base64::Engine;
-    let jpeg = match jpeg_base64 {
-        Some(b) => base64::engine::general_purpose::STANDARD.decode(b.as_bytes()).map_err(|e| e.to_string())?,
-        None => vec![],
-    };
-    let stream = match (video_path, root) {
-        (Some(p), Some(r)) => video_source(&app, Path::new(&r), Path::new(&p)),
-        _ => None,
-    };
-    let g = state.0.lock().unwrap_or_else(|p| p.into_inner());
-    let Some(c) = g.as_ref() else { return Ok(()) };
-    c.shared.lock().unwrap_or_else(|p| p.into_inner()).frame = (!none).then_some(cast::Frame { seq, jpeg, name, video, stream, index, total });
-    Ok(())
+async fn cast_frame(app: tauri::AppHandle, seq: u64, jpeg_base64: Option<String>, name: String, video: bool, index: usize, total: usize, none: bool, video_path: Option<String>, root: Option<String>) -> Result<(), String> {
+    // Decoding, looking at the video's file and taking the locks wait: off the async runtime.
+    blocking(move || {
+        use base64::Engine;
+        let jpeg = match jpeg_base64 {
+            Some(b) => base64::engine::general_purpose::STANDARD.decode(b.as_bytes()).map_err(|e| e.to_string())?,
+            None => vec![],
+        };
+        let stream = match (video_path, root) {
+            (Some(p), Some(r)) => video_source(&app, Path::new(&r), Path::new(&p)),
+            _ => None,
+        };
+        let state = app.state::<CastState>();
+        let g = state.0.lock().unwrap_or_else(|p| p.into_inner());
+        let Some(c) = g.as_ref() else { return Ok(()) };
+        c.shared.lock().unwrap_or_else(|p| p.into_inner()).frame = (!none).then_some(cast::Frame { seq, jpeg, name, video, stream, index, total });
+        Ok(())
+    })
+    .await
 }
 
 /// A video in the library a browser can play, to stream: read piece by piece, from the file or
@@ -1961,6 +1976,7 @@ impl Holder {
             if self.pid == std::process::id() {
                 return true;
             }
+            // SAFETY: kill(2) with signal 0 sends nothing; it only asks whether the process is there.
             if unsafe { libc::kill(self.pid as libc::pid_t, 0) } != 0 {
                 return std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM);
             }
@@ -3260,6 +3276,10 @@ async fn find_download(app: tauri::AppHandle, id: String, works: Vec<FindWork>, 
     .await
 }
 
+/// The most one frame of an animation, and all of them, may unpack to.
+const MAX_FRAME: u64 = 64 * 1024 * 1024;
+const MAX_FRAMES: u64 = 4 * 1024 * 1024 * 1024;
+
 /// An animation: its frames' zip downloaded and unpacked, then played at their timings into an MP4.
 fn find_animation(granted: &[String], headers: &std::collections::BTreeMap<String, String>, anim: &FindAnimation, dir: &Path, ctl: &std::sync::Arc<jobctl::Control>) -> Result<(PathBuf, u64), String> {
     let frames_dir = dir.join("frames");
@@ -3272,12 +3292,22 @@ fn find_animation(granted: &[String], headers: &std::collections::BTreeMap<Strin
     let mut pictures: Vec<String> = zip.file_names().filter_map(|n| n.ok()).filter(|n| !n.ends_with('/') && media::classify(Path::new(n.as_ref())) == Some(media::MediaKind::Image)).map(|n| n.into_owned()).collect();
     pictures.sort();
     let mut frames = Vec::with_capacity(anim.frames.len());
+    let mut unpacked = 0u64;
     for (i, f) in anim.frames.iter().enumerate() {
         let name = safe_file_name(&f.file);
         let at = if zip.index_for_name(&f.file).is_some() { f.file.clone() } else { pictures.get(i).cloned().ok_or_else(|| format!("frame {} is missing from the zip", f.file))? };
+        if !ctl.go_on() {
+            return Err("stopped".into());
+        }
         let mut entry = zip.by_name(&at).map_err(|_| format!("frame {} is missing from the zip", f.file))?;
+        // A frame no larger than a picture can be, and all of them no larger than an animation: a zip
+        // that unpacks to more is refused, not let fill the disk.
         let mut file = std::fs::File::create(frames_dir.join(&name)).map_err(|e| e.to_string())?;
-        std::io::copy(&mut entry, &mut file).map_err(|e| e.to_string())?;
+        let copied = std::io::copy(&mut std::io::Read::take(&mut entry, MAX_FRAME + 1), &mut file).map_err(|e| e.to_string())?;
+        unpacked += copied;
+        if copied > MAX_FRAME || unpacked > MAX_FRAMES {
+            return Err("the animation's frames are larger than an animation's can be".into());
+        }
         frames.push((name, f.delay));
     }
     let out = dir.join(safe_file_name(&anim.name));
@@ -3846,9 +3876,9 @@ fn drop_journals(ctx: &fsx::Ctx, from: u64, to: u64) -> Result<(), String> {
 }
 
 /// Write a change to the index's journal at once (a crash loses at most the picture it was on).
-fn journal(vs: &VaultLock, root: &Path, seq: u64, change: &tagindex::Change) {
-    let Ok(bytes) = serde_json::to_vec(change) else { return };
-    let _ = with_ctx(vs, root, |ctx| ctx.append_meta_record(&journal_name(seq), &bytes));
+fn journal(vs: &VaultLock, root: &Path, seq: u64, change: &tagindex::Change) -> Result<(), String> {
+    let bytes = serde_json::to_vec(change).map_err(|e| e.to_string())?;
+    with_ctx(vs, root, |ctx| ctx.append_meta_record(&journal_name(seq), &bytes))
 }
 
 fn write_index(ctx: &fsx::Ctx, ix: &tagindex::Index) -> Result<(), String> {
@@ -3977,7 +4007,7 @@ async fn tags_index_forget(vs: VS<'_>, root: String, keys: Vec<String>) -> Resul
         };
         let root = PathBuf::from(root);
         let seq = with_tag_index(&vs, &root, forget)?;
-        changes.iter().for_each(|c| journal(&vs, &root, seq, c));
+        changes.iter().try_for_each(|c| journal(&vs, &root, seq, c))?;
         flush_tag_index(&vs, false)
     })
     .await
@@ -3994,7 +4024,7 @@ async fn tags_index_rename(vs: VS<'_>, root: String, pairs: Vec<(String, String)
         };
         let root = PathBuf::from(root);
         let seq = with_tag_index(&vs, &root, rename)?;
-        changes.iter().for_each(|c| journal(&vs, &root, seq, c));
+        changes.iter().try_for_each(|c| journal(&vs, &root, seq, c))?;
         flush_tag_index(&vs, false)
     })
     .await
@@ -4012,20 +4042,20 @@ async fn tags_index_restamp(vs: VS<'_>, root: String, stamps: Vec<(String, u64, 
         };
         let root = PathBuf::from(root);
         let seq = with_tag_index(&vs, &root, stamp)?;
-        changes.iter().for_each(|c| journal(&vs, &root, seq, c));
+        changes.iter().try_for_each(|c| journal(&vs, &root, seq, c))?;
         flush_tag_index(&vs, false)
     })
     .await
 }
 
-/// The items most like any of the queries, best first.
+/// The items most like any of the queries, best first (`parts`: an item's crops and frames count too).
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
-async fn tags_rank(vs: VS<'_>, root: String, queries: Vec<tagindex::Query>, candidates: Option<Vec<String>>, groups: tagindex::Groups, skip: Vec<String>, min: f32, limit: usize) -> Result<Vec<(String, f32)>, String> {
+async fn tags_rank(vs: VS<'_>, root: String, queries: Vec<tagindex::Query>, candidates: Option<Vec<String>>, groups: tagindex::Groups, skip: Vec<String>, min: f32, limit: usize, parts: Option<bool>) -> Result<Vec<(String, f32)>, String> {
     let vs = vs.share();
     blocking(move || {
         let skip: std::collections::HashSet<String> = skip.into_iter().collect();
-        with_tag_index(&vs, Path::new(&root), |ix| ix.rank(&queries, candidates.as_deref(), &groups, &skip, min, limit, false))
+        with_tag_index(&vs, Path::new(&root), |ix| ix.rank(&queries, candidates.as_deref(), &groups, &skip, min, limit, parts.unwrap_or(false)))
     })
     .await
 }
@@ -4900,11 +4930,14 @@ fn index_items(app: &tauri::AppHandle, vs: &VaultLock, rootp: PathBuf, items: Ve
                     ix.put(&key, r.embedding.as_deref(), &r.parts, r.tags.as_deref(), r.anime.as_deref(), stamp);
                     (ix.put_change(&key), ix.journal)
                 };
+                // A change not journalled is lost if the app stops before the index is next saved: said, as
+                // this picture's error, not dropped.
+                let mut failed = None;
                 if let Ok((Some(change), seq)) = with_tag_index(vs, &rootp, put) {
-                    journal(vs, &rootp, seq, &change);
+                    failed = journal(vs, &rootp, seq, &change).err();
                 }
                 let _ = flush_tag_index(vs, false);
-                IndexedItem { key, embedding: None, tags: r.tags, error: None }
+                IndexedItem { key, embedding: None, tags: r.tags, error: failed }
             }
             Err(e) => IndexedItem { key, embedding: None, tags: None, error: Some(e) },
         };
@@ -5428,6 +5461,7 @@ pub fn run() {
         .manage(IndexState::default())
         .manage(CastState::default())
         .setup(|app| {
+            let _ = APP.set(app.handle().clone());
             // A bundled app ships pdfium among its resources.
             if let Ok(dir) = app.path().resource_dir() {
                 pdf::bundled_in(dir);

@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Quire's local engine: its models and plugins' pipelines behind a line-based JSON protocol"
 authors = ["Kile"]
 edition = "2024"
+rust-version = "1.89"
 publish = false
 
 # Koharu (MIT OR Apache-2.0) does the work: text detection, OCR, translation
@@ -40,3 +41,7 @@ ort = { version = "2.0.0-rc.15", features = ["coreml"] }
 
 [profile.release]
 debug = false
+
+# No unsafe code here: none is needed.
+[lints.rust]
+unsafe_code = "forbid"

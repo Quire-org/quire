@@ -10,6 +10,7 @@ import { linkedHints, useDupes, versionHints, withParents, type Sensitivity } fr
 import { useVersions } from "../versionsStore";
 import { usePlugins } from "../plugins/store";
 import { Thumb } from "../components/Thumb";
+import { useStopWhenGone } from "../lib/video";
 import { TopNav, SideToggle } from "../components/TopNav";
 import { FolderPicker } from "../components/FolderPicker";
 import { fmtEta, useCountdown } from "../lib/eta";
@@ -140,12 +141,13 @@ export function Dupes() {
     }
   };
   const tick = (g: DupeGroup, key: string, on: boolean) => setKeepSel((m) => ({ ...m, [g.id]: on ? [...(m[g.id] ?? []), key] : (m[g.id] ?? []).filter((k) => k !== key) }));
+  const untick = (g: DupeGroup) => setKeepSel((x) => ({ ...x, [g.id]: [] }));
   /** The ticked files kept (`asSeries`: together, as a series), the rest of the group to the trash. */
   const keepTicked = async (g: DupeGroup, asSeries = false) => {
     const keep = new Set(keepSel[g.id] ?? []);
     if (asSeries && keep.size > 1) useStore.getState().makeSeries(g.members.map((m) => m.item.key).filter((k) => keep.has(k)));
     for (const m of g.members) if (!keep.has(m.item.key)) await trash(m);
-    setKeepSel((x) => ({ ...x, [g.id]: [] }));
+    untick(g);
     // What was kept is no duplicate set any more (a series never is one).
     const left = useDupes.getState().groups.find((x) => x.members.every((mm) => keep.has(mm.item.key)));
     if (!left || keep.size < 2) return;
@@ -223,8 +225,8 @@ export function Dupes() {
   }, [shown.length > limit]); // eslint-disable-line react-hooks/exhaustive-deps
   const est = d.estimate;
   // Stable across renders, so a card only re-renders when its own group, ticks or arming change.
-  const live = useRef({ trash, keepOnly, keepTicked, trashAll, tick, openGroup, setArmed, setTimelineOf });
-  live.current = { trash, keepOnly, keepTicked, trashAll, tick, openGroup, setArmed, setTimelineOf };
+  const live = useRef({ trash, keepOnly, keepTicked, trashAll, tick, untick, openGroup, setArmed, setTimelineOf });
+  live.current = { trash, keepOnly, keepTicked, trashAll, tick, untick, openGroup, setArmed, setTimelineOf };
   const act = useMemo<CardActions>(
     () => ({
       trash: (m) => void live.current.trash(m),
@@ -234,9 +236,13 @@ export function Dupes() {
       tick: (g, key, on) => live.current.tick(g, key, on),
       open: (g, idx) => live.current.openGroup(g, idx),
       ignore: (g) => useDupes.getState().ignoreGroup(g),
-      series: (g) => {
-        useStore.getState().makeSeries(g.members.map((m) => m.item.key));
-        useDupes.setState({ groups: useDupes.getState().groups.filter((x) => x.id !== g.id) });
+      series: (g, ticked) => {
+        useStore.getState().makeSeries(ticked ?? g.members.map((m) => m.item.key));
+        // Some of it a series, every one kept: the group is no duplicates.
+        if (ticked) {
+          useDupes.getState().ignoreGroup(g);
+          live.current.untick(g);
+        } else useDupes.setState({ groups: useDupes.getState().groups.filter((x) => x.id !== g.id) });
       },
       arm: (g) => {
         live.current.setArmed(g.id);
@@ -457,6 +463,7 @@ function VideoTimeline({ g, big, onOpen }: { g: DupeGroup; big?: boolean; onOpen
   const [playhead, setPlayhead] = useState<number | null>(null);
   const pendingSeek = useRef<number | null>(null);
   const player = useRef<HTMLVideoElement>(null);
+  const playerAt = useStopWhenGone(player);
   // Matched once per group, not on every playhead tick.
   const tracks = useMemo(() => {
     const vids = g.members.filter((m) => m.video);
@@ -519,7 +526,7 @@ function VideoTimeline({ g, big, onOpen }: { g: DupeGroup; big?: boolean; onOpen
       {big && (
         <div className="vt-player">
           <video
-            ref={player}
+            ref={playerAt}
             key={current.m.item.key}
             src={mediaUrl(current.m.item)}
             controls
@@ -697,8 +704,8 @@ interface CardActions {
   tick(g: DupeGroup, key: string, on: boolean): void;
   open(g: DupeGroup, idx: number): void;
   ignore(g: DupeGroup): void;
-  /** Keep every one, as a series: alike on purpose. */
-  series(g: DupeGroup): void;
+  /** Keep every one, as a series: alike on purpose (`ticked`: only those a series, the rest kept on their own). */
+  series(g: DupeGroup, ticked?: string[]): void;
   arm(g: DupeGroup): void;
   timeline(g: DupeGroup): void;
 }
@@ -729,6 +736,8 @@ const GroupCard = memo(
     // A version a plugin made first, with a badge: usually the one to keep.
     const members = g.members.map((m, idx) => ({ m, idx, version: versions.length ? versionOf(m.item, versions) : undefined }));
     if (versions.length) members.sort((a, b) => Number(!!b.version) - Number(!!a.version) || a.idx - b.idx);
+    // Some of a group of pictures ticked (two at least, not all): those can be a series.
+    const someTicked = g.kind === "image" && (kept?.length ?? 0) > 1 && kept!.length < g.members.length;
     return (
       <section className="dupe-group panel">
         <div className="dupe-head">
@@ -740,7 +749,7 @@ const GroupCard = memo(
               Keep {kept!.length} ticked, trash {g.members.length - kept!.length}
             </button>
           )}
-          {g.kind === "image" && (kept?.length ?? 0) > 1 && kept!.length < g.members.length && (
+          {someTicked && (
             <button className="btn sm" disabled={busy} onClick={() => act.keepTicked(g, true)} title="The ticked ones are alike on purpose: keep them together as a series, and trash the rest of this group">
               <Stack /> Keep {kept!.length} as a series, trash {g.members.length - kept!.length}
             </button>
@@ -748,10 +757,17 @@ const GroupCard = memo(
           <button className="btn sm ghost" onClick={() => act.ignore(g)} title="These are not duplicates: keep every one, and don't show this group again">
             Keep all
           </button>
-          {g.kind === "image" && g.members.length <= 12 && (
-            <button className="btn sm ghost" onClick={() => act.series(g)} title="Keep every one, together as a series: alike on purpose (a burst, variations). Kept together, it is one tile in Browse and whole in Sort">
-              <Stack /> Keep all as a series
+          {someTicked ? (
+            <button className="btn sm ghost" onClick={() => act.series(g, kept)} title="Keep every one, the ticked together as a series (alike on purpose), the rest on their own. Nothing goes to the trash">
+              <Stack /> Keep all, the {kept!.length} ticked as a series
             </button>
+          ) : (
+            g.kind === "image" &&
+            g.members.length <= 12 && (
+              <button className="btn sm ghost" onClick={() => act.series(g)} title="Keep every one, together as a series: alike on purpose (a burst, variations). Kept together, it is one tile in Browse and whole in Sort">
+                <Stack /> Keep all as a series
+              </button>
+            )
           )}
           <button className={`btn sm ${armed ? "danger" : "ghost"}`} disabled={busy} onClick={() => (armed ? act.trashAll(g) : act.arm(g))} title="Trash every file in this group (press twice)">
             {armed ? `Sure? Trash all ${g.members.length}` : "Trash all"}
