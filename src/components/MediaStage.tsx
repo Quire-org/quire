@@ -12,6 +12,29 @@ import { VideoFaceLayer } from "./FacesInPicture";
 export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
 /**
+ * Sound let on stays on: within an hour of a video last playing with its sound (unmuted, or played so),
+ * the next one starts with sound too, so a run of videos needn't each be unmuted. Muting one ends it.
+ * Kept in this window's storage, so a restart within the hour keeps it.
+ */
+const SOUND_KEY = "quire.soundOnAt";
+const SOUND_FOR = 60 * 60_000;
+export function soundLetOn(now = Date.now()): boolean {
+  try {
+    return now - Number(localStorage.getItem(SOUND_KEY) ?? 0) < SOUND_FOR;
+  } catch {
+    return false;
+  }
+}
+function keepSound(on: boolean) {
+  try {
+    if (on) localStorage.setItem(SOUND_KEY, String(Date.now()));
+    else localStorage.removeItem(SOUND_KEY);
+  } catch {
+    /* for this video only */
+  }
+}
+
+/**
  * Full-bleed display of one item: image, RAW (via embedded preview) or video
  * with a small custom control bar. Media gets explicit pixel sizes from its
  * aspect ratio (see FitImage) so portrait files render where they should.
@@ -68,7 +91,13 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [muted, setMuted] = useState(true);
+  // Muted or not, for the video it was said of; a new video starts as the sound was last let on or not.
+  const [sound, setSound] = useState(() => ({ of: item.primary, muted: !soundLetOn() }));
+  const muted = sound.of === item.primary ? sound.muted : !soundLetOn();
+  // A video refused autoplay with its sound is muted to play: not the reader muting it (see onVolumeChange).
+  const mutedToPlay = useRef(false);
+  // The video it has tried to start already (once each: a seek fires canplay again).
+  const startedFor = useRef<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [natural, setNatural] = useState<Natural | null>(null);
   const [speed, setSpeed] = useState(1);
@@ -143,9 +172,32 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
           e.currentTarget.playbackRate = speed;
         }}
         onRateChange={(e) => setSpeed(e.currentTarget.playbackRate)}
-        onPlay={() => setPlaying(true)}
+        onCanPlay={(e) => {
+          const v = e.currentTarget;
+          if (elsewhere || startedFor.current === item.primary) return;
+          startedFor.current = item.primary;
+          mutedToPlay.current = false;
+          // With its sound, a video may be refused autoplay (the webview's rule): it plays muted then, as before.
+          if (v.paused && !v.muted)
+            void v.play().catch(() => {
+              mutedToPlay.current = true;
+              v.muted = true;
+              void v.play().catch(() => {});
+            });
+        }}
+        onPlay={(e) => {
+          setPlaying(true);
+          if (!e.currentTarget.muted) keepSound(true);
+        }}
         onPause={() => setPlaying(false)}
-        onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
+        onVolumeChange={(e) => {
+          const m = e.currentTarget.muted;
+          setSound({ of: item.primary, muted: m });
+          // Still muted only to be let play (however often that is told): not the reader's doing.
+          if (m && mutedToPlay.current) return;
+          mutedToPlay.current = false;
+          keepSound(!m);
+        }}
         onError={() => setFailed(true)}
         onClick={() => {
           const v = videoRef.current;
