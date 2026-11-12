@@ -3,6 +3,7 @@ import { Plus } from "@phosphor-icons/react";
 import { Modal } from "./Modal";
 import { Mini, Thumb } from "./Thumb";
 import { useStore } from "../store";
+import { IS_MOBILE } from "../lib/platform";
 import { seriesCount, type Series } from "../lib/series";
 import { useRunPick } from "../lib/useRunPick";
 import { suggestForSeries, useSeriesAdd } from "../seriesStore";
@@ -57,7 +58,7 @@ function SeriesAddBody({ series, onDone }: { series: Series; onDone: () => void 
           return it ? <Mini key={k} item={it} size={176} className="series-add-in" /> : null;
         })}
       </div>
-      <div className="label">Might belong in it · click to pick (shift for a run)</div>
+      <div className="label">Might belong in it · {IS_MOBILE ? "tap to pick" : "click to pick (shift for a run)"}</div>
       {found == null ? (
         <p className="dim mono">LOOKING…</p>
       ) : shown.length ? (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent, useDeferredValue } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { TopNav, SideToggle } from "../components/TopNav";
 import { PluginButtons } from "../components/PluginButtons";
@@ -15,25 +15,21 @@ import { ArtistPicker } from "../components/ArtistPicker";
 import { useTags } from "../tagsStore";
 import { useStore, type BrowseFilters } from "../store";
 import { revertAll, useVersions } from "../versionsStore";
-import { seriesIndex, stacks } from "../lib/series";
-import { showSimilar, useSimilarOrder } from "../similarStore";
-import { openSeriesAdd } from "../seriesStore";
+import { showSimilar } from "../similarStore";
+import { openSeriesAdd, seriesActionFor } from "../seriesStore";
 import { SimilarBar } from "../components/SimilarBar";
-import { FiltersButton, FiltersPanel, type Filter } from "../components/Filters";
-import { NO_FILTER, filterPictures, useFilterData, usePictureFilterSections, type PictureFilter } from "../components/PictureFilters";
+import { FiltersButton, FiltersPanel } from "../components/Filters";
+import { FILTERS_OFF, useBrowseItems, type SortSel } from "./browseItems";
 import { Thumb } from "../components/Thumb";
 import { Deco } from "../components/Deco";
 import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
-import { formatBytes, shuffled, naturalCompare } from "../lib/format";
+import { formatBytes } from "../lib/format";
 import type { MediaItem } from "../lib/types";
 import { tileShapes } from "../lib/tileShapes";
 
-type SortSel = "name" | "date" | "rating" | "size";
 type Layout = "masonry" | "grid";
 
 const GAP = 10;
-/** Every filter off (the search, order and layout stay). */
-const FILTERS_OFF: Partial<BrowseFilters> = { location: "all", kind: "all", folders: null, minRating: 0, unratedOnly: false, tagged: "all", tags: [], tagsMode: "or", tagsOut: [], tagsOutMode: "or", artists: [], people: [] };
 const DEFAULTS_RESET: Partial<BrowseFilters> = { ...FILTERS_OFF, query: "", sortBy: "name", desc: false, random: false };
 const META_H = 30; // caption row under each tile, must match .thumb-meta
 const OVERSCAN = 900;
@@ -48,7 +44,7 @@ export function Browse() {
   const targets = s.library?.targets ?? [];
   const f = s.browseFilters;
   const setF = s.setBrowseFilters;
-  const { location, kind, query, sortBy, desc, minRating, unratedOnly, random, zoom, layout, tagged = "all", tags: tagsSel = [], tagsMode = "or", tagsOut = [], tagsOutMode = "or", artists: artistsSel = [], people: peopleSel = [] } = f;
+  const { location, kind, query, sortBy, desc, minRating, unratedOnly, random, zoom, layout, tagged = "all" } = f;
   const [filtersOpen, setFiltersOpen] = useState(false);
   useEffect(() => {
     void useTags.getState().load();
@@ -56,11 +52,8 @@ export function Browse() {
   }, [s.root]);
   const folders = useMemo(() => (f.folders ? new Set(f.folders) : null), [f.folders]);
   const setQuery = (v: string) => setF({ query: v });
-  // Typing stays instant; filtering the whole library follows a beat behind.
-  const searchQuery = useDeferredValue(query);
   const setZoom = (v: number) => setF({ zoom: v });
   const setLayout = (v: Layout) => setF({ layout: v });
-  const seed = useStore((st) => st.browseSeed);
   const setSeed = () => useStore.getState().reshuffleBrowse();
   const toggleRandom = () => {
     setF({ random: !useStore.getState().browseFilters.random });
@@ -102,43 +95,7 @@ export function Browse() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.root, s.allStale]);
 
-  const all = useMemo(() => s.allItems.filter((i) => !i.albumKey), [s.allItems]);
-  const ratings = s.library?.ratings ?? {};
-  const viewed = s.viewed;
-  const targetName = useMemo(() => Object.fromEntries(targets.map((t) => [t.id, t.name])), [targets]);
-
-
-  // Narrowed as everywhere pictures are (PictureFilters), then in the order asked for.
-  const picked = useMemo<PictureFilter>(() => ({ ...NO_FILTER, location, kind, folders: f.folders, query: searchQuery, minRating, unratedOnly, tagged, tags: tagsSel, tagsMode, tagsOut, tagsOutMode, artists: artistsSel, people: peopleSel }), [location, kind, f.folders, searchQuery, minRating, unratedOnly, tagged, tagsSel, tagsMode, tagsOut, tagsOutMode, artistsSel, peopleSel]);
-  const filterData = useFilterData(picked);
-  // A rating or a view is a reason to put the list in order again only when it is ordered by them.
-  const ratingsForSort = sortBy === "rating" ? ratings : null;
-  const viewedForSort = location === "recent" ? viewed : null;
-  // Show similar: the most alike first, as far as the filters let them through.
-  const similar = useSimilarOrder(all, filterData);
-  const seedKey = similar?.keys[0];
-  const seedItem = useMemo(() => (seedKey ? all.find((i) => i.key === seedKey) : undefined), [all, seedKey]);
-  const items = useMemo(() => {
-    const list = filterPictures(all, picked, filterData);
-    if (similar) {
-      const at = new Map(similar.keys.map((k, i) => [k, i]));
-      return list.filter((i) => at.has(i.key)).sort((a, b) => at.get(a.key)! - at.get(b.key)!);
-    }
-    if (random) return shuffled(list, seed);
-    if (location === "recent") return list.slice().sort((a, b) => (viewed[b.key] ?? 0) - (viewed[a.key] ?? 0));
-    const cmp: Record<SortSel, (a: MediaItem, b: MediaItem) => number> = {
-      name: (a, b) => naturalCompare(a.name, b.name),
-      date: (a, b) => a.modified - b.modified,
-      size: (a, b) => a.size - b.size,
-      rating: (a, b) => (ratings[a.key] ?? 0) - (ratings[b.key] ?? 0) || a.name.localeCompare(b.name),
-    };
-    const out = list.slice().sort(cmp[sortBy]);
-    return desc ? out.reverse() : out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, picked, filterData, similar, random, seed, sortBy, desc, ratingsForSort, viewedForSort]);
-
-  // The filters, as every screen shows them: a section each in the panel, chips for what is on.
-  const filters: Filter[] = usePictureFilterSections({ ...picked, query }, setF, all);
+  const { all, items, tiles, filters, similar, seedKey, seedItem, seriesOf, ratings, targetName } = useBrowseItems();
 
   // Drop selections that are no longer in the list (moved, trashed, filtered out).
   useEffect(() => {
@@ -149,10 +106,6 @@ export function Browse() {
   }, [items, selected]);
 
   const totalBytes = useMemo(() => items.reduce((a, i) => a + i.size, 0), [items]);
-
-  // Series kept together are one tile, the rest of each behind its first picture; opened, all of them in a row.
-  const seriesOf = useMemo(() => seriesIndex(s.library?.series), [s.library?.series]);
-  const tiles = useMemo(() => (s.seriesTogether ? stacks(items, seriesOf) : items.map((item) => ({ item, members: [item] }))), [items, seriesOf, s.seriesTogether]);
 
   /* ---------- layout ---------- */
   // Kept past the screen (tileShapes): back from the viewer, the mosaic is as it was.
@@ -249,16 +202,7 @@ export function Browse() {
   };
   const selectedItems = useMemo(() => items.filter((i) => selected.has(i.key)), [items, selected]);
   // A few pictures alike made a series, or a series' pictures taken out of it.
-  const seriesAction = useMemo(() => {
-    const pictures = selectedItems.filter((i) => i.kind === "image" || i.kind === "raw");
-    const inOne = selectedItems.filter((i) => seriesOf.has(i.key));
-    if (inOne.length && inOne.length === selectedItems.length && new Set(inOne.map((i) => seriesOf.get(i.key))).size === 1 && seriesOf.get(inOne[0].key)!.length === inOne.length)
-      return { label: "Split series", title: "These are no series: each picture on its own again", run: () => s.leaveSeries(inOne.map((i) => i.key)) };
-    if (pictures.length >= 2 && pictures.length === selectedItems.length)
-      return { label: "Make series", title: "Keep these together as a series: one tile here, and whole in Sort (one key files all of it)", run: () => s.makeSeries(pictures.map((i) => i.key)) };
-    return null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedItems, seriesOf]);
+  const seriesAction = useMemo(() => seriesActionFor(selectedItems, seriesOf), [selectedItems, seriesOf]);
   // Revert shows once anything here has been overwritten by an edit or a plugin.
   const hasVersions = useVersions((v) => Object.keys(v.links).length > 0);
   const rateSelected = (r: number | null) => {

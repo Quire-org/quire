@@ -115,6 +115,12 @@ pub fn forget(path: &Path) {
 /// Watch the opened folder, so files changed in place (same name, new content) are read again.
 /// One folder at a time: opening another one moves the watch.
 pub fn watch(root: &Path) {
+    // iOS's watcher opens a handle for every file under the folder. A drive's worth runs out of them,
+    // the watch fails, and the next listing (Albums makes one per album) walks the whole drive to try
+    // again. Nothing else changes the drive while the app has it, so there is nothing to watch for.
+    if cfg!(mobile) {
+        return;
+    }
     static WATCH: Mutex<Option<(PathBuf, notify::RecommendedWatcher)>> = Mutex::new(None);
     let mut w = WATCH.lock().unwrap_or_else(|p| p.into_inner());
     if w.as_ref().is_some_and(|(r, _)| r == root) {

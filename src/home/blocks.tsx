@@ -27,6 +27,7 @@ import { useActivity } from "../lib/activity";
 import { JobRow } from "../components/Activity";
 import { PlatformIcon } from "../components/PlatformIcon";
 import { SCREENS } from "../components/TopNav";
+import { IS_MOBILE } from "../lib/platform";
 import { filterPictures, useFilterData, type PictureFilter } from "../components/PictureFilters";
 import { FaceCrop } from "../screens/People";
 import { DEFAULT_SHORTCUTS, KINDS, RANDOM_BOARD, SHORTCUT_SCREENS, boardStrip, canMosaic, justify, nearestDay, onThisDay, pickStable, shownOnHome, today, type Block, type BlockType } from "./board";
@@ -153,6 +154,9 @@ function useShapes(items: MediaItem[]): number {
   return version;
 }
 
+/** How much of a picture a mosaic may trim: it was asked for, so a small block has one too rather than a grid. */
+const MOSAIC_TRIM = 0.25;
+
 /** The most a mosaic waits for its pictures' shapes before laying out with those it has. */
 const SHAPES_WAIT_MS = 1200;
 
@@ -184,7 +188,7 @@ function Pics({ items, labelOf, side }: { items: MediaItem[]; labelOf?: (i: Medi
   const tiles = useMemo(() => {
     if (!mosaic || !settled) return null;
     const known = pool.filter((i) => shapeOf(i) !== undefined);
-    return justify(known.map((i) => ({ key: i.key, a: shapeOf(i)! })), box.w, box.h, block?.maxRows);
+    return justify(known.map((i) => ({ key: i.key, a: shapeOf(i)! })), box.w, box.h, block?.maxRows, GAP, MOSAIC_TRIM);
     // Laid out once it settles (and again if the block's size changes), not as each later shape comes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mosaic, settled, pool, box.w, box.h, block?.maxRows]);
@@ -1052,7 +1056,7 @@ function BackupBlock() {
 export function useShortcutOptions(): { id: string; label: string; icon: React.ReactNode; key?: string; go: () => void }[] {
   const finders = useFinders((f) => f.finders);
   return [
-    ...SHORTCUT_SCREENS.map((id) => SCREENS[id] && { id, label: SCREENS[id]!.label, icon: SCREENS[id]!.icon, key: SCREENS[id]!.key, go: SCREENS[id]!.go }),
+    ...SHORTCUT_SCREENS.filter((id) => !IS_MOBILE || id === "browse" || id === "albums" || id === "find").map((id) => SCREENS[id] && { id, label: SCREENS[id]!.label, icon: SCREENS[id]!.icon, key: SCREENS[id]!.key, go: SCREENS[id]!.go }),
     ...Object.values(finders).map((f) => ({
       id: `find:${f.pluginId}`,
       label: f.name,

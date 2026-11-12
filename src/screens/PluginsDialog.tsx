@@ -8,6 +8,10 @@ import { usePlugins } from "../plugins/store";
 import { describePermission } from "../plugins/permissions";
 import { nextLoad, notifySettings } from "../plugins/host";
 import { useEngine } from "../plugins/engine";
+import { GitHubRepos } from "../components/GitHubRepos";
+import { GitHubSignIn } from "../components/GitHubSignIn";
+import { isSource } from "../lib/githubRepos";
+import { IS_MOBILE } from "../lib/platform";
 import type {
   Inspected,
   PluginInfo,
@@ -46,6 +50,9 @@ export function PluginsDialog() {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Pending | null>(null);
   const [checking, setChecking] = useState(false);
+  const [github, setGithub] = useState(false);
+  // Signed in, words are looked for in the list below; only a link or a path is added as typed.
+  const searching = github && !isSource(source);
   const fromGitHub = plugins.list.some((p) => p.state.github);
 
   // A plugin edited in place may ask for more than it was granted: ask as soon as the dialog opens.
@@ -149,35 +156,48 @@ export function PluginsDialog() {
           className="row plugin-add"
           onSubmit={(e) => {
             e.preventDefault();
-            void inspect(source);
+            if (!searching) void inspect(source);
           }}
         >
           <input
             className="input grow mono"
-            placeholder="GitHub link or folder path"
+            placeholder={github ? (IS_MOBILE ? "Search GitHub, or paste a link" : "Search GitHub, or a link or folder path") : IS_MOBILE ? "GitHub link" : "GitHub link or folder path"}
             value={source}
             onChange={(e) => setSource(e.target.value)}
             disabled={busy}
             spellCheck={false}
             title="For example https://github.com/owner/repo, a folder inside a repository (…/tree/main/folder), or /path/to/plugin"
           />
-          <button
-            className="btn"
-            type="button"
-            onClick={() => void browse()}
-            disabled={busy}
-            title="Choose a folder on this computer"
-          >
-            <FolderOpen /> Browse…
-          </button>
+          {!IS_MOBILE && (
+            <button
+              className="btn"
+              type="button"
+              onClick={() => void browse()}
+              disabled={busy}
+              title="Choose a folder on this computer"
+            >
+              <FolderOpen /> Browse…
+            </button>
+          )}
           <button
             className="btn primary"
             type="submit"
-            disabled={busy || !source.trim()}
+            disabled={busy || !source.trim() || searching}
           >
             <DownloadSimple /> {busy && !pending ? "Looking…" : "Add"}
           </button>
         </form>
+        {github && (
+          <GitHubRepos
+            typed={source}
+            disabled={busy}
+            onPick={(url) => {
+              setSource(url);
+              void inspect(url);
+            }}
+          />
+        )}
+        <GitHubSignIn onSignedIn={setGithub} />
         <div className="row plugin-sub">
           <span className="dim small">
             GitHub plugins update from their repository. Folders are used in

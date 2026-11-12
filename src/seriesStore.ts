@@ -89,6 +89,18 @@ export function useSuggestedSeries(item: MediaItem | undefined, queue: MediaItem
   }, [item?.key, queue, library?.series, library?.seriesNot, cache, links, looked]);
 }
 
+/** What a selection can do about series: a series' pictures, all of them, taken apart; a few pictures alike made one. */
+export function seriesActionFor(selected: MediaItem[], seriesOf: Map<string, Series>): { label: string; title: string; run: () => void } | null {
+  const st = useStore.getState();
+  const pictures = selected.filter((i) => i.kind === "image" || i.kind === "raw");
+  const inOne = selected.filter((i) => seriesOf.has(i.key));
+  if (inOne.length && inOne.length === selected.length && new Set(inOne.map((i) => seriesOf.get(i.key))).size === 1 && seriesOf.get(inOne[0].key)!.length === inOne.length)
+    return { label: "Split series", title: "These are no series: each picture on its own again", run: () => st.leaveSeries(inOne.map((i) => i.key)) };
+  if (pictures.length >= 2 && pictures.length === selected.length)
+    return { label: "Make series", title: "Keep these together as a series: one tile here, and whole in Sort (one key files all of it)", run: () => st.makeSeries(pictures.map((i) => i.key)) };
+  return null;
+}
+
 /** A series being added to (Add, from the viewer's SERIES badge or a series' tile in Browse): one of its pictures. */
 export const useSeriesAdd = create<{ of: string | null }>(() => ({ of: null }));
 

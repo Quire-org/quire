@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { debounced } from "../lib/pending";
 import { api } from "../lib/api";
 import { useStore } from "../store";
-import { add, emptyDoc, followMoves, forgetGone, move, presetBlocks, resize, settle, upgrade, type Block, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, type PresetId } from "./board";
+import { HOME_DEVICE } from "../lib/platform";
+import { COLS, MOBILE_KINDS, add, emptyDoc, followMoves, forgetGone, move, phoneCols, presetBlocks, readingOrder, resize, settle, upgrade, type Block, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, type PresetId } from "./board";
 
 /**
  * The Home of the library open: its board (kept with the library, in its vault when it has one),
@@ -49,9 +50,29 @@ interface HomeState {
   forget(gone: (key: string) => boolean): void;
 }
 
+/** How many columns this device's board has. */
+export const homeCols = HOME_DEVICE === "phone" ? phoneCols : COLS;
+
+/** The Homes a library can have: each device's own. */
+const DEVICES = [undefined, "phone", "tablet"] as const;
+
+/** The Homes of the library's other devices changed too (what they hold follows the library), kept as they are otherwise. */
+async function changeOtherHomes(root: string, change: (d: HomeDoc) => HomeDoc) {
+  for (const device of DEVICES) {
+    if (device === HOME_DEVICE) continue;
+    const raw = await Promise.resolve()
+      .then(() => api.homeLoad(root, device))
+      .catch(() => null);
+    if (!raw || typeof raw !== "object" || !Array.isArray((raw as HomeDoc).blocks)) continue;
+    const doc = upgrade({ ...emptyDoc(), ...(raw as Partial<HomeDoc>), version: 1 });
+    const next = change(doc);
+    if (JSON.stringify(next) !== JSON.stringify(doc)) await Promise.resolve(api.homeSave(root, next, device)).catch(() => {});
+  }
+}
+
 const homeSave = debounced("home", 400, async (root) => {
   const { doc, docRoot } = useHome.getState();
-  if (doc && docRoot === root) await api.homeSave(root, doc).catch((e) => useStore.getState().toast(`The Home couldn't be saved: ${String(e)}`, "error"));
+  if (doc && docRoot === root) await api.homeSave(root, doc, HOME_DEVICE).catch((e) => useStore.getState().toast(`The Home couldn't be saved: ${String(e)}`, "error"));
 });
 
 export const useHome = create<HomeState>((set, get) => {
@@ -78,7 +99,7 @@ export const useHome = create<HomeState>((set, get) => {
       if (!root) return null;
       if (!force && get().docRoot === root && get().doc) return get().doc;
       const raw = await Promise.resolve()
-        .then(() => api.homeLoad(root))
+        .then(() => api.homeLoad(root, HOME_DEVICE))
         .catch(() => null);
       if (!opening && useStore.getState().root !== root) return null;
       const had = raw && typeof raw === "object" && Array.isArray((raw as HomeDoc).blocks);
@@ -88,7 +109,10 @@ export const useHome = create<HomeState>((set, get) => {
     },
 
     start(preset) {
-      change((d) => ({ ...d, blocks: presetBlocks(preset) }));
+      const blocks = presetBlocks(preset);
+      // On a phone or a tablet, what can be there, each put in the first gap it fits, for its width.
+      const here = HOME_DEVICE ? readingOrder(blocks.filter((b) => MOBILE_KINDS.includes(b.type))).reduce<Block[]>((placed, b) => add(placed, b.type, undefined, homeCols).blocks, []) : blocks;
+      change((d) => ({ ...d, blocks: here }));
     },
 
     setArranging(on) {
@@ -110,7 +134,7 @@ export const useHome = create<HomeState>((set, get) => {
     addBlock(type, where) {
       let id: string | null = null;
       blocks((b) => {
-        const r = add(b, type, where);
+        const r = add(b, type, where, homeCols);
         id = r.id;
         return r.blocks;
       });
@@ -183,6 +207,8 @@ export const useHome = create<HomeState>((set, get) => {
     },
 
     follow(pairs) {
+      const root = useStore.getState().root;
+      if (root) void changeOtherHomes(root, (o) => followMoves(o, pairs));
       const d = get().doc;
       if (!d) return;
       const next = followMoves(d, pairs);
@@ -190,6 +216,8 @@ export const useHome = create<HomeState>((set, get) => {
     },
 
     forget(gone) {
+      const root = useStore.getState().root;
+      if (root) void changeOtherHomes(root, (o) => forgetGone(o, gone));
       const d = get().doc;
       if (!d) return;
       const next = forgetGone(d, gone);

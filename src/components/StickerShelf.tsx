@@ -3,6 +3,7 @@ import { Scissors, Trash } from "@phosphor-icons/react";
 import { blobUrl, useScrapbook } from "../scrapbook/store";
 import type { CustomSticker, StickerSource } from "../scrapbook/model";
 import { CATEGORIES, STICKERS } from "../scrapbook/stickers";
+import { IS_MOBILE } from "../lib/platform";
 
 /** A sticker being dragged off the shelf, as what it is: put down where it is dropped. */
 export const STICKER_DRAG = "application/x-scrap-sticker";
@@ -47,9 +48,11 @@ export function StickerShelf({ onAdd, onMake, stickers }: { onAdd: (src: Sticker
       </div>
       {cat === "mine" ? (
         <>
-          <button className="btn sm primary" onClick={onMake} title="Find the subjects of a picture and cut them out as stickers">
-            <Scissors /> Cut stickers from a picture
-          </button>
+          {!IS_MOBILE && (
+            <button className="btn sm primary" onClick={onMake} title="Find the subjects of a picture and cut them out as stickers">
+              <Scissors /> Cut stickers from a picture
+            </button>
+          )}
           <div className="scrap-grid">
             {stickers.map((s) => (
               <div key={s.id} className="scrap-tile sticker" draggable onDragStart={(ev) => dragSticker(ev, { blob: s.blob }, s.h / s.w, true)} onClick={() => onAdd({ blob: s.blob }, s.h / s.w, true)} title={s.from ? `From ${s.from}` : "Add it"}>

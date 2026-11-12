@@ -1,11 +1,13 @@
 mod albums;
 mod backup;
-mod cast;
 mod drive;
 mod dupes;
 mod edit;
 mod formerly;
 mod fsx;
+mod github;
+#[cfg(target_os = "ios")]
+mod ios;
 mod jobctl;
 mod libdocs;
 mod library;
@@ -620,10 +622,10 @@ fn thumb_for(app: &tauri::AppHandle, uri: &tauri::http::Uri) -> Result<std::sync
         if let Some(t) = thumbs::cached(&key) {
             return Ok(t);
         }
-        let bytes = with_ctx_read(&vs, &root, |ctx| ctx.read_all(&pdf)).map_err(|e| (404, e))?;
+        let bytes = pdf::bytes_of((&pdf, size, modified), || with_ctx_read(&vs, &root, |ctx| ctx.read_all(&pdf))).map_err(|e| (404, e))?;
         let made = {
             let _turn = thumbs::Slot::take();
-            pdf::render(bytes, page, width).and_then(|img| thumbs::encode(image::DynamicImage::ImageRgb8(img))).map_err(|e| (415, e))?
+            pdf::render(&bytes, page, width).and_then(|img| thumbs::encode(image::DynamicImage::ImageRgb8(img))).map_err(|e| (415, e))?
         };
         let t = std::sync::Arc::new(made);
         thumbs::keep(key, t.clone());
@@ -734,7 +736,7 @@ async fn image_hash(vs: VS<'_>, root: String, path: String, is_raw: bool) -> Res
         // A PDF album's page (the PDF itself: its first), drawn as a picture of it.
         if let Some((pdf, page)) = pdf::split_page(&path).or_else(|| pdf::is_pdf(Path::new(&path)).then(|| (PathBuf::from(&path), 1))) {
             let bytes = with_ctx_read(&vs, Path::new(&root), |ctx| ctx.read_all(&pdf))?;
-            return dupes::image_hash_bytes(&pdf::render_jpeg(bytes, page, 1024)?, false);
+            return dupes::image_hash_bytes(&pdf::render_jpeg(&bytes, page, 1024)?, false);
         }
         let p = PathBuf::from(&path);
         let bytes = with_ctx_read(&vs, Path::new(&root), |ctx| if ctx.vault_id(&p).is_some() { ctx.read_all(&p).map(Some) } else { Ok(None) })?;
@@ -945,21 +947,30 @@ async fn vault_unlock_quick(vs: VS<'_>, root: String) -> Result<(), String> {
 async fn vault_lock(vs: VS<'_>) -> Result<(), String> {
     let vs = vs.share();
     blocking(move || {
-        // The tag index's latest goes into the vault while it is still open; then the decrypted
-        // index in memory goes too, rather than staying to be written anywhere later.
-        let _ = flush_tag_index(&vs, true);
-        let root = vs.read().unwrap_or_else(|p| p.into_inner()).as_ref().map(|v| v.root.clone());
-        // Dropping the vault writes its index if anything is unsaved.
-        *vs.write().unwrap_or_else(|p| p.into_inner()) = None;
-        if let Some(root) = root {
-            let mut g = tag_index_lock();
-            if g.as_ref().is_some_and(|i| i.root == root) {
-                *g = None;
-            }
-        }
+        lock_vault_now(&vs);
         Ok(())
     })
     .await
+}
+
+/// Lock the vault, if one is open.
+fn lock_vault_now(vs: &VaultLock) {
+    // The tag index's latest goes into the vault while it is still open; then the decrypted
+    // index in memory goes too, rather than staying to be written anywhere later.
+    let _ = flush_tag_index(vs, true);
+    let root = vs.read().unwrap_or_else(|p| p.into_inner()).as_ref().map(|v| v.root.clone());
+    // Dropping the vault writes its index if anything is unsaved.
+    *vs.write().unwrap_or_else(|p| p.into_inner()) = None;
+    if let Some(root) = root {
+        let mut g = tag_index_lock();
+        if g.as_ref().is_some_and(|i| i.root == root) {
+            *g = None;
+        }
+    }
+    // A PDF being read may have come out of the vault.
+    pdf::forget();
+    #[cfg(target_os = "ios")]
+    ios::drop_sites();
 }
 
 #[tauri::command]
@@ -1567,139 +1578,6 @@ async fn fs_delete(vs: VS<'_>, root: String, paths: Vec<String>) -> Result<usize
         })
     })
     .await
-}
-
-/* ---------------- showing on another device ---------------- */
-
-/// The session showing on another device, while there is one.
-#[derive(Default)]
-struct CastState(std::sync::Mutex<Option<cast::Cast>>);
-
-/// Starts showing: a link (for each network this Mac is on) and the certificate's fingerprint.
-#[tauri::command]
-async fn cast_start(state: tauri::State<'_, CastState>, remote: bool) -> Result<cast::CastInfo, String> {
-    let mut g = state.0.lock().unwrap_or_else(|p| p.into_inner());
-    if let Some(c) = g.as_ref() {
-        return Ok(c.info.clone());
-    }
-    let c = cast::start(remote)?;
-    let info = c.info.clone();
-    *g = Some(c);
-    Ok(info)
-}
-
-/// Stops showing: every device is told it ended, and the link is dead.
-#[tauri::command]
-async fn cast_stop(state: tauri::State<'_, CastState>) -> Result<(), String> {
-    state.0.lock().unwrap_or_else(|p| p.into_inner()).take();
-    Ok(())
-}
-
-/// The picture shown now (a screen-sized JPEG the app made), or the video shown now (`video_path`,
-/// streamed as the device's player asks), or nothing.
-#[tauri::command]
-#[allow(clippy::too_many_arguments)]
-async fn cast_frame(app: tauri::AppHandle, seq: u64, jpeg_base64: Option<String>, name: String, video: bool, index: usize, total: usize, none: bool, video_path: Option<String>, root: Option<String>) -> Result<(), String> {
-    // Decoding, looking at the video's file and taking the locks wait: off the async runtime.
-    blocking(move || {
-        use base64::Engine;
-        let jpeg = match jpeg_base64 {
-            Some(b) => base64::engine::general_purpose::STANDARD.decode(b.as_bytes()).map_err(|e| e.to_string())?,
-            None => vec![],
-        };
-        let stream = match (video_path, root) {
-            (Some(p), Some(r)) => video_source(&app, Path::new(&r), Path::new(&p)),
-            _ => None,
-        };
-        let state = app.state::<CastState>();
-        let g = state.0.lock().unwrap_or_else(|p| p.into_inner());
-        let Some(c) = g.as_ref() else { return Ok(()) };
-        c.shared.lock().unwrap_or_else(|p| p.into_inner()).frame = (!none).then_some(cast::Frame { seq, jpeg, name, video, stream, index, total });
-        Ok(())
-    })
-    .await
-}
-
-/// A video in the library a browser can play, to stream: read piece by piece, from the file or
-/// decrypted from the vault (never written out). None for anything else.
-fn video_source(app: &tauri::AppHandle, root: &Path, path: &Path) -> Option<cast::VideoSource> {
-    if !path.starts_with(root) || media::classify(path) != Some(media::MediaKind::Video) {
-        return None;
-    }
-    let mime = match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
-        "mp4" | "m4v" => "video/mp4",
-        "mov" => "video/quicktime",
-        "webm" => "video/webm",
-        _ => return None,
-    };
-    let in_vault = {
-        let st = app.state::<VaultState>();
-        let guard = st.0.read().unwrap_or_else(|p| p.into_inner());
-        guard.as_ref().filter(|v| v.root == root).and_then(|v| {
-            let rel = media::rel_key(root, path);
-            v.entry_by_rel(&rel).map(|e| (std::sync::Arc::new(v.keys()), e.id.clone(), e.size))
-        })
-    };
-    if let Some((keys, id, size)) = in_vault {
-        let read = move |at: u64, n: usize| keys.read_range(&id, size, at, (at + n as u64).min(size));
-        return Some(cast::VideoSource { size, mime, read: std::sync::Arc::new(read) });
-    }
-    let size = std::fs::metadata(path).ok()?.len();
-    let file = path.to_path_buf();
-    let read = move |at: u64, n: usize| -> Result<Vec<u8>, String> {
-        use std::io::{Read, Seek, SeekFrom};
-        let mut f = std::fs::File::open(&file).map_err(|e| e.to_string())?;
-        f.seek(SeekFrom::Start(at)).map_err(|e| e.to_string())?;
-        let mut buf = Vec::with_capacity(n);
-        f.take(n as u64).read_to_end(&mut buf).map_err(|e| e.to_string())?;
-        Ok(buf)
-    };
-    Some(cast::VideoSource { size, mime, read: std::sync::Arc::new(read) })
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CastStatus {
-    running: bool,
-    devices: Vec<cast::Device>,
-    /// Back (-1) or on (1), asked by devices since last time.
-    nav: Vec<i32>,
-}
-
-#[tauri::command]
-async fn cast_status(state: tauri::State<'_, CastState>) -> Result<CastStatus, String> {
-    let g = state.0.lock().unwrap_or_else(|p| p.into_inner());
-    let Some(c) = g.as_ref() else { return Ok(CastStatus { running: false, devices: vec![], nav: vec![] }) };
-    let mut s = c.shared.lock().unwrap_or_else(|p| p.into_inner());
-    Ok(CastStatus { running: true, devices: s.devices.clone(), nav: std::mem::take(&mut s.nav) })
-}
-
-/// A device let in, turned down (its address can't ask again this session), or sent away.
-#[tauri::command]
-async fn cast_decide(state: tauri::State<'_, CastState>, id: String, allow: bool) -> Result<(), String> {
-    let g = state.0.lock().unwrap_or_else(|p| p.into_inner());
-    let Some(c) = g.as_ref() else { return Ok(()) };
-    let mut s = c.shared.lock().unwrap_or_else(|p| p.into_inner());
-    let mut denied = None;
-    if let Some(d) = s.devices.iter_mut().find(|d| d.id == id) {
-        d.state = if allow { cast::Access::Allowed } else { cast::Access::Denied };
-        if !allow {
-            denied = d.ip.parse().ok();
-        }
-    }
-    if let Some(ip) = denied {
-        s.denied_ips.insert(ip);
-    }
-    Ok(())
-}
-
-/// Whether devices may go back and forth, or only follow the Mac.
-#[tauri::command]
-async fn cast_remote(state: tauri::State<'_, CastState>, on: bool) -> Result<(), String> {
-    if let Some(c) = state.0.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
-        c.shared.lock().unwrap_or_else(|p| p.into_inner()).remote = on;
-    }
-    Ok(())
 }
 
 /* ---------------- importing ---------------- */
@@ -2377,6 +2255,11 @@ fn cookies_for(w: &tauri::WebviewWindow, url: &tauri::Url) -> String {
 /// sign-in, for a plugin that also asks the website. The window keeps nothing on this computer.
 #[tauri::command]
 async fn plugin_login(app: tauri::AppHandle, id: String, url: String, until: Vec<String>, title: String, cookies: Option<Vec<String>>, load: Option<bool>) -> Result<Option<LoginBack>, String> {
+    // A sign-in is kept with the library: made on a computer, a phone has it too. A window of its own
+    // here would cover the app with no way to close it.
+    if cfg!(mobile) {
+        return Err("Sign in to this platform on your computer: the sign-in is kept with the library, so this device has it too.".into());
+    }
     let reg = registry(&app)?;
     let granted = reg.effective_permissions(&id);
     let url = plugins::login_allowed(&granted, &url)?;
@@ -2459,10 +2342,12 @@ struct CheckPassed {
 }
 
 /// The browser the check window says it is (and requests after it then say too).
+#[cfg(not(target_os = "ios"))]
 const CHECK_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
 
 /// The bar the check window shows at the foot of the site's pages: what to do, and Done (a visit to
 /// an address the window stops at, so the page itself never goes anywhere).
+#[cfg(not(target_os = "ios"))]
 const CHECK_BAR: &str = r#"(function () {
   if (window.top !== window) return;
   var add = function () {
@@ -2491,7 +2376,8 @@ const CHECK_BAR: &str = r#"(function () {
 /// Done on the bar at the foot of the page, or closes the window: the window's cookies for the site
 /// then (its clearance, the answers it keeps) go to the plugin. Done, the window stays, hidden, as
 /// the site's browser session (`plugin_browse`). None when there were no cookies, or after ten
-/// minutes. Each check its own window.
+/// minutes. Each check its own window. (On iOS, `ios::plugin_check`.)
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 async fn plugin_check(app: tauri::AppHandle, id: String, url: String, name: String) -> Result<Option<CheckPassed>, String> {
     let reg = registry(&app)?;
@@ -2503,11 +2389,12 @@ async fn plugin_check(app: tauri::AppHandle, id: String, url: String, name: Stri
     let pressed = done.clone();
     let site = site_of(&url);
     let stay = stay_on(site.clone());
-    let window = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::External(url.clone()))
+    let builder = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::External(url.clone()))
         .title(format!("{}: answer what it asks, then press Done", name.chars().take(40).collect::<String>()))
-        .inner_size(560.0, 760.0)
-        .center()
-        .focused(true)
+        .inner_size(560.0, 760.0);
+    #[cfg(desktop)]
+    let builder = builder.center().focused(true);
+    let window = builder
         .incognito(true)
         .user_agent(CHECK_AGENT)
         .initialization_script(CHECK_BAR)
@@ -2574,6 +2461,7 @@ async fn plugin_check(app: tauri::AppHandle, id: String, url: String, name: Stri
 
 /// Where a site's session window waits: a page of the site with no scripts (its robots.txt), so it
 /// runs none of the site's ads or tracking, and its requests are still the site's own.
+#[cfg(not(target_os = "ios"))]
 fn quiet_page(url: &reqwest::Url) -> Option<reqwest::Url> {
     url.join("/robots.txt").ok()
 }
@@ -2585,6 +2473,7 @@ fn site_of(url: &reqwest::Url) -> String {
 
 /// Where a site's window may go: the site and its subdomains, and Cloudflare's check; never where
 /// an ad would send it.
+#[cfg(not(target_os = "ios"))]
 fn stay_on(site: String) -> impl Fn(&reqwest::Url) -> bool + Send + 'static {
     move |to| match to.scheme() {
         "about" | "data" | "blob" => true,
@@ -2596,9 +2485,11 @@ fn stay_on(site: String) -> impl Fn(&reqwest::Url) -> bool + Send + 'static {
 }
 
 /// Sites' browser sessions: "<plugin>|<site>" → the hidden window that fetches its pages.
+#[cfg(not(target_os = "ios"))]
 static SESSIONS: std::sync::Mutex<Option<std::collections::HashMap<String, String>>> = std::sync::Mutex::new(None);
 
 /// A window as the session of a plugin's site, in place of any before it (which goes).
+#[cfg(not(target_os = "ios"))]
 fn keep_session(app: &tauri::AppHandle, id: &str, site: &str, label: String) {
     let old = SESSIONS.lock().unwrap_or_else(|p| p.into_inner()).get_or_insert_with(Default::default).insert(format!("{id}|{site}"), label.clone());
     if let Some(old) = old.filter(|o| *o != label) {
@@ -2628,6 +2519,7 @@ const BROWSE_BODY_CAP: usize = 8 * 1024 * 1024;
 
 /// Script run in a session window, its answer back: a string, or None (null, or no answer: a window
 /// still on its first page runs scripts only once it has loaded, and answers none of them).
+#[cfg(not(target_os = "ios"))]
 fn eval_in(window: &tauri::WebviewWindow, js: String) -> Result<Option<String>, String> {
     let (tx, rx) = std::sync::mpsc::channel::<String>();
     window
@@ -2643,7 +2535,8 @@ fn eval_in(window: &tauri::WebviewWindow, js: String) -> Result<Option<String>, 
 /// that its check let in, so the request is the browser's own (some checks turn the app's own
 /// requests away, whatever cookies they carry). The window passed the check in `plugin_check`; one
 /// gone (the app restarted) is opened again, hidden, with the site's cookies the plugin kept
-/// (`cookies`). For a plugin that may open the site; only its pages, as text.
+/// (`cookies`). For a plugin that may open the site; only its pages, as text. (On iOS, `ios::plugin_browse`.)
+#[cfg(not(target_os = "ios"))]
 #[tauri::command]
 async fn plugin_browse(app: tauri::AppHandle, id: String, url: String, cookies: Option<String>) -> Result<Browsed, String> {
     let reg = registry(&app)?;
@@ -2706,15 +2599,7 @@ return "started";}})()"#,
         let started = std::time::Instant::now();
         loop {
             if let Some(out) = eval_in(&window, read.clone())? {
-                let v: serde_json::Value = serde_json::from_str(&out).map_err(|e| e.to_string())?;
-                if let Some(e) = v["error"].as_str() {
-                    return Err(format!("{site}'s window couldn't fetch it: {e}"));
-                }
-                // The cap is applied in the window's own script; checked here too, since that script
-                // runs in the site's page, where the site's scripts could have replaced what it uses.
-                let body = v["body"].as_str().unwrap_or_default();
-                let cut = body.char_indices().map(|(i, _)| i).nth(BROWSE_BODY_CAP);
-                return Ok(Browsed { status: v["status"].as_u64().unwrap_or(0) as u16, body: body[..cut.unwrap_or(body.len())].to_string(), truncated: v["truncated"].as_bool().unwrap_or(false) || cut.is_some() });
+                return browsed_from(&out, &site);
             }
             if started.elapsed() > std::time::Duration::from_secs(60) {
                 return Err(format!("{site} took too long to answer"));
@@ -2725,7 +2610,37 @@ return "started";}})()"#,
     .await
 }
 
+/// What a session's fetch said, as a page. The cap is applied in the script that fetched it; checked
+/// here too, since a window's script runs in the site's page, where the site's scripts could have
+/// replaced what it uses.
+fn browsed_from(out: &str, site: &str) -> Result<Browsed, String> {
+    let v: serde_json::Value = serde_json::from_str(out).map_err(|e| e.to_string())?;
+    if let Some(e) = v["error"].as_str() {
+        return Err(format!("{site}'s window couldn't fetch it: {e}"));
+    }
+    let body = v["body"].as_str().unwrap_or_default();
+    let cut = body.char_indices().map(|(i, _)| i).nth(BROWSE_BODY_CAP);
+    Ok(Browsed { status: v["status"].as_u64().unwrap_or(0) as u16, body: body[..cut.unwrap_or(body.len())].to_string(), truncated: v["truncated"].as_bool().unwrap_or(false) || cut.is_some() })
+}
+
+#[cfg(test)]
+mod browsed_tests {
+    use super::*;
+
+    #[test]
+    fn a_session_s_answer_becomes_a_page_within_the_cap() {
+        let page = browsed_from(r#"{"status":200,"body":"hello","truncated":false}"#, "x.org").unwrap();
+        assert_eq!((page.status, page.body.as_str(), page.truncated), (200, "hello", false));
+        let long = format!(r#"{{"status":200,"body":"{}","truncated":false}}"#, "a".repeat(BROWSE_BODY_CAP + 1));
+        let cut = browsed_from(&long, "x.org").unwrap();
+        assert_eq!((cut.body.len(), cut.truncated), (BROWSE_BODY_CAP, true));
+        assert!(browsed_from(r#"{"error":"refused"}"#, "x.org").err().unwrap().contains("refused"));
+        assert!(browsed_from("not json", "x.org").is_err());
+    }
+}
+
 /// A random number, for names a site's own scripts can't guess.
+#[cfg(not(target_os = "ios"))]
 fn rand_u64() -> u64 {
     use std::hash::{BuildHasher, Hasher};
     let mut h = std::collections::hash_map::RandomState::new().build_hasher();
@@ -3083,12 +2998,49 @@ async fn views_save(vs: VS<'_>, root: String, data: serde_json::Value) -> Result
 
 /// The library's Home: its board of blocks, which folders it shows, what the library opens on.
 #[tauri::command]
-async fn home_load(vs: VS<'_>, root: String) -> Result<serde_json::Value, String> {
-    load_doc(&vs, root, "home").await
+async fn home_load(vs: VS<'_>, root: String, device: Option<String>) -> Result<serde_json::Value, String> {
+    load_doc(&vs, root, home_doc(device.as_deref())).await
 }
 #[tauri::command]
-async fn home_save(vs: VS<'_>, root: String, data: serde_json::Value) -> Result<(), String> {
-    save_doc(&vs, root, "home", data).await
+async fn home_save(vs: VS<'_>, root: String, device: Option<String>, data: serde_json::Value) -> Result<(), String> {
+    save_doc(&vs, root, home_doc(device.as_deref()), data).await
+}
+
+/// The Home of a phone or a tablet is its own, kept with the library beside the computer's.
+fn home_doc(device: Option<&str>) -> &'static str {
+    match device {
+        Some("phone") => "home-phone",
+        Some("tablet") => "home-tablet",
+        _ => "home",
+    }
+}
+
+/// Who is signed in to GitHub.
+#[tauri::command]
+async fn github_status() -> Result<github::Status, String> {
+    blocking(|| Ok(github::status())).await
+}
+/// A sign-in begun: the code to approve on GitHub, and where.
+#[tauri::command]
+async fn github_sign_in() -> Result<github::Started, String> {
+    blocking(github::start).await
+}
+/// Has the code been approved yet?
+#[tauri::command]
+async fn github_sign_in_check(device_code: String) -> Result<github::Checked, String> {
+    blocking(move || github::check(&device_code)).await
+}
+#[tauri::command]
+async fn github_sign_out() -> Result<(), String> {
+    blocking(github::sign_out).await
+}
+#[tauri::command]
+async fn github_my_repos() -> Result<Vec<github::Repo>, String> {
+    blocking(github::my_repos).await
+}
+#[tauri::command]
+async fn github_search_repos(words: String) -> Result<Vec<github::Repo>, String> {
+    blocking(move || github::search_repos(&words)).await
 }
 
 /// The library's artists: who they are, their links to platforms, and the pictures given them.
@@ -3452,8 +3404,9 @@ async fn read_media_image(vs: VS<'_>, root: String, path: String) -> Result<Resp
     let vs = vs.share();
     blocking(move || {
         if let Some((pdf, page)) = pdf::split_page(&path) {
-            let bytes = with_ctx_read(&vs, Path::new(&root), |ctx| ctx.read_all(&pdf))?;
-            return pdf::render_jpeg(bytes, page, 2400).map(Response::new);
+            let (size, modified) = with_ctx_read(&vs, Path::new(&root), |ctx| ctx.stat(&pdf)).ok_or("no such PDF")?;
+            let bytes = pdf::bytes_of((&pdf, size, modified), || with_ctx_read(&vs, Path::new(&root), |ctx| ctx.read_all(&pdf)))?;
+            return pdf::render_jpeg(&bytes, page, 2400).map(Response::new);
         }
         let p = PathBuf::from(&path);
         let bytes = with_ctx_read(&vs, Path::new(&root), |ctx| ctx.read_all(&p))?;
@@ -4971,7 +4924,7 @@ struct Prepared {
 fn prepare(vs: &VaultLock, root: &Path, item: &MediaItem) -> Prepared {
     // A PDF album's page: drawn from the PDF at the size the index looks at.
     if let Some((pdf, page)) = pdf::split_page(&item.primary) {
-        let inputs = with_ctx_read(vs, root, |ctx| ctx.read_all(&pdf)).and_then(|bytes| pdf::render(bytes, page, INDEX_SIDE)).and_then(|img| as_bmp(&img)).map(|b| vec![b]);
+        let inputs = with_ctx_read(vs, root, |ctx| ctx.read_all(&pdf)).and_then(|bytes| pdf::render(&bytes, page, INDEX_SIDE)).and_then(|img| as_bmp(&img)).map(|b| vec![b]);
         return Prepared { inputs, video: false };
     }
     let p = PathBuf::from(&item.primary);
@@ -5050,7 +5003,7 @@ async fn pdf_comic(app: tauri::AppHandle, vs: VS<'_>, root: String, path: String
         let options = engine::IndexOptions { embed: false, tag: true, min_probability: 0.2, embedder, tagger, parts: false, drawn_only: false };
         let mut best = 0f32;
         for page in 1..=pages.min(4) {
-            let img = pdf::render(bytes.clone(), page, INDEX_SIDE)?;
+            let img = pdf::render(&bytes, page, INDEX_SIDE)?;
             let r = engine::index(&app, &state, as_bmp(&img)?, &options)?;
             for (i, p) in r.tags.unwrap_or_default() {
                 if wanted.contains(&i) {
@@ -5342,7 +5295,6 @@ fn content_type(rel: &str) -> &'static str {
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 /* ---------------- app icon ---------------- */
 
 /// Replace the icon of the running app with a PNG rendered by the frontend in the
@@ -5369,7 +5321,12 @@ fn set_app_icon(app: tauri::AppHandle, request: tauri::ipc::Request<'_>) -> Resu
         })
         .map_err(|e| e.to_string())
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(mobile)]
+    {
+        let _ = (app, png);
+        Ok(())
+    }
+    #[cfg(all(desktop, not(target_os = "macos")))]
     {
         let rgba = image::load_from_memory(&png).map_err(|e| e.to_string())?.to_rgba8();
         let (w, h) = rgba.dimensions();
@@ -5403,7 +5360,7 @@ fn own_origin(value: &str) -> bool {
 
 /// The app's own window, when it asked with its Origin (a cross-origin load): named back to it in
 /// `Access-Control-Allow-Origin`, so it may draw what it gets onto a canvas (a video's poster, a frame
-/// for the duplicate check, a picture to cast or edit). Anyone else is refused (`own_window_asked`).
+/// for the duplicate check, a picture to edit). Anyone else is refused (`own_window_asked`).
 fn own_cors(headers: &tauri::http::HeaderMap) -> Option<String> {
     let origin = headers.get("origin")?.to_str().ok()?.trim();
     own_origin(origin).then(|| origin.to_string())
@@ -5446,11 +5403,15 @@ fn refused() -> tauri::http::Response<Vec<u8>> {
     tauri::http::Response::builder().status(403).header("Content-Type", "text/plain").body(b"only the app's own window may ask for this".to_vec()).unwrap()
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Before the window opens, which reads its saved settings as it does.
     #[cfg(target_os = "macos")]
     formerly::adopt_webview_data();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "ios")]
+    let builder = builder.plugin(quire_ios_bridge::init());
+    builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -5459,7 +5420,6 @@ pub fn run() {
         .manage(update::UpdateState::default())
         .manage(engine::EngineState::default())
         .manage(IndexState::default())
-        .manage(CastState::default())
         .setup(|app| {
             let _ = APP.set(app.handle().clone());
             // A bundled app ships pdfium among its resources.
@@ -5477,6 +5437,8 @@ pub fn run() {
             }
             let base = plugin_base(app);
             app.manage(PluginsState(base));
+            #[cfg(target_os = "ios")]
+            ios::watch(app.handle());
             Ok(())
         })
         // msplugin://localhost/<id>/<file>: plugin files, plus the frame shell and SDK.
@@ -5513,7 +5475,7 @@ pub fn run() {
                     .status(status)
                     .header("Content-Type", mime)
                     // The URL names the file's version (v=), so a copy stays good.
-                    .header("Cache-Control", "private, max-age=86400");
+                    .header("Cache-Control", if cfg!(mobile) { "no-store" } else { "private, max-age=86400" });
                 if let Some(origin) = cors {
                     reply = reply.header("Access-Control-Allow-Origin", origin);
                 }
@@ -5616,8 +5578,14 @@ pub fn run() {
             plugin_library_get,
             plugin_library_set,
             plugin_login,
+            #[cfg(not(target_os = "ios"))]
             plugin_check,
+            #[cfg(not(target_os = "ios"))]
             plugin_browse,
+            #[cfg(target_os = "ios")]
+            ios::plugin_check,
+            #[cfg(target_os = "ios")]
+            ios::plugin_browse,
             plugin_sites_set,
             plugin_login_close,
             find_image,
@@ -5636,6 +5604,22 @@ pub fn run() {
             people_save,
             home_load,
             home_save,
+            github_status,
+            github_sign_in,
+            github_sign_in_check,
+            github_sign_out,
+            github_my_repos,
+            github_search_repos,
+            #[cfg(target_os = "ios")]
+            ios::ios_pick_folder,
+            #[cfg(target_os = "ios")]
+            ios::ios_restore_folder,
+            #[cfg(target_os = "ios")]
+            ios::ios_close_folder,
+            #[cfg(target_os = "ios")]
+            ios::ios_keep_awake,
+            #[cfg(target_os = "ios")]
+            ios::ios_hold_other_audio,
             artist_avatar_save,
             find_download,
             find_clear,
@@ -5694,12 +5678,6 @@ pub fn run() {
             scrapbook_blob_delete,
             scrapbook_export,
             snapshot_load,
-            cast_start,
-            cast_stop,
-            cast_frame,
-            cast_status,
-            cast_decide,
-            cast_remote,
             snapshot_save,
             import_scan,
             import_fingerprints,
@@ -5797,7 +5775,7 @@ mod own_protocol_tests {
     #[test]
     fn the_window_may_draw_what_its_own_protocols_send() {
         // A cross-origin load from the app's window (a video's poster, a frame for the duplicate check,
-        // a picture to cast) is told it may read what it gets; without that the webview won't draw it.
+        // a picture to edit) is told it may read what it gets; without that the webview won't draw it.
         assert_eq!(own_cors(&headers(&[("origin", "tauri://localhost")])).as_deref(), Some("tauri://localhost"));
         assert_eq!(own_cors(&headers(&[("origin", "http://localhost:1420")])).as_deref(), Some("http://localhost:1420"));
         // Nobody else, and nothing to name when the window didn't say.
@@ -5825,7 +5803,7 @@ mod own_protocol_tests {
         assert_eq!(header(&r, "Access-Control-Allow-Origin").as_deref(), own);
         assert_eq!(header(&r, "Content-Type").as_deref(), Some("video/mp4"));
         assert_eq!(header(&r, "Content-Range").as_deref(), Some("bytes 100-199/5000"));
-        // All of it, as a picture to cast would be.
+        // All of it, as a picture to edit would be.
         let r = vault_answer(Some(&v), &id, None, own);
         assert_eq!((r.status().as_u16(), r.body().len()), (200, clip.len()));
         assert_eq!(header(&r, "Access-Control-Allow-Origin").as_deref(), own);
@@ -6028,6 +6006,19 @@ mod claim_tests {
         assert!(refused.contains(&format!("process {}", std::process::id())), "{refused}");
         drop(stuck);
         let _ = fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod home_doc_tests {
+    use super::home_doc;
+
+    #[test]
+    fn each_device_has_its_own_home_and_nothing_else_names_a_document() {
+        assert_eq!(home_doc(None), "home");
+        assert_eq!(home_doc(Some("phone")), "home-phone");
+        assert_eq!(home_doc(Some("tablet")), "home-tablet");
+        assert_eq!(home_doc(Some("../tags")), "home");
     }
 }
 

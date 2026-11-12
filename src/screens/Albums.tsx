@@ -36,6 +36,7 @@ import { VersionsReview } from "../components/VersionsReview";
 import { FitImage } from "../components/FitImage";
 import { steppedJob } from "../lib/jobs";
 import { ask } from "../components/Confirm";
+import { IS_MOBILE } from "../lib/platform";
 
 type KindSel = "all" | "photos" | "videos" | "mixed";
 type SortSel = "name" | "date" | "size" | "count" | "rating";
@@ -747,8 +748,9 @@ export function Albums() {
   );
 }
 
-const AlbumCard = memo(function AlbumCard({ album, onMenu }: { album: Album; onMenu: (e: React.MouseEvent, a: Album) => void }) {
+export const AlbumCard = memo(function AlbumCard({ album, onMenu }: { album: Album; onMenu: (e: React.MouseEvent, a: Album) => void }) {
   const s = useStore(useShallow((x) => ({ library: x.library, openAlbum: x.openAlbum })));
+  const open = () => void s.openAlbum(album);
   const rating = s.library?.albumRatings[album.key];
   const [cover, setCover] = useState<string | null>(null);
   // The cover loads once the card comes near the screen, not all of them at once when the grid opens.
@@ -780,8 +782,8 @@ const AlbumCard = memo(function AlbumCard({ album, onMenu }: { album: Album; onM
 
   return (
     <div ref={card} className="album-card panel" onContextMenu={(e) => onMenu(e, album)}>
-      <div className="album-cover" onClick={() => void s.openAlbum(album)} title="Open album (right-click for more)">
-        {made ? <img className="album-scrap" src={made} alt="" draggable={false} /> : cover && !scrap ? <FitImage src={cover} mode="fit" blurBackdrop /> : <div className="thumb-ph mono">{album.count ? "…" : "EMPTY"}</div>}
+      <div className="album-cover" onClick={open} title="Open album (right-click for more)">
+        {made ? <img className="album-scrap" src={made} alt="" draggable={false} /> : cover && !scrap ? <FitImage src={cover} mode="fit" blurBackdrop /> : <div className="thumb-ph mono">{album.pdf && IS_MOBILE ? "PDF" : album.count ? "…" : "EMPTY"}</div>}
         {(() => {
           const translation = s.library?.albumTranslations?.[album.key];
           const langs = s.library?.albumLanguages ?? {};
@@ -807,9 +809,9 @@ const AlbumCard = memo(function AlbumCard({ album, onMenu }: { album: Album; onM
             </span>
           );
         })()}
-        <span className="badge accent2 album-count" title={album.pdf ? `A PDF of ${album.count} pages, ${formatBytes(album.bytes)}` : `${album.images} photos, ${album.videos} videos, ${formatBytes(album.bytes)}`}>
-          {album.pdf && "PDF · "}
-          {album.count}
+        {/* A phone hasn't counted a PDF's pages until it has been opened. */}
+        <span className="badge accent2 album-count" title={album.pdf ? `A PDF${album.count ? ` of ${album.count} pages` : ""}, ${formatBytes(album.bytes)}` : `${album.images} photos, ${album.videos} videos, ${formatBytes(album.bytes)}`}>
+          {album.pdf ? (album.count ? `PDF · ${album.count}` : "PDF") : album.count}
         </span>
         {rating != null && (
           <span className="badge accent tile-rating">
@@ -818,7 +820,7 @@ const AlbumCard = memo(function AlbumCard({ album, onMenu }: { album: Album; onM
         )}
         {/* Open, and no sort folders: an album stays in its album folder. */}
         <div className="album-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="btn sm" onClick={() => void s.openAlbum(album)}>
+          <button className="btn sm" onClick={open}>
             Open
           </button>
         </div>

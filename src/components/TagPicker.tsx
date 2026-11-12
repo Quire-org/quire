@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { useTags, tagKeysFor, ancestorsOf, nameOf, pathOf, telling, treeOfType, typeOf, type Suggestion } from "../tagsStore";
+import { IS_MOBILE } from "../lib/platform";
+import { useTags, tagIdFrom, tagKeysFor, ancestorsOf, nameOf, pathOf, telling, treeOfType, typeOf, type Suggestion } from "../tagsStore";
 import { useAsync } from "../lib/useAsync";
 import { moveIntoBucket, useStore } from "../store";
 import { inTarget } from "../lib/filing";
@@ -87,17 +88,15 @@ export function PickOne({ keys, children, empty }: { keys: string[]; children?: 
 }
 
 /** A tag to put on something: typed as type/name or just a name, with the known tags offered as you type. */
-export function TagPicker({ onAdd, placeholder = "Add a tag (type/name or name)…", autoFocus, defaultType }: { onAdd: (id: string) => void; placeholder?: string; autoFocus?: boolean; defaultType?: string }) {
+export function TagPicker({ onAdd, placeholder, autoFocus, defaultType }: { onAdd: (id: string) => void; placeholder?: string; autoFocus?: boolean; defaultType?: string }) {
   const d = useTags((s) => s.data);
   const [text, setText] = useState("");
   const known = useMemo(() => (d ? [...new Set(Object.values(d.tags).flat())].sort() : []), [d]);
   const q = text.trim().toLowerCase();
   const matches = q ? known.filter((id) => id.toLowerCase().includes(q)).slice(0, 8) : [];
   const commit = (id: string) => {
-    const clean = id.trim().replace(/\s*\/\s*/, "/");
-    if (!clean) return;
-    const types = d?.types ?? [];
-    const full = clean.includes("/") ? clean : `${defaultType || types[0] || "tags"}/${clean}`;
+    const full = tagIdFrom(id, d?.types ?? [], defaultType);
+    if (!full) return;
     useTags.getState().addTag(full);
     onAdd(full);
     setText("");
@@ -111,7 +110,7 @@ export function TagPicker({ onAdd, placeholder = "Add a tag (type/name or name)�
         commit(exact ?? text);
       }}
     >
-      <input className="input" placeholder={placeholder} value={text} autoFocus={autoFocus} onChange={(e) => setText(e.target.value)} />
+      <input className="input" placeholder={placeholder ?? "Add a tag (type/name or name)…"} value={text} autoFocus={autoFocus} onChange={(e) => setText(e.target.value)} />
       {matches.length > 0 && (
         <div className="chips">
           {matches.map((id) => (
@@ -174,10 +173,11 @@ export function TagEditor({ keys: rawKeys }: { keys: string[] }) {
   const setTag = useTags((s) => s.setTag);
   const models = useTags((s) => s.models);
   const names = useTags((s) => s.names);
-  const suggestions = useAsync(keys.join("\n"), () => (d && keys.length ? useTags.getState().suggest(keys) : NO_TAGS), [d, models, names], NO_TAGS);
+  // Suggestions come from the computer's engine: a phone or tablet goes without.
+  const suggestions = useAsync(keys.join("\n"), () => (d && keys.length && !IS_MOBILE ? useTags.getState().suggest(keys) : NO_TAGS), [d, models, names], NO_TAGS);
   // Words the tagger saw that are no tag of yours yet: one click makes the tag.
   const fresh = useMemo(() => {
-    if (!d || !names || !keys.length) return [] as { name: string; p: number }[];
+    if (!d || !names || !keys.length || IS_MOBILE) return [] as { name: string; p: number }[];
     const best = new Map<string, number>();
     for (const k of keys) for (const [name, p] of useTags.getState().autoOf(k).slice(0, 30)) best.set(name, Math.max(best.get(name) ?? 0, p));
     const taken = new Set([...Object.keys(d.autoMap ?? {}), ...(d.ignoredWords ?? [])]);
@@ -265,7 +265,7 @@ export function TagEditor({ keys: rawKeys }: { keys: string[] }) {
           </div>
         </form>
       )}
-      <TagPicker onAdd={(id) => setTag(keys, id, true)} autoFocus />
+      <TagPicker onAdd={(id) => setTag(keys, id, true)} autoFocus={!IS_MOBILE} />
     </div>
   );
 }

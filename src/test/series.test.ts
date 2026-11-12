@@ -41,7 +41,7 @@ const { joined, without, together, stacks, lookAlikes, seriesIndex, pairKey } = 
 const { useStore, followMoves } = await import("../store");
 const { useDupes, withoutIgnored } = await import("../dupesStore");
 const { SeriesStrip } = await import("../components/SeriesStrip");
-const { lookForSeries, openSeriesAdd, useSeriesAdd } = await import("../seriesStore");
+const { lookForSeries, openSeriesAdd, seriesActionFor, useSeriesAdd } = await import("../seriesStore");
 const { SeriesAddDialog } = await import("../components/SeriesAdd");
 const { useJobs } = await import("../lib/jobs");
 
@@ -202,6 +202,20 @@ describe("looking for series", () => {
     expect(titles).toContain("Looking for series");
     expect(Object.keys(useDupes.getState().cache)).toEqual(["in/a.jpg"]);
     expect(useDupes.getState().cache["in/a.jpg"]).toMatchObject({ fp: "fp-/vol/in/a.jpg", image: { phash: "0000000000000000" } });
+  });
+});
+
+describe("what a selection can do about series", () => {
+  const pic = (key: string, kind = "image") => ({ key, kind }) as unknown as MediaItem;
+
+  it("makes pictures a series, and takes a whole series apart, but nothing less", () => {
+    expect(seriesActionFor([pic("a"), pic("b")], new Map())?.label).toBe("Make series");
+    expect(seriesActionFor([pic("a")], new Map())).toBeNull();
+    expect(seriesActionFor([pic("a"), pic("v", "video")], new Map())).toBeNull();
+    const series = ["a", "b", "c"];
+    const of = new Map(series.map((k) => [k, series]));
+    expect(seriesActionFor(series.map((k) => pic(k)), of)?.label).toBe("Split series");
+    expect(seriesActionFor([pic("a")], of)).toBeNull();
   });
 });
 

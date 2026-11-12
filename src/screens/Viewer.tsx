@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityButton } from "../components/Activity";
-import { CastButton } from "../components/Cast";
 import { useShallow } from "zustand/react/shallow";
 import { useFind } from "../findStore";
 import { PlatformIcon } from "../components/PlatformIcon";
-import { useStore, originalOf, selectCurrent, selectRating } from "../store";
+import { useStore, originalOf, selectCurrent, selectRating, SLIDESHOW_SECONDS } from "../store";
 import { VersionSwitch } from "../components/VersionSwitch";
 import { PageTurn } from "../components/PageTurn";
 import { MediaStage, SPEEDS } from "../components/MediaStage";
@@ -15,11 +14,11 @@ import { useScrapbook } from "../scrapbook/store";
 import { Popover } from "../components/Popover";
 import { ContextMenu } from "../components/ContextMenu";
 import { PluginButtons } from "../components/PluginButtons";
+import { SeriesBadge } from "../components/SeriesBadge";
 import { SeriesStrip } from "../components/SeriesStrip";
 import { FacesButton, FacesPanel } from "../components/FacesInPicture";
 import { toggleFaceMode } from "../peopleStore";
-import type { MediaItem, Target } from "../lib/types";
-import { seriesCount, seriesIndex } from "../lib/series";
+import type { Target } from "../lib/types";
 import { PluginPanel } from "../components/PluginPanel";
 import { TagEditor } from "../components/TagPicker";
 import { ArtistPicker } from "../components/ArtistPicker";
@@ -457,9 +456,6 @@ export function Viewer() {
             {s.queue.length ? s.index + 1 : 0} of {s.queue.length}
           </span>
 
-          {/* On a phone or tablet nearby. */}
-          <CastButton />
-
           {/* Slideshow: play/pause, with a menu for interval, HUD hiding, shuffle and surprise. */}
           <span className="btn-group">
             <button className={`btn sm ghost ${show.playing ? "active" : ""}`} onClick={s.toggleSlideshow} title={show.playing ? "Pause slideshow (⏎)" : "Start slideshow (⏎)"}>
@@ -478,7 +474,7 @@ export function Viewer() {
               <div className="pop-title">Slideshow</div>
               <div className="pop-row">
                 <span className="small">Seconds per image</span>
-                <Select compact value={String(show.interval)} onChange={(v) => s.setSlideshowInterval(Number(v))} options={[2, 3, 5, 8, 10, 15, 20, 30, 60].map((n) => ({ value: String(n), label: `${n}s` }))} />
+                <Select compact value={String(show.interval)} onChange={(v) => s.setSlideshowInterval(Number(v))} options={SLIDESHOW_SECONDS.map((n) => ({ value: String(n), label: `${n}s` }))} />
               </div>
               <label className="check side-row">
                 <input type="checkbox" checked={show.hideUi} onChange={(e) => s.setSlideshowHideUi(e.target.checked)} /> Hide the HUD while playing
@@ -651,21 +647,5 @@ export function Viewer() {
       </div>
       )}
     </div>
-  );
-}
-
-/** The picture on show is one of a series: which of it (kept together, in a row), and how many. */
-function SeriesBadge({ item }: { item: MediaItem }) {
-  const series = useStore((s) => seriesIndex(s.library?.series).get(item.key));
-  const queue = useStore((s) => s.queue);
-  const together = useStore((s) => s.seriesTogether);
-  const trashDir = useStore((s) => s.library?.trashDir);
-  if (!series) return null;
-  const inQueue = queue.filter((q) => series.includes(q.key));
-  const at = inQueue.findIndex((q) => q.key === item.key);
-  return (
-    <button className="badge accent badge-button" onClick={() => openSeriesAdd(item.key)} title={`${together ? "One of a series kept together: a target key files all of it" : "One of a series (kept apart: Settings, Look and reading)"}. Click: the series, and more to add to it`}>
-      SERIES {together && inQueue.length > 1 ? `${at + 1}/${inQueue.length}` : `· ${seriesCount(series, trashDir)}`}
-    </button>
   );
 }

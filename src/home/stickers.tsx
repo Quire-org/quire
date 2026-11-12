@@ -7,6 +7,7 @@ import { newId, type StickerLayer, type StickerSource } from "../scrapbook/model
 import { ORIGINAL } from "../scrapbook/looks";
 import { STICKERS } from "../scrapbook/stickers";
 import { filterPictures, useFilterData } from "../components/PictureFilters";
+import { HOME_DEVICE } from "../lib/platform";
 import { MINE, pick, type HomeSticker } from "./board";
 import { useHome } from "./store";
 
@@ -293,6 +294,9 @@ function HomeStickerView({ s, m, art, pool, seed, canArrange, picked, onGrab, on
   );
 }
 
+/** A new sticker's width, a share of the board's: on a narrower board a bigger share, to be about the same size to grab. */
+const NEW_WIDTH = HOME_DEVICE === "phone" ? 0.3 : HOME_DEVICE === "tablet" ? 0.15 : 0.1;
+
 /** A new sticker for the Home: one from the shelf, or a random one, a little askew, where it goes. */
 export function newSticker(at: { x: number; y: number }, from?: { src: StickerSource; aspect: number; custom: boolean }): HomeSticker {
   return {
@@ -303,7 +307,7 @@ export function newSticker(at: { x: number; y: number }, from?: { src: StickerSo
     outline: from?.custom ?? false,
     x: at.x,
     y: at.y,
-    w: 0.1,
+    w: NEW_WIDTH,
     rot: Math.round((Math.random() - 0.5) * 20),
   };
 }

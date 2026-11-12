@@ -24,7 +24,6 @@ import { Scrapbook } from "./screens/Scrapbook";
 import { CoverEditor } from "./screens/CoverEditor";
 import { StickerStudio } from "./components/StickerStudio";
 import { ImportDialog } from "./components/ImportDialog";
-import { CastHost } from "./components/Cast";
 import { OrganiseDialog } from "./components/OrganiseDialog";
 import { useScrapbook } from "./scrapbook/store";
 import { KeepDialog } from "./components/KeepDialog";
@@ -192,7 +191,6 @@ export default function App() {
       {organiseOpen && <OrganiseDialog />}
       {importOpen && <ImportDialog />}
       <FindLogin />
-      <CastHost />
       {loading && screen !== "welcome" && <div className="loading-bar mono">{loading}</div>}
       <Toasts />
     </IconContext.Provider>

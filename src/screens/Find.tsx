@@ -30,7 +30,10 @@ import { bare, flipped, isLeftOut, queryOf, termsOf, withTerms } from "../lib/qu
 import { countsOf, linkedArtist, useArtists, type LocalArtist } from "../artistsStore";
 import { ArtistLinkPicker } from "../components/ArtistLinkPicker";
 import { ArtistIcon } from "../components/ArtistIcon";
+import { HOME_DEVICE, IS_MOBILE } from "../lib/platform";
 
+/** As mobile.css has it: below this a closer look is one column. */
+const STACKED_BELOW = "(max-width: 699px)";
 const GAP = 8;
 
 /** Works looked at closer, one on top of another: a related work opened from a work goes on top, Back returns. */
@@ -90,7 +93,7 @@ function NoPlatform() {
         <h2>
           <PuzzlePiece /> No platform yet
         </h2>
-        <p>Find searches platforms through plugins, one for each. Add a platform's plugin in Settings → Plugins with its folder or GitHub link, and what it offers (a feed, bookmarks, rankings, searches) shows here.</p>
+        <p>Find searches platforms through plugins, one for each. Add a platform's plugin in Settings → Plugins with {IS_MOBILE ? "its" : "its folder or"} GitHub link, and what it offers (a feed, bookmarks, rankings, searches) shows here.</p>
         <div>
           <button className="btn primary" onClick={openPlugins}>
             Plugins…
@@ -276,6 +279,7 @@ function FindBody() {
   return (
     <div className={`find-layout ${sideHidden ? "side-hidden" : ""}`}>
       <FindSide />
+      {HOME_DEVICE === "phone" && !sideHidden && <div className="m-scrim" onClick={() => useStore.setState({ sideCollapsed: true })} />}
       <main className={`find-main ${look ? "previewing" : ""}`}>
         {f.account === null ? (
           <div className="find-note dim">Asking {finder.name}…</div>
@@ -1120,6 +1124,19 @@ function ArtistHeader({ artist }: { artist: FindArtist }) {
 /* ---------- looking closer ---------- */
 
 /** Looking closer at a work: every page (a tick on each, for the pages to keep), what is known of it, works related to it. `choosing`: opened in the basket, where importing is chosen. */
+/** Whether a closer look is one column: a phone, or a tablet beside another app (as mobile.css has it). */
+function useStacked(): boolean {
+  const [stacked, setStacked] = useState(() => IS_MOBILE && matchMedia(STACKED_BELOW).matches);
+  useEffect(() => {
+    if (!IS_MOBILE) return;
+    const narrow = matchMedia(STACKED_BELOW);
+    const changed = () => setStacked(narrow.matches);
+    narrow.addEventListener("change", changed);
+    return () => narrow.removeEventListener("change", changed);
+  }, []);
+  return stacked;
+}
+
 function Preview({ item: listed, index, count, depth, onClose, onBack, onMove, onRelated, onContext, choosing }: { item: FindItem; index: number; count: number; depth: number; onClose: () => void; onBack: () => void; onMove: (i: number) => void; onRelated: (list: FindItem[], index: number) => void; onContext: OnContext; choosing: boolean }) {
   const f = useFind(useShallow((s) => ({ pluginId: s.pluginId, picks: s.picks, baskets: s.baskets, togglePick: s.togglePick, toggleBasket: s.toggleBasket, setPages: s.setPages, setAlbum: s.setAlbum, check: s.check, open: s.open })));
   const finder = useFinders((s) => s.finders[f.pluginId!]);
@@ -1184,20 +1201,21 @@ function Preview({ item: listed, index, count, depth, onClose, onBack, onMove, o
   };
   // H: only its pages, everything around them away (as the top bar and side panel).
   const bare = useStore((s) => s.navCollapsed && s.sideCollapsed);
+  const stacked = useStacked();
   return (
-    <div className={`find-preview ${bare ? "bare" : ""}`} role="dialog" aria-label={item.title}>
+    <div className={`find-preview ${bare ? "bare" : ""}`} role="dialog" aria-label={item.title} ref={stacked ? pagesRef : undefined}>
       {finder.albums && pages.length > 1 ? (
         // A work of an album platform is read as an album.
         <AlbumPages key={item.id} pages={pages} picked={pagePicked} onToggle={togglePick} error={work.error}>
           <Related item={item} root={pagesRef} marks={marks} onOpen={onRelated} onContext={onContext} />
         </AlbumPages>
       ) : (
-        <div className="find-preview-pages" ref={pagesRef}>
+        <div className="find-preview-pages" ref={stacked ? undefined : pagesRef}>
           {pages.map((p, i) => (
             <PreviewPage key={`${item.id}-${i}`} url={p.preview} thumb={p.thumb ?? (i === 0 ? item.thumb : null)} page={pages.length > 1 ? { index: i, keep: keeps(i), onToggle: () => togglePage(i) } : null} />
           ))}
           {work.error && <div className="find-note find-error">{work.error}</div>}
-          <Related item={item} root={pagesRef} marks={marks} onOpen={onRelated} onContext={onContext} />
+          {!stacked && <Related item={item} root={pagesRef} marks={marks} onOpen={onRelated} onContext={onContext} />}
         </div>
       )}
       <aside className="find-preview-side panel">
@@ -1351,6 +1369,7 @@ function Preview({ item: listed, index, count, depth, onClose, onBack, onMove, o
         {linking && <LinkTag platform={finder.platform} name={linking} onClose={() => setLinking(null)} />}
         {work.view?.caption && <p className="small find-caption-text">{work.view.caption}</p>}
       </aside>
+      {stacked && !(finder.albums && pages.length > 1) && <Related item={item} root={pagesRef} marks={marks} onOpen={onRelated} onContext={onContext} />}
     </div>
   );
 }

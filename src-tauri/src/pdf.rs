@@ -1,15 +1,20 @@
 //! PDFs as albums: each page a picture of the album. pdfium (Chromium's PDF engine, BSD licence)
 //! draws them; it is loaded at run time from beside the app (`npm run pdfium` puts it in
-//! `binaries/` while developing). A page is addressed as the PDF's path and its number from 1,
-//! `…/Book.pdf#3`; the PDF itself is read through the library, so from the vault too.
+//! `binaries/` while developing). On iOS, the system draws them (`ios-bridge`). A page is addressed
+//! as the PDF's path and its number from 1, `…/Book.pdf#3`; the PDF itself is read through the
+//! library, so from the vault too.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
-use image::{DynamicImage, RgbImage};
+#[cfg(not(target_os = "ios"))]
+use image::DynamicImage;
+use image::RgbImage;
+#[cfg(not(target_os = "ios"))]
 use pdfium_render::prelude::*;
 
+#[cfg(not(target_os = "ios"))]
 static PDFIUM: OnceLock<Result<Pdfium, String>> = OnceLock::new();
 /// The bundled app's resource folder (told at start-up): pdfium ships there, under `binaries/`.
 static BUNDLED: OnceLock<PathBuf> = OnceLock::new();
@@ -21,6 +26,7 @@ pub fn bundled_in(dir: PathBuf) {
 
 /// An empty file is no pdfium: the bundler wants the resource to exist, so a checkout without it
 /// stands an empty one in (scripts/sidecar.mjs) until `npm run pdfium`.
+#[cfg(not(target_os = "ios"))]
 fn library_path() -> Option<PathBuf> {
     let real = |p: PathBuf| std::fs::metadata(&p).map(|m| m.is_file() && m.len() > 0).unwrap_or(false).then_some(p);
     if let Some(p) = std::env::var_os("QUIRE_PDFIUM") {
@@ -40,6 +46,7 @@ fn library_path() -> Option<PathBuf> {
     real(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(&name))
 }
 
+#[cfg(not(target_os = "ios"))]
 fn pdfium() -> Result<&'static Pdfium, String> {
     PDFIUM
         .get_or_init(|| {
@@ -63,25 +70,82 @@ pub fn split_page(path: &str) -> Option<(PathBuf, u32)> {
     is_pdf(&pdf).then_some((pdf, n))
 }
 
+/// A PDF: its path, size and date.
+type PdfKey = (PathBuf, u64, u64);
+/// How many pages each PDF has.
+type Counts = HashMap<PdfKey, u32>;
+static COUNTS: Mutex<Option<Counts>> = Mutex::new(None);
+
+/// How many pages a PDF was found to have, if that has been asked (nothing is read).
+pub fn known_pages(key: (&Path, u64, u64)) -> Option<u32> {
+    COUNTS.lock().unwrap_or_else(|p| p.into_inner()).as_ref().and_then(|m| m.get(&(key.0.to_path_buf(), key.1, key.2))).copied()
+}
+
 /// How many pages a PDF has; remembered by its size and date (an album scan asks often).
 pub fn page_count(bytes: impl FnOnce() -> Result<Vec<u8>, String>, key: (&Path, u64, u64)) -> Result<u32, String> {
-    /// A PDF (its path, size and date) and how many pages it has.
-    type Counts = HashMap<(PathBuf, u64, u64), u32>;
-    static COUNTS: Mutex<Option<Counts>> = Mutex::new(None);
-    let k = (key.0.to_path_buf(), key.1, key.2);
-    if let Some(n) = COUNTS.lock().unwrap_or_else(|p| p.into_inner()).as_ref().and_then(|m| m.get(&k)) {
-        return Ok(*n);
+    if let Some(n) = known_pages(key) {
+        return Ok(n);
     }
-    let doc = pdfium()?.load_pdf_from_byte_vec(bytes()?, None).map_err(|e| format!("not a PDF that can be read: {e}"))?;
-    let n = doc.pages().len().max(0) as u32;
-    COUNTS.lock().unwrap_or_else(|p| p.into_inner()).get_or_insert_with(HashMap::new).insert(k, n);
+    #[cfg(not(target_os = "ios"))]
+    let n = pdfium()?.load_pdf_from_byte_vec(bytes()?, None).map_err(|e| format!("not a PDF that can be read: {e}"))?.pages().len().max(0) as u32;
+    #[cfg(target_os = "ios")]
+    let n = quire_ios_bridge::pdf_page_count(&bytes_of(key, bytes)?).ok_or("not a PDF that can be read")?;
+    COUNTS.lock().unwrap_or_else(|p| p.into_inner()).get_or_insert_with(HashMap::new).insert((key.0.to_path_buf(), key.1, key.2), n);
     Ok(n)
+}
+
+/// One PDF's bytes, kept while its pages are looked at.
+#[derive(Default)]
+struct Holding(Option<(PdfKey, Arc<Vec<u8>>)>);
+
+impl Holding {
+    fn get(&mut self, key: (&Path, u64, u64), read: impl FnOnce() -> Result<Vec<u8>, String>) -> Result<Arc<Vec<u8>>, String> {
+        let wanted = (key.0.to_path_buf(), key.1, key.2);
+        if let Some((held, bytes)) = &self.0
+            && *held == wanted
+        {
+            return Ok(bytes.clone());
+        }
+        // The one held goes first: two large PDFs in memory at once is what a phone can't spare.
+        self.0 = None;
+        let bytes = Arc::new(read()?);
+        self.0 = Some((wanted, bytes.clone()));
+        Ok(bytes)
+    }
+}
+
+static HOLDING: Mutex<Holding> = Mutex::new(Holding(None));
+
+/// A PDF's bytes, to draw a page from. A phone holds on to the one being looked at, and waits its
+/// turn to read it, rather than reading a large file into memory for every page on screen at once.
+pub fn bytes_of(key: (&Path, u64, u64), read: impl FnOnce() -> Result<Vec<u8>, String>) -> Result<Arc<Vec<u8>>, String> {
+    if cfg!(target_os = "ios") {
+        HOLDING.lock().unwrap_or_else(|p| p.into_inner()).get(key, read)
+    } else {
+        read().map(Arc::new)
+    }
+}
+
+/// Nothing of a PDF stays in memory (the vault was locked).
+pub fn forget() {
+    *HOLDING.lock().unwrap_or_else(|p| p.into_inner()) = Holding::default();
 }
 
 /// A page drawn so its longer side is `side` pixels (a page larger than that is shrunk; one smaller
 /// is drawn sharp at that size), on white.
-pub fn render(bytes: Vec<u8>, page: u32, side: u32) -> Result<RgbImage, String> {
-    let doc = pdfium()?.load_pdf_from_byte_vec(bytes, None).map_err(|e| format!("not a PDF that can be read: {e}"))?;
+#[cfg(target_os = "ios")]
+pub fn render(bytes: &[u8], page: u32, side: u32) -> Result<RgbImage, String> {
+    let drawn = quire_ios_bridge::pdf_draw(bytes, page.max(1), side.clamp(16, 8000));
+    let (width, height, pixels) = drawn.ok_or_else(|| format!("page {page} couldn't be drawn"))?;
+    let rgb = pixels.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
+    RgbImage::from_raw(width, height, rgb).ok_or_else(|| format!("page {page} couldn't be drawn"))
+}
+
+/// A page drawn so its longer side is `side` pixels (a page larger than that is shrunk; one smaller
+/// is drawn sharp at that size), on white.
+#[cfg(not(target_os = "ios"))]
+pub fn render(bytes: &[u8], page: u32, side: u32) -> Result<RgbImage, String> {
+    let doc = pdfium()?.load_pdf_from_byte_slice(bytes, None).map_err(|e| format!("not a PDF that can be read: {e}"))?;
     let p = doc.pages().get((page.max(1) - 1) as PdfPageIndex).map_err(|_| format!("the PDF has no page {page}"))?;
     let side = side.clamp(16, 8000) as i32;
     let config = PdfRenderConfig::new().set_target_width(side).set_maximum_height(side);
@@ -90,6 +154,7 @@ pub fn render(bytes: Vec<u8>, page: u32, side: u32) -> Result<RgbImage, String> 
 }
 
 /// A drawn page's transparency (pdfium leaves the paper see-through) put on white paper.
+#[cfg(not(target_os = "ios"))]
 fn on_white(img: DynamicImage) -> RgbImage {
     let rgba = img.to_rgba8();
     let mut out = RgbImage::new(rgba.width(), rgba.height());
@@ -103,7 +168,7 @@ fn on_white(img: DynamicImage) -> RgbImage {
 }
 
 /// A page as JPEG, for showing.
-pub fn render_jpeg(bytes: Vec<u8>, page: u32, side: u32) -> Result<Vec<u8>, String> {
+pub fn render_jpeg(bytes: &[u8], page: u32, side: u32) -> Result<Vec<u8>, String> {
     let img = render(bytes, page, side)?;
     let mut out = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 88).encode_image(&img).map_err(|e| e.to_string())?;
@@ -113,6 +178,24 @@ pub fn render_jpeg(bytes: Vec<u8>, page: u32, side: u32) -> Result<Vec<u8>, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn one_pdf_is_held_read_once_and_let_go_for_another() {
+        let mut held = Holding::default();
+        let reads = std::cell::Cell::new(0);
+        let read = |n: u8| {
+            reads.set(reads.get() + 1);
+            Ok(vec![n])
+        };
+        let a = (Path::new("/v/a.pdf"), 1, 1);
+        assert_eq!(*held.get(a, || read(1)).unwrap(), vec![1]);
+        assert_eq!(*held.get(a, || read(9)).unwrap(), vec![1], "the same PDF isn't read again");
+        assert_eq!(reads.get(), 1);
+        assert_eq!(*held.get((Path::new("/v/b.pdf"), 1, 1), || read(2)).unwrap(), vec![2]);
+        assert_eq!(*held.get((Path::new("/v/a.pdf"), 2, 1), || read(3)).unwrap(), vec![3], "changed, it is read again");
+        assert!(held.get((Path::new("/v/c.pdf"), 1, 1), || Err("no".into())).is_err());
+        assert!(held.0.is_none(), "what was held went first, even when the next couldn't be read");
+    }
 
     #[test]
     fn a_page_is_its_pdf_and_number() {

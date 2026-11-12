@@ -1,4 +1,6 @@
 let mockTags: unknown = null;
+/** A phone's and a tablet's Homes, apart from the computer's. */
+const mockDeviceHomes: Record<string, unknown> = {};
 /**
  * Browser-only stand-in for the Tauri bridge, enabled with `?mock` on the
  * Vite dev server (never bundled into the app). It lets the UI be developed
@@ -215,8 +217,6 @@ function loadDemoFaces() {
 /** Those of them the demo's library knows by name already (one more is left for "Who is this?"). */
 const DEMO_PEOPLE: Record<string, string> = { "ellen-ochoa": "Ellen Ochoa", "jessica-meir": "Jessica Meir", "neil-armstrong": "Neil Armstrong", "peggy-whitson": "Peggy Whitson", "sunita-williams": "Sunita Williams" };
 
-/** Showing on another device, in the mock: since when, and whether its one made-up phone was let in. */
-let cast: { since: number; allowed: boolean | null } | null = null;
 /** Faces marked by hand in the mock: the part marked is the face. */
 const mockMarked: { id: number; key: string; kind: "photo" | "drawn"; bbox: [number, number, number, number]; score: number; size: number; marked: true }[] = [];
 /** `?mock&e2e`: a library with tags, people and an artist already, for the end-to-end tests. */
@@ -345,6 +345,26 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       return null;
     case "initial_root":
       return ROOT;
+    case "ios_restore_folder":
+      return null;
+    case "ios_pick_folder":
+      return ROOT;
+    case "github_status":
+      return { login: null };
+    case "github_sign_in":
+      return { userCode: "MOCK-CODE", verificationUri: "https://github.com/login/device", deviceCode: "mock", interval: 5, expiresIn: 900 };
+    case "github_sign_in_check":
+      return "waiting";
+    case "github_sign_out":
+      return null;
+    case "github_my_repos":
+      return [{ fullName: "sample-org/page-reader", private: true, description: "A sample plugin", htmlUrl: "https://github.com/sample-org/page-reader" }];
+    case "github_search_repos":
+      return [{ fullName: "someone/reader-tools", private: false, description: null, htmlUrl: "https://github.com/someone/reader-tools" }];
+    case "ios_close_folder":
+    case "ios_keep_awake":
+    case "ios_hold_other_audio":
+      return null;
     case "library_claim":
     case "library_release":
       return null;
@@ -950,9 +970,10 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
     case "faces_forget":
       return null;
     case "home_load":
-      return mockHome;
+      return args.device ? (mockDeviceHomes[String(args.device)] ?? null) : mockHome;
     case "home_save":
-      mockHome = args.data;
+      if (args.device) mockDeviceHomes[String(args.device)] = args.data;
+      else mockHome = args.data;
       return null;
     case "people_load":
       if (E2E && !mockPeople) {
@@ -1164,22 +1185,6 @@ async function invoke(cmd: string, args: Record<string, unknown> = {}): Promise<
       await new Promise((r) => setTimeout(r, 400));
       return { pngBase64: btoa(bin), width: W, height: H, result: {}, seconds: 0.4 };
     }
-    case "cast_start":
-      cast = { since: Date.now(), allowed: null };
-      return { urls: [{ iface: "en0", url: "https://192.168.1.20:47321/" }], fingerprint: "3F 9A 41 C7 2E 88 D0 15 6B A3 7E 52 0C F9 94 E1" };
-    case "cast_status":
-      // A phone asks to watch a moment after it starts.
-      if (!cast) return { running: false, devices: [], nav: [] };
-      return { running: true, devices: Date.now() - cast.since > 1200 ? [{ id: "phone", name: "Phone", ip: "192.168.1.31", state: cast.allowed == null ? "pending" : cast.allowed ? "allowed" : "denied" }] : [], nav: [] };
-    case "cast_decide":
-      if (cast) cast.allowed = !!args.allow;
-      return null;
-    case "cast_stop":
-      cast = null;
-      return null;
-    case "cast_frame":
-    case "cast_remote":
-      return null;
     case "plugin:event|listen":
       return 1;
     case "plugin:event|unlisten":

@@ -13,7 +13,7 @@ import { RESERVED_KEYS } from "../lib/hotkeys";
 import { bucketOf } from "../lib/filing";
 import { CUES, cue, useSounds } from "../lib/sounds";
 import { formatBytes, tailPath } from "../lib/format";
-import { ArrowCircleUp, ArrowsClockwise, Plugs, SpeakerHigh, BookOpen, CloudArrowUp, Cpu, Eye, FolderMinus, FolderOpen, FolderPlus, Folders, HardDrive, LockKey, MagnifyingGlass, PuzzlePiece, Smiley, Tray, Trash as TrashIcon, X } from "@phosphor-icons/react";
+import { ArrowCircleUp, ArrowsClockwise, List, Plugs, SpeakerHigh, BookOpen, CloudArrowUp, Cpu, Eye, FolderMinus, FolderOpen, FolderPlus, Folders, HardDrive, LockKey, MagnifyingGlass, PuzzlePiece, Smiley, Tray, Trash as TrashIcon, X } from "@phosphor-icons/react";
 import { kindFromTags, usePeople } from "../peopleStore";
 import { useTags } from "../tagsStore";
 import { useOnline } from "../lib/online";
@@ -28,6 +28,8 @@ import { PluginsDialog } from "./PluginsDialog";
 import { LocalModels } from "./LocalModels";
 import { Updates } from "./Updates";
 import { useUpdateCount } from "../lib/updates";
+import { IS_MOBILE } from "../lib/platform";
+import { MobileVault } from "../mobile/Vault";
 
 type Page = "folders" | "import" | "trash" | "viewing" | "faces" | "plugins" | "online" | "models" | "backup" | "drive" | "vault" | "updates";
 type Flag = "trashOpen" | "pluginsOpen" | "modelsOpen" | "backupOpen" | "driveOpen" | "vaultOpen" | "updatesOpen";
@@ -75,6 +77,10 @@ const GROUPS: { label: string; pages: { id: Page; label: string; icon: ReactNode
   { label: "App", pages: [{ id: "updates", label: "Updates", icon: <ArrowCircleUp />, words: "update version new release download restart check plugins extensions github" }] },
 ];
 
+/** The pages a phone or tablet has. */
+const MOBILE_PAGES: Page[] = ["viewing", "trash", "vault", "plugins", "online"];
+const PAGES = IS_MOBILE ? GROUPS.map((g) => ({ ...g, pages: g.pages.filter((p) => MOBILE_PAGES.includes(p.id)) })).filter((g) => g.pages.length) : GROUPS;
+
 /**
  * Settings: a screen of its own, the topics listed on the left (found by typing), one page each on
  * the right. Trash, Plugins, Local models, Backup, Drive health, Vault and Updates are pages here too, opened
@@ -83,8 +89,10 @@ const GROUPS: { label: string; pages: { id: Page; label: string; icon: ReactNode
 export function Settings() {
   const s = useStore();
   const flagged = FLAGS.find(([, f]) => s[f])?.[0];
-  const [own, setOwn] = useState<Page>("folders");
+  const [own, setOwn] = useState<Page>(IS_MOBILE ? "viewing" : "folders");
   const page = flagged ?? own;
+  // A phone's list of pages is a side panel, as Find's sections are, open only when asked for.
+  const [navOpen, setNavOpen] = useState(false);
   const [q, setQ] = useState("");
   const updateCount = useUpdateCount();
   const close = () => s.set({ settingsOpen: false, ...NONE });
@@ -92,6 +100,7 @@ export function Settings() {
     const flag = FLAGS.find(([x]) => x === p)?.[1];
     s.set({ settingsOpen: true, ...NONE, ...(flag ? { [flag]: true } : {}) });
     if (!flag) setOwn(p);
+    setNavOpen(false);
   };
 
   // Open as Settings whichever way it was opened, so the screens behind leave their keys alone.
@@ -110,11 +119,17 @@ export function Settings() {
   }, []);
 
   const needle = q.trim().toLowerCase();
-  const groups = GROUPS.map((g) => ({ ...g, pages: g.pages.filter((p) => !needle || `${g.label} ${p.label} ${p.words}`.toLowerCase().includes(needle)) })).filter((g) => g.pages.length);
-  const title = GROUPS.flatMap((g) => g.pages).find((p) => p.id === page)?.label ?? "";
+  const groups = PAGES.map((g) => ({ ...g, pages: g.pages.filter((p) => !needle || `${g.label} ${p.label} ${p.words}`.toLowerCase().includes(needle)) })).filter((g) => g.pages.length);
+  const title = PAGES.flatMap((g) => g.pages).find((p) => p.id === page)?.label ?? "";
 
   return (
-    <div className="settings-screen" role="dialog" aria-label="Settings">
+    <div className={`settings-screen ${navOpen ? "nav-open" : ""}`} role="dialog" aria-label="Settings">
+      {IS_MOBILE && (
+        <button className="m-icon settings-menu" aria-label="Settings pages" onClick={() => setNavOpen(true)}>
+          <List />
+        </button>
+      )}
+      {IS_MOBILE && navOpen && <div className="m-scrim" onClick={() => setNavOpen(false)} />}
       <aside className="settings-nav">
         <h2 className="settings-nav-head">Settings</h2>
         <label className="settings-find">
@@ -181,7 +196,7 @@ export function Settings() {
           {page === "models" && <LocalModels />}
           {page === "backup" && <Backup />}
           {page === "drive" && <Drive />}
-          {page === "vault" && <VaultDialog />}
+          {page === "vault" && (IS_MOBILE ? <MobileVault /> : <VaultDialog />)}
           {page === "updates" && <Updates />}
         </AsPage.Provider>
       </main>

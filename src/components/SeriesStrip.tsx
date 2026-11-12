@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Stack, X } from "@phosphor-icons/react";
+import { useDupes } from "../dupesStore";
+import { IS_MOBILE } from "../lib/platform";
 import { useStore } from "../store";
 import { lookForSeries, useSuggestedSeries } from "../seriesStore";
 import { Mini } from "./Thumb";
@@ -19,9 +21,12 @@ export function SeriesStrip() {
   const others = useSuggestedSeries(sorting ? current : undefined, queue);
   const [left, setLeft] = useState<Set<string>>(new Set());
   useEffect(() => setLeft(new Set()), [current?.key]);
-  // What waits in Sort is looked at once (new pictures as they come).
+  // What waits in Sort is looked at once (new pictures as they come). A phone or tablet doesn't look:
+  // it goes by what the computer has compared already.
   useEffect(() => {
-    if (sorting) void lookForSeries(unsorted);
+    if (!sorting) return;
+    if (IS_MOBILE) void useDupes.getState().loadCache();
+    else void lookForSeries(unsorted);
   }, [sorting, unsorted]);
   if (!sorting || !current || !root || !others.length) return null;
   const byKey = new Map(queue.map((q) => [q.key, q]));

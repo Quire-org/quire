@@ -5,6 +5,7 @@ import { dirOf } from "../lib/moves";
 import { Modal } from "../components/Modal";
 import { Thumb } from "../components/Thumb";
 import { formatBytes } from "../lib/format";
+import { IS_MOBILE } from "../lib/platform";
 import type { MediaItem } from "../lib/types";
 
 export function Trash() {
@@ -111,25 +112,27 @@ export function Trash() {
           <span className="mono">{items.length}</span> items, <span className="mono">{formatBytes(bytes)}</span> in{" "}
           <span className="mono">{s.library?.trashDir}</span>
         </span>
-        {confirm ? (
-          <span className="row">
-            <span className="mono" style={{ color: "var(--danger)" }}>
-              This cannot be undone.
+        {/* On a phone or tablet things come back out of the trash; deleting for good is the computer's. */}
+        {!IS_MOBILE &&
+          (confirm ? (
+            <span className="row">
+              <span className="mono" style={{ color: "var(--danger)" }}>
+                This cannot be undone.
+              </span>
+              <button className="btn sm danger" disabled={busy} onClick={() => void purge()}>
+                Yes, delete everything
+              </button>
+              <button className="btn sm ghost" onClick={() => setConfirm(false)}>
+                Cancel
+              </button>
             </span>
-            <button className="btn sm danger" disabled={busy} onClick={() => void purge()}>
-              Yes, delete everything
+          ) : (
+            <button className="btn sm danger" disabled={items.length === 0 || busy} onClick={() => setConfirm(true)}>
+              Empty trash
             </button>
-            <button className="btn sm ghost" onClick={() => setConfirm(false)}>
-              Cancel
-            </button>
-          </span>
-        ) : (
-          <button className="btn sm danger" disabled={items.length === 0 || busy} onClick={() => setConfirm(true)}>
-            Empty trash
-          </button>
-        )}
+          ))}
       </div>
-      {kept && kept.originals > 0 && (
+      {!IS_MOBILE && kept && kept.originals > 0 && (
         <div className="sec-head">
           <span className="dim">
             Also kept, out of sight: <span className="mono">{kept.originals}</span> original{kept.originals === 1 ? "" : "s"} of pictures edited in place, <span className="mono">{formatBytes(kept.bytes)}</span>, so Revert in Info can bring them back. Each goes with its version when that is deleted for good.

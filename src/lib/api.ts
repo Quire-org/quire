@@ -3,6 +3,7 @@ import { backendJob, startJob } from "./jobs";
 import { isPdfPage } from "./pdf";
 import type { Incoming } from "./filing";
 import { open } from "@tauri-apps/plugin-dialog";
+import { IS_MOBILE } from "./platform";
 import type { DownloadProgress, EngineCatalog, FetchResponse, Inspected, Manifest, PluginInfo, UpdateCheck, StoreInfo } from "../plugins/types";
 import type { AppBuild, AppUpdate, VaultAdopted, IndexModels, IndexProgress, IndexedItem, MediaInfo, TagData, TagIndexView, TagName, Album, AlbumRename, BackupOutcome, BackupPlan, BackupProgress, Benchmark, DirEntryInfo, DriveInfo, EditOp, EditResult, EditTools, Hardware, History, ImageHashResult, VaultProgress, VaultStatus, Library, MediaItem, MoveResult, TrashInfo, VerifyProgress, VerifyResult, AlbumGuess, FaceView, FacesSorted, VersionInfo, VersionLink } from "./types";
 
@@ -23,6 +24,27 @@ function vaultCommand(cmd: string, args: Record<string, unknown>, init: Paramete
 
 /** A backend command over many files as an Activity job counting files (Pause and Stop out). */
 const formatMB = (bytes: number) => `${(bytes / 1048576).toFixed(bytes < 10485760 ? 1 : 0)} MB`;
+
+/** Who is signed in to GitHub. */
+export interface GitHubStatus {
+  login: string | null;
+}
+
+export interface GitHubRepo {
+  fullName: string;
+  private: boolean;
+  description: string | null;
+  htmlUrl: string;
+}
+
+/** A GitHub sign-in begun: the code to approve, and where. */
+export interface GitHubCode {
+  userCode: string;
+  verificationUri: string;
+  deviceCode: string;
+  interval: number;
+  expiresIn: number;
+}
 
 /** A pick for find_download: its files, or an animation's frames. */
 export interface FindDownload {
@@ -189,11 +211,29 @@ export const api = {
   artistAvatarSave: (id: string, root: string, name: string, url: string, headers: Record<string, string>) => invoke<void>("artist_avatar_save", { id, root, name, url, headers }),
   /** Find's state kept with the library (the basket). */
   /** The Home's board, kept with the library. */
-  homeLoad: (root: string) => invoke<unknown>("home_load", { root }),
+  homeLoad: (root: string, device?: string) => invoke<unknown>("home_load", { root, device }),
+  /** The library's folder, opened by the system's picker (iOS only). */
+  iosPickFolder: () => invoke<string | null>("ios_pick_folder"),
+  /** The folder picked last time, where it is now; none when its drive isn't plugged in (iOS only). */
+  iosRestoreFolder: () => invoke<string | null>("ios_restore_folder"),
+  /** What is still held for the drive sent to it, and the drive let go of (iOS only). */
+  iosCloseFolder: () => invoke<void>("ios_close_folder"),
+  /** The screen kept from dimming and locking, or left to again (iOS only). */
+  iosKeepAwake: (on: boolean) => invoke<void>("ios_keep_awake", { on }),
+  /** Other apps' audio taken for a video with sound, or given back with word that they can go on (iOS only). */
+  iosHoldOtherAudio: (hold: boolean) => invoke<void>("ios_hold_other_audio", { hold }),
+  githubStatus: () => invoke<GitHubStatus>("github_status"),
+  /** Every repository the sign-in reaches, private ones too. */
+  githubMyRepos: () => invoke<GitHubRepo[]>("github_my_repos"),
+  /** GitHub's search by name: public repositories, and private ones the sign-in reaches. */
+  githubSearchRepos: (words: string) => invoke<GitHubRepo[]>("github_search_repos", { words }),
+  githubSignIn: () => invoke<GitHubCode>("github_sign_in"),
+  githubSignInCheck: (deviceCode: string) => invoke<"waiting" | "slower" | "done">("github_sign_in_check", { deviceCode }),
+  githubSignOut: () => invoke<void>("github_sign_out"),
   /** What each screen was left showing in this library (see lib/views.ts). */
   viewsLoad: (root: string) => invoke<unknown>("views_load", { root }),
   viewsSave: (root: string, data: unknown) => invoke<void>("views_save", { root, data }),
-  homeSave: (root: string, data: unknown) => invoke<void>("home_save", { root, data }),
+  homeSave: (root: string, data: unknown, device?: string) => invoke<void>("home_save", { root, data, device }),
   findStateLoad: (root: string) => invoke<unknown>("find_state_load", { root }),
   findStateSave: (root: string, data: unknown) => invoke<void>("find_state_save", { root, data }),
   pluginLog: (id: string, level: string, message: string) => invoke<void>("plugin_log", { id, level, message }),
@@ -348,15 +388,6 @@ export const api = {
   imageHash: (path: string, isRaw: boolean) =>
     invoke<ImageHashResult>("image_hash", { root: currentRoot(), path, isRaw }),
   fileFingerprint: (path: string) => invoke<string>("file_fingerprint", { root: currentRoot(), path }),
-  /** Showing on another device (components/Cast). */
-  castStart: (remote: boolean) => invoke<{ urls: { iface: string; url: string }[]; fingerprint: string }>("cast_start", { remote }),
-  castStop: () => invoke<void>("cast_stop"),
-  /** The picture shown now (a JPEG made here), or the video shown now (streamed from its file as the device plays it), or nothing. */
-  castFrame: (seq: number, jpegBase64: string | null, name: string, video: boolean, index: number, total: number, none: boolean, videoPath: string | null = null, root: string | null = null) =>
-    invoke<void>("cast_frame", { seq, jpegBase64, name, video, index, total, none, videoPath, root }),
-  castStatus: () => invoke<{ running: boolean; devices: { id: string; name: string; ip: string; state: "pending" | "allowed" | "denied" }[]; nav: number[] }>("cast_status"),
-  castDecide: (id: string, allow: boolean) => invoke<void>("cast_decide", { id, allow }),
-  castRemote: (on: boolean) => invoke<void>("cast_remote", { on }),
   /** What was where at the last full look at the library (lib/snapshot), or null. */
   snapshotLoad: (root: string) => invoke<unknown>("snapshot_load", { root }),
   snapshotSave: (root: string, snapshot: unknown) => invoke<void>("snapshot_save", { root, snapshot }),
@@ -429,6 +460,7 @@ export function faceUrl(root: string, item: { primary: string; modified: number 
 }
 
 export async function pickFolder(title: string, defaultPath?: string) {
+  if (IS_MOBILE) return api.iosPickFolder();
   const res = await open({ directory: true, multiple: false, title, defaultPath });
   return typeof res === "string" ? res : null;
 }

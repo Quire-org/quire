@@ -27,8 +27,6 @@ rand = "0.8"
 zeroize = { version = "1", features = ["derive"] }
 hex = "0.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
-# PDF albums' pages, drawn by pdfium (loaded at run time: npm run pdfium puts it in binaries/).
-pdfium-render = { version = "0.9.4", default-features = false, features = ["image_025", "thread_safe", "pdfium_latest"] }
 # Disks (drive health) and this computer's memory and chip (which language model suits it).
 sysinfo = { version = "0.33", default-features = false, features = ["disk", "system"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking", "json"] }
@@ -39,10 +37,11 @@ quire-tags = { path = "tags" }
 quire-crypto = { path = "crypto" }
 percent-encoding = "2"
 notify = "8"
-# Showing on another device: a session's own certificate, and TLS for it.
-rcgen = { version = "0.13", default-features = false, features = ["crypto", "ring"] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 sha2 = "0.10"
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+# PDF albums' pages, drawn by pdfium (loaded at run time: npm run pdfium puts it in binaries/). iOS draws its own.
+pdfium-render = { version = "0.9.4", default-features = false, features = ["image_025", "thread_safe", "pdfium_latest"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -58,6 +57,15 @@ objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSResponder", "
 objc2-local-authentication = { version = "0.3", features = ["LAContext", "LAError", "LAPublicDefines"] }
 # Quick unlock's key, as a generic password in the user's Keychain.
 security-framework = "3"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+# What only iOS can do: its folder picker, and hearing the app leave the screen.
+quire-ios-bridge = { path = "ios-bridge" }
+# Quick unlock's key and the GitHub sign-in, as items in the device's Keychain; a context to look for
+# one without bringing up Face ID.
+security-framework = "3"
+core-foundation = "0.10"
+objc2-local-authentication = { version = "0.3", features = ["LAContext"] }
 
 # The tag index and each tag's learning run number-heavy loops: optimised in dev builds too (learning a
 # tag took 4.5 s unoptimised, 0.23 s optimised). Built as one piece (codegen-units = 1): optimised and
@@ -82,6 +90,20 @@ opt-level = 3
 [profile.dev.package.argon2]
 opt-level = 3
 [profile.dev.package.blake2]
+opt-level = 3
+
+# Pictures are decoded for every thumbnail: unoptimised, a phone takes many seconds over each one.
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.image-webp]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
 opt-level = 3
 
 [profile.release]

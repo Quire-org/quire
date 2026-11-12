@@ -15,12 +15,12 @@ import { basename, samePages, shuffled, uid, naturalCompare, plainCompare } from
 import type { Album, AlbumRename, History, ItemSource, Library, LibrarySettings, MediaItem, Target, VaultStatus } from "./lib/types";
 import type { Fix } from "./scrapbook/model";
 import { useEdit, type Pipeline } from "./editStore";
-import { steppedJob } from "./lib/jobs";
+import { steppedJob, useJobs } from "./lib/jobs";
 import { PART, bucketOf, filedFolder, folderName, fromRoot, inTarget, isFilingName, ownFolderOf, partOf, targetFor, within } from "./lib/filing";
 import { invoke } from "@tauri-apps/api/core";
 import { cue } from "./lib/sounds";
 import { useOnline } from "./lib/online";
-import { IS_MAC } from "./lib/platform";
+import { IS_MAC, IS_MOBILE } from "./lib/platform";
 
 export type Screen = "welcome" | "home" | "viewer" | "browse" | "dupes" | "albums" | "files" | "tags" | "people" | "artists" | "find" | "activity" | "scrapbook" | "cover";
 
@@ -72,6 +72,9 @@ export interface AlbumFilters {
 }
 const DEFAULT_BROWSE: BrowseFilters = { location: "all", kind: "all", folders: null, query: "", sortBy: "name", desc: false, minRating: 0, unratedOnly: false, random: false, zoom: 220, layout: "masonry", tagged: "all", tags: [], tagsMode: "or", tagsOut: [], tagsOutMode: "or", artists: [], people: [] };
 const DEFAULT_ALBUMS: AlbumFilters = { query: "", rootSel: "all", kind: "all", minRating: 0, unratedOnly: false, sortBy: "name", desc: false, random: false, zoom: 260, tags: [], tagsMode: "or", tagsOut: [], tagsOutMode: "or", artists: [], people: [] };
+
+/** The seconds a slideshow can give each picture. */
+export const SLIDESHOW_SECONDS = [2, 3, 5, 8, 10, 15, 20, 30, 60];
 
 /** Preferences remembered on this computer: the bars folded away, and the last used of the library's settings (see lib/librarySettings), for before a library opens. */
 export function loadPref<T extends object>(key: string, def: T): T {
@@ -557,6 +560,18 @@ async function tidyVault(root: string) {
   }
 }
 
+/**
+ * A library closed on a phone or tablet. iOS has no eject: what it can have is the vault's last writes
+ * done, the drive let go of, and being told when it can be unplugged. While something is still at work
+ * on the drive, it is left to finish.
+ */
+async function letGoOfDrive() {
+  if (useJobs.getState().jobs.length) return useStore.getState().toast("Closed, but something in Activity is still running: let it finish before unplugging the drive.", "warn");
+  await api.vaultLock();
+  await api.iosCloseFolder();
+  useStore.getState().toast("Everything is saved. You can unplug the drive.", "ok");
+}
+
 export const useStore = create<Store>((set, get) => ({
   root: null,
   library: null,
@@ -733,10 +748,11 @@ export const useStore = create<Store>((set, get) => ({
 
   closeRoot() {
     // Written before anything is forgotten (a rating given just now is kept), then let go of.
-    void flushAll().then(() => {
+    const saved = flushAll().then(() => {
       closeViews();
       return api.libraryRelease().catch(() => {});
     });
+    if (IS_MOBILE) void saved.then(letGoOfDrive).catch((e) => get().toast(String(e), "error"));
     setCurrentRoot(null);
     set({
       vault: null,
@@ -1439,19 +1455,19 @@ export const useStore = create<Store>((set, get) => ({
 
   openTags() {
     if (get().editMode) get().leaveEdit();
-    set({ screen: "tags", hudHidden: false });
+    set({ screen: "tags", hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
     void get().loadAll();
   },
 
   openScrapbook() {
     if (get().editMode) get().leaveEdit();
-    set({ screen: "scrapbook", hudHidden: false });
+    set({ screen: "scrapbook", hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
     void get().loadAll();
   },
 
   openPeople() {
     if (get().editMode) get().leaveEdit();
-    set({ screen: "people", hudHidden: false });
+    set({ screen: "people", hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
   openHome() {
@@ -1462,13 +1478,13 @@ export const useStore = create<Store>((set, get) => ({
 
   openArtists(id) {
     if (get().editMode) get().leaveEdit();
-    set({ screen: "artists", hudHidden: false });
+    set({ screen: "artists", hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
     void import("./artistsStore").then(({ useArtists }) => id !== undefined && useArtists.getState().setOpen(id));
   },
 
   openFind() {
     if (get().editMode) get().leaveEdit();
-    set({ screen: "find", hudHidden: false });
+    set({ screen: "find", hudHidden: false, slideshow: { ...get().slideshow, playing: false, hidByShow: false } });
   },
 
   openActivity() {
@@ -1498,7 +1514,7 @@ export const useStore = create<Store>((set, get) => ({
       const hidByShow = cur.hideUi && !get().hudHidden;
       if (hidByShow) set({ hudHidden: true, infoOpen: false });
       set({ slideshow: { ...cur, playing, hidByShow } });
-      get().toast(`Slideshow: ${cur.interval}s per image. Enter pauses, H shows the controls`);
+      get().toast(`Slideshow: ${cur.interval}s per image. ${IS_MOBILE ? "Tap the picture for the controls, hold Play for the speed" : "Enter pauses, H shows the controls"}`);
     } else {
       if (cur.hidByShow && get().hudHidden && !get().immersive) set({ hudHidden: false });
       set({ slideshow: { ...cur, playing, hidByShow: false } });

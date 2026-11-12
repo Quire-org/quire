@@ -26,17 +26,6 @@
         { "frame": "vault-done", "at": 90 },
         { "frame": "unlock", "at": 110, "enter": "wipe" }
       ]
-    },
-    {
-      "caption": "Show a picture on your phone.",
-      "line": "Only what's on screen, to a device you let in.",
-      "length": 110,
-      "steps": [
-        { "frame": "cast-0", "click": 14 },
-        { "frame": "cast-1", "at": 22, "click": 14, "enter": "open" },
-        { "frame": "cast-2", "at": 46, "click": 16 },
-        { "frame": "cast-3", "at": 70 }
-      ]
     }
   ],
   "end": { "title": "Quire", "lines": ["Free and open source, for macOS, Windows and Linux", "Nothing leaves your computer unless you say so."], "link": "github.com/Quire-org/quire" },

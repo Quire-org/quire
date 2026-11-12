@@ -57,6 +57,30 @@ checking and naming a group of faces, the Find basket), checks each screen for a
 spilling out of its box, cut off, laid over something else or past the window
 (`e2e/overflow.js`), and leaves a screenshot of each in `e2e/out` to look over.
 
+## iPhone and iPad
+
+The same Rust backend and stores, with touch screens of their own in `src/mobile/` on their own page
+(`mobile.html`, chosen by `tauri.ios.conf.json`). `npm run dev` and `http://localhost:1420/mobile.html?mock`
+show them in a browser; use a phone-sized WebKit window with touch on. What only iOS can do (opening a
+folder and keeping it open, hearing the app leave the screen) is the Swift plugin in `src-tauri/ios-bridge`.
+
+It isn't on the App Store, which needs a paid developer licence, so for now it is for enthusiasts who build
+it themselves. A free Apple account is enough, but an install made with one stops opening after seven days
+until it is built again.
+
+Needs Xcode, CocoaPods and XcodeGen (`brew install cocoapods xcodegen`) and the Rust targets
+`aarch64-apple-ios` and `aarch64-apple-ios-sim`, with `rustup component add llvm-tools`.
+
+```sh
+export APPLE_DEVELOPMENT_TEAM=<your team id>   # kept out of the repository
+npm run tauri ios build -- --debug --open      # opens Xcode: pick the device and press Run
+```
+
+The engine and ffmpeg aren't on iOS: no model runs or video edits, and only Find's platforms can be added
+as plugins. iOS draws PDF pages itself, so pdfium isn't needed there. A site's browser check is passed in a
+sheet of the app's own, whose browser view then stays hidden as the site's session (`SiteSessions.swift`). The vault locks the moment the app
+leaves the screen.
+
 ## Screenshots, the demo video and the web demo
 
 The README's screenshots, its looping clip, the demo video and the web demo come from the browser

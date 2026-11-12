@@ -27,7 +27,7 @@ export interface VaultStatus {
   plaintextFiles: number;
   plaintextBytes: number;
   encryptedFiles: number;
-  /** "touchid" | "hello" | "keyring" */
+  /** "touchid" | "faceid" | "hello" | "keyring" */
   quickMethod: string;
   /** The drive's format as the system names it: "msdos" (FAT), "exfat", "apfs"…, when known. */
   format?: string | null;

@@ -231,7 +231,7 @@ function Suggestion({ s }: { s: ArtistSuggestion }) {
   );
 }
 
-function ArtistCard({ artist, count, albums, toCheck, onOpen }: { artist: LocalArtist; count: number; albums: number; toCheck: number; onOpen: () => void }) {
+export function ArtistCard({ artist, count, albums, toCheck, onOpen }: { artist: LocalArtist; count: number; albums: number; toCheck: number; onOpen: () => void }) {
   return (
     <button className="artist-card" onClick={onOpen}>
       <ArtistIcon artist={artist} size={72} />

@@ -510,16 +510,19 @@ fn check_download_url(url: &str) -> Result<reqwest::Url, String> {
     }
 }
 
-fn http_get(url: &str, accept: Option<&str>) -> Result<Vec<u8>, String> {
+fn http_get(url: &str, accept: Option<&str>, token: Option<&str>) -> Result<Vec<u8>, String> {
     let u = check_download_url(url)?;
     let mut req = client()?.get(u);
     if let Some(a) = accept {
         req = req.header("Accept", a);
     }
+    if let Some(t) = token {
+        req = req.bearer_auth(t);
+    }
     let resp = req.send().map_err(|e| format!("could not reach GitHub: {e}"))?;
     let status = resp.status().as_u16();
     if status == 404 {
-        return Err("not found on GitHub. Check the link; private repositories are not supported.".into());
+        return Err("not found on GitHub. Check the link; for a private repository, sign in to GitHub first (Settings → Plugins).".into());
     }
     if status == 403 || status == 429 {
         return Err("GitHub is limiting requests from this network. Try again in a while.".into());
@@ -528,6 +531,18 @@ fn http_get(url: &str, accept: Option<&str>) -> Result<Vec<u8>, String> {
         return Err(format!("GitHub answered HTTP {status}"));
     }
     read_capped(resp, MAX_ZIP as usize, "the download is larger than 50 MB")
+}
+
+/// Asked of GitHub as anyone first, so nothing ties a public plugin to an account; not found, then
+/// as the user signed in, for a private repository.
+fn gh_get(url: &str, accept: Option<&str>) -> Result<Vec<u8>, String> {
+    match http_get(url, accept, None) {
+        Err(e) if e.starts_with("not found") => match crate::github::token() {
+            Some(token) => http_get(url, accept, Some(&token)),
+            None => Err(e),
+        },
+        other => other,
+    }
 }
 
 /// A response body read up to `cap` bytes, and refused past it, rather than taken whole first.
@@ -549,7 +564,7 @@ impl Registry {
     /// this commit, so the manifest that was approved is the code that runs.
     fn gh_commit(&self, r: &GitHubRef) -> Result<String, String> {
         let url = format!("{}/repos/{}/{}/commits/{}", self.gh.api, r.owner, r.repo, r.git_ref.as_deref().unwrap_or("HEAD"));
-        let body = http_get(&url, Some("application/vnd.github.sha"))?;
+        let body = gh_get(&url, Some("application/vnd.github.sha"))?;
         let sha = String::from_utf8_lossy(&body).trim().to_ascii_lowercase();
         if sha.len() != 40 || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err("GitHub did not return a commit for that link".into());
@@ -560,14 +575,35 @@ impl Registry {
     fn gh_manifest(&self, r: &GitHubRef, commit: &str) -> Result<Manifest, String> {
         let sub = r.path.as_ref().map(|p| format!("{p}/")).unwrap_or_default();
         let url = format!("{}/{}/{}/{}/{}plugin.json", self.gh.raw, r.owner, r.repo, commit, sub);
-        let bytes = http_get(&url, None).map_err(|e| if e.starts_with("not found") { format!("no plugin.json in {}", r.url()) } else { e })?;
+        // raw.githubusercontent.com is for public files: a private repository's comes from the API.
+        let bytes = http_get(&url, None, None)
+            .or_else(|e| match (e.starts_with("not found"), crate::github::token()) {
+                (true, Some(token)) => http_get(&format!("{}/repos/{}/{}/contents/{}plugin.json?ref={}", self.gh.api, r.owner, r.repo, sub, commit), Some("application/vnd.github.raw+json"), Some(&token)),
+                _ => Err(e),
+            })
+            .map_err(|e| if e.starts_with("not found") { format!("no plugin.json in {}", r.url()) } else { e })?;
         let m: Manifest = serde_json::from_slice(&bytes).map_err(|e| format!("plugin.json: {e}"))?;
         validate(&m)?;
         Ok(m)
     }
 
     fn gh_archive(&self, r: &GitHubRef, commit: &str) -> Result<Vec<u8>, String> {
-        http_get(&format!("{}/repos/{}/{}/zipball/{}", self.gh.api, r.owner, r.repo, commit), None)
+        gh_get(&format!("{}/repos/{}/{}/zipball/{}", self.gh.api, r.owner, r.repo, commit), None)
+    }
+}
+
+const NO_FOLDERS_HERE: &str = "On iPhone and iPad a plugin comes from a GitHub link, not a folder.";
+
+/// On iPhone and iPad only Find's platforms run: a plugin's own pipeline needs the engine, which iOS can't start.
+fn runs_here(m: &Manifest) -> Result<(), String> {
+    if !cfg!(mobile) {
+        Ok(())
+    } else if m.engine.is_some() {
+        Err(format!("{} needs the engine, so it only runs on a computer.", m.name))
+    } else if !m.permissions.iter().any(|p| p == "find") {
+        Err(format!("{} isn't a platform for Find: on iPhone and iPad only those can be added for now.", m.name))
+    } else {
+        Ok(())
     }
 }
 
@@ -896,6 +932,7 @@ impl Registry {
     /// Look at a GitHub link or folder without installing anything.
     pub fn inspect(&self, input: &str) -> Result<Inspected, String> {
         match parse_source(input)? {
+            Source::Local(_) if cfg!(mobile) => Err(NO_FOLDERS_HERE.into()),
             Source::Local(dir) => {
                 let m = Self::read_manifest(&dir)?;
                 Ok(Inspected { manifest: m, kind: "local".into(), location: dir.to_string_lossy().into_owned() })
@@ -903,6 +940,7 @@ impl Registry {
             Source::GitHub(r) => {
                 let commit = self.gh_commit(&r)?;
                 let m = self.gh_manifest(&r, &commit)?;
+                runs_here(&m)?;
                 Ok(Inspected { manifest: m, kind: "github".into(), location: r.url() })
             }
         }
@@ -912,6 +950,7 @@ impl Registry {
     /// `expect_id`, when given, must match the plugin found there.
     pub fn install(&self, input: &str, granted: Vec<String>, expect_id: Option<&str>) -> Result<Manifest, String> {
         match parse_source(input)? {
+            Source::Local(_) if cfg!(mobile) => Err(NO_FOLDERS_HERE.into()),
             Source::Local(dir) => {
                 let m = Self::read_manifest(&dir)?;
                 check_id(&m, expect_id)?;
@@ -934,6 +973,7 @@ impl Registry {
             let root = extract_zip(&bytes, &tmp, r.path.as_deref())?;
             let m = Self::read_manifest(&root)?;
             check_id(&m, expect_id)?;
+            runs_here(&m)?;
             self.commit_install(&m, &root, r.url(), granted, false, Some((r.clone(), commit.to_string())))?;
             Ok(m)
         })();

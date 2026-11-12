@@ -149,18 +149,27 @@ describe("the Home's board", () => {
     expect(board.canMosaic({ ...block("a", 0, 0, 6, 6), type: "activity" })).toBe(false);
   });
 
+  it("makes a mosaic of a small block and of pictures nearly all one shape", () => {
+    const tall = Array.from({ length: 60 }, (_, i) => ({ key: `p${i}`, a: i % 7 === 0 ? 1.5 : 0.7 }));
+    const rowsOf = (tiles: { y: number }[]) => new Set(tiles.map((t) => Math.round(t.y))).size;
+    expect(board.justify(tall, 340, 298)).not.toBeNull();
+    // A row is no more than about 240 high: a box of 298 doesn't become a row of two big ones.
+    const wide = Array.from({ length: 60 }, (_, i) => ({ key: `p${i}`, a: [1.5, 1.33, 1.8][i % 3] }));
+    expect(rowsOf(board.justify(wide, 700, 298)!)).toBeGreaterThanOrEqual(2);
+  });
+
   it("keeps a mosaic to the most rows asked for: fewer, bigger rows filling the same box", () => {
     const list = Array.from({ length: 60 }, (_, i) => ({ key: `p${i}`, a: [1.5, 0.75, 1, 1.33, 0.66][i % 5] }));
     const rowsOf = (tiles: { y: number }[]) => new Set(tiles.map((t) => Math.round(t.y))).size;
-    const free = board.justify(list, 800, 900)!;
+    const free = board.justify(list, 800, 1200)!;
     expect(rowsOf(free)).toBeGreaterThan(2);
     // Two rows can't fill this height without trimming too much: as tall as they may be, in the middle.
-    const two = board.justify(list, 800, 900, 2)!;
+    const two = board.justify(list, 800, 1200, 2)!;
     expect(rowsOf(two)).toBe(2);
     expect(Math.min(...two.map((t) => t.h))).toBeGreaterThan(Math.min(...free.map((t) => t.h)));
     const [top, bottom] = [Math.min(...two.map((t) => t.y)), Math.max(...two.map((t) => t.y + t.h))];
     expect(top).toBeGreaterThan(0);
-    expect(top).toBeCloseTo(900 - bottom, 0);
+    expect(top).toBeCloseTo(1200 - bottom, 0);
     // Each keeps its shape, up to the trim.
     for (const t of two) expect(Math.abs(t.w / t.h / list.find((p) => p.key === t.key)!.a - 1)).toBeLessThanOrEqual(0.15 + 1e-9);
     // The kinds with rows of pictures can be capped; the others have none.
@@ -367,6 +376,9 @@ describe("the Home on screen", () => {
     expect(rowHeight(false, 10, 900)).toBe(64);
     expect(rowHeight(true, 10, 900)).toBe(Math.floor((900 - 24 - 9 * 10) / 10));
     expect(rowHeight(true, 40, 900)).toBe(48);
+    // A little too long: squeezed in. Much too long: as tall as ever, and it scrolls.
+    expect(rowHeight(true, 17, 742)).toBe(32);
+    expect(rowHeight(true, 18, 742)).toBe(48);
     expect(rowHeight(true, 0, 900)).toBe(64);
     const { host, unmount } = await mount();
     await act(async () => button(host, "Sorting desk").click());

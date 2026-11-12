@@ -1,7 +1,6 @@
-// The private photos workflow video: faces found on the computer and named once, the library locked
-// in a vault, and a picture shown on a phone that was let in (see ../../kit.mjs; script.json puts it
-// together). The faces are the ones Quire's face finder found in the example library
-// (examples/faces.json). `npm run workflows -- private`.
+// The private photos workflow video: faces found on the computer and named once, and the library
+// locked in a vault (see ../../kit.mjs; script.json puts it together). The faces are the ones Quire's
+// face finder found in the example library (examples/faces.json). `npm run workflows -- private`.
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { capture } from "../../kit.mjs";
@@ -64,33 +63,5 @@ await capture({
     await act("openRoot", "/Volumes/Pictures");
     await settle(1500);
     await shot("unlock");
-    const quick = button(/Touch ID/);
-    if (await quick.isVisible().catch(() => false)) await quick.click();
-    else {
-      await page.locator("input[type=password]").first().fill("mock");
-      await page.keyboard.press("Enter");
-    }
-    await settle(2000);
-
-    console.log("cast");
-    await page.evaluate(async () => {
-      const { useStore } = await import("/src/store.ts");
-      const s = useStore.getState();
-      const photos = s.allItems.filter((i) => i.dir === "Photos").sort((a, b) => a.name.localeCompare(b.name));
-      s.openViewer(photos, photos.findIndex((i) => i.name === "harbour-at-dawn"), { kind: "browse" });
-    });
-    await settle(1500);
-    const phone = page.locator('button[title^="Show on another device"]').first();
-    await shot("cast-0", { click: await middleOf(phone) });
-    await phone.click();
-    await settle(800);
-    await shot("cast-1", { click: await middleOf(button(/Start showing/)) });
-    await button(/Start showing/).click();
-    await page.waitForTimeout(2600);
-    await settle(400);
-    await shot("cast-2", { click: await middleOf(button(/^Allow/)) });
-    await button(/^Allow/).click();
-    await settle(1500);
-    await shot("cast-3");
   },
 });

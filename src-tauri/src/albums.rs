@@ -50,9 +50,10 @@ pub fn album_from_items(root: &Path, sub: &Path, stored_root: &str, items: Vec<M
 pub fn album_from_pdf(ctx: &Ctx, root: &Path, pdf: &Path, stored_root: &str) -> Album {
     let (size, modified) = ctx.stat(pdf).unwrap_or((0, 0));
     let key = media::rel_key(root, pdf);
-    let pages = crate::pdf::page_count(|| ctx.read_all(pdf), (pdf, size, modified)).unwrap_or(0);
+    // A phone counts a PDF's pages when it is opened: counting here would read every PDF off the drive.
+    let pages = if cfg!(mobile) { crate::pdf::known_pages((pdf, size, modified)).unwrap_or(0) } else { crate::pdf::page_count(|| ctx.read_all(pdf), (pdf, size, modified)).unwrap_or(0) };
     Album {
-        cover: (pages > 0).then(|| pdf_page(ctx, root, pdf, 1, (size, modified))),
+        cover: (cfg!(mobile) || pages > 0).then(|| pdf_page(ctx, root, pdf, 1, (size, modified))),
         key,
         path: pdf.to_string_lossy().into_owned(),
         name: pdf.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),

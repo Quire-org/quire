@@ -4,11 +4,12 @@ import { formatTime } from "../lib/format";
 import type { MediaItem } from "../lib/types";
 import { FitImage, useFitSize, type FitMode, type Natural } from "./FitImage";
 import { ScrubPreview } from "./ScrubPreview";
-import { DeviceMobile, Gauge, Pause, Play, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
-import { useCast } from "./Cast";
+import { Gauge, Pause, Play, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
 import { useOriginalShown } from "../versionsStore";
 import { VideoFaceLayer } from "./FacesInPicture";
+import { useVideoSound } from "../lib/otherAudio";
 import { useStopWhenGone } from "../lib/video";
+import { IS_MOBILE } from "../lib/platform";
 
 export const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -106,11 +107,9 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
   const [controlsOn, setControlsOn] = useState(true);
   const overControls = useRef(false);
   const videoAt = useStopWhenGone(videoRef);
-  // Shown on a phone or tablet (Show on another device): it plays there, not here as well.
-  const elsewhere = useCast((x) => (x.info ? (x.devices.find((d) => d.state === "allowed")?.name ?? null) : null));
-  useEffect(() => {
-    if (elsewhere) videoRef.current?.pause();
-  }, [elsewhere, item.primary, videoRef]);
+  // Whether it has a sound track at all, as the webview knows once it can play.
+  const [hasSound, setHasSound] = useState(false);
+  useVideoSound(hasSound && !muted && !failed);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Controls show on any mouse movement and fade after a moment of stillness.
   const poke = () => {
@@ -138,6 +137,7 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
 
   useEffect(() => {
     setFailed(false);
+    setHasSound(false);
     setTime(0);
     setDuration(0);
     setNatural(null);
@@ -152,6 +152,13 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
     const r = bar.getBoundingClientRect();
     v.currentTime = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * duration;
   };
+  const frameAt = (clientX: number) => {
+    const bar = barRef.current;
+    if (!bar || !duration) return;
+    const r = bar.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    setHover({ t: f * duration, x: f * r.width });
+  };
 
   return (
     <div className="fitbox video-wrap" ref={setBox} onMouseMove={poke}>
@@ -161,8 +168,8 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
         className={`stage-media ${size ? "sized" : ""}`}
         style={size ?? undefined}
         src={mediaUrl(item)}
-        autoPlay={!elsewhere}
-        preload={elsewhere ? "metadata" : "auto"}
+        autoPlay
+        preload="auto"
         loop={loop}
         onEnded={onEnded}
         muted={muted}
@@ -176,7 +183,9 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
         onRateChange={(e) => setSpeed(e.currentTarget.playbackRate)}
         onCanPlay={(e) => {
           const v = e.currentTarget;
-          if (elsewhere || startedFor.current === item.primary) return;
+          const tracks = (v as HTMLVideoElement & { audioTracks?: { length: number } }).audioTracks;
+          setHasSound(!tracks || tracks.length > 0);
+          if (startedFor.current === item.primary) return;
           startedFor.current = item.primary;
           mutedToPlay.current = false;
           // With its sound, a video may be refused autoplay (the webview's rule): it plays muted then, as before.
@@ -200,21 +209,21 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
           mutedToPlay.current = false;
           keepSound(!m);
         }}
-        onError={() => setFailed(true)}
+        onError={() => {
+          setFailed(true);
+          // One that can't play has no end to wait for: a slideshow goes on past it.
+          onEnded?.();
+        }}
         onClick={() => {
+          // On a phone a tap brings the controls and the bars; the play button is the one that plays.
           const v = videoRef.current;
-          if (v) v.paused ? v.play() : v.pause();
+          if (v && !IS_MOBILE) v.paused ? v.play() : v.pause();
         }}
       />
       {/* Its faces (⇧P), on the frame it is paused on: as large as the video is shown, centred as it is. */}
       {size && (
         <div className="video-faces" style={size}>
           <VideoFaceLayer item={item} time={time} paused={!playing} />
-        </div>
-      )}
-      {elsewhere && (
-        <div className="video-elsewhere panel">
-          <DeviceMobile /> Playing on {elsewhere === "A browser" ? "another device" : `the ${elsewhere}`}
         </div>
       )}
       <div
@@ -242,23 +251,33 @@ function VideoStage({ item, videoRef, fit, loop, onEnded }: { item: MediaItem; v
         <div
           ref={barRef}
           className="vbar"
-          onMouseMove={(e) => {
-            const bar = barRef.current;
-            if (!bar || !duration) return;
-            const r = bar.getBoundingClientRect();
-            const f = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-            setHover({ t: f * duration, x: e.clientX - r.left });
+          onPointerMove={(e) => {
+            if (e.pointerType === "mouse") frameAt(e.clientX);
           }}
-          onMouseLeave={() => setHover(null)}
-          onMouseDown={(e) => {
+          onPointerLeave={(e) => {
+            if (e.pointerType === "mouse") setHover(null);
+          }}
+          onPointerDown={(e) => {
+            // A finger doesn't hover: its frame shows while it is on the bar and goes when it lifts.
+            const finger = e.pointerType !== "mouse";
             seek(e.clientX);
-            const move = (ev: MouseEvent) => seek(ev.clientX);
-            const up = () => {
-              window.removeEventListener("mousemove", move);
-              window.removeEventListener("mouseup", up);
+            if (finger) frameAt(e.clientX);
+            const move = (ev: PointerEvent) => {
+              seek(ev.clientX);
+              if (finger) {
+                frameAt(ev.clientX);
+                poke();
+              }
             };
-            window.addEventListener("mousemove", move);
-            window.addEventListener("mouseup", up);
+            const up = () => {
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+              window.removeEventListener("pointercancel", up);
+              if (finger) setHover(null);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+            window.addEventListener("pointercancel", up);
           }}
         >
           <div className="vbar-fill" style={{ width: duration ? `${(time / duration) * 100}%` : "0%" }} />

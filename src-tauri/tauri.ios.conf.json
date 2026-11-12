@@ -1,0 +1,23 @@
+{
+  "build": {
+    "devUrl": "http://localhost:1420/mobile.html"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Quire",
+        "url": "mobile.html",
+        "theme": "Dark",
+        "backgroundColor": "#07080c",
+        "dragDropEnabled": false
+      }
+    ]
+  },
+  "bundle": {
+    "externalBin": [],
+    "resources": [],
+    "iOS": {
+      "minimumSystemVersion": "17.0"
+    }
+  }
+}

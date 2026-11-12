@@ -57,6 +57,11 @@ export function sameView(a: SavedView, b: SavedView): boolean {
   return a.section === b.section && a.query === b.query && a.option === b.option && (a.author?.id ?? null) === (b.author?.id ?? null) && a.tag === b.tag;
 }
 
+/** Whether a saved search is of the site on show. One kept before its site was noted is of any, until it is opened. */
+export function ofSite(s: SavedSearch, site: string | null): boolean {
+  return !s.site || s.site === site;
+}
+
 /** Whether a view can be saved: a search with terms, or an artist's works with one of their tags. */
 export function saveable(view: SavedView, searchSection: string | null): boolean {
   return (view.section === searchSection && !!view.query.trim()) || (view.section === "artist" && !!view.author && !!view.tag);

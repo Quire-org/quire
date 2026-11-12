@@ -7,6 +7,7 @@ import { FaceCrop, NameField } from "../screens/People";
 import { usePillsBottom } from "./PluginPanel";
 import { useTags } from "../tagsStore";
 import { isTypingTarget } from "../lib/hotkeys";
+import { IS_MOBILE } from "../lib/platform";
 import { formatTime } from "../lib/format";
 import type { FaceView, MediaItem } from "../lib/types";
 
@@ -18,6 +19,9 @@ import type { FaceView, MediaItem } from "../lib/types";
  *
  * A video's faces were each seen in a frame at a moment: listed in time, a click goes to that moment
  * and pauses there, the faces of that frame outlined on it. Marking a missed face is for pictures.
+ *
+ * Looking for faces needs the computer's engine: a phone or tablet shows what was found there, names
+ * them and puts them right, but doesn't look or mark.
  */
 
 const canHaveFaces = (item: MediaItem | undefined): item is MediaItem => !!item && (item.kind === "image" || item.kind === "raw");
@@ -212,16 +216,15 @@ export function FacesPanel({ videoRef }: { videoRef?: RefObject<HTMLVideoElement
     let live = true;
     setAdding(false);
     useFaceMode.setState({ picked: null, marking: false });
-    setLooking(true);
-    usePeople
-      .getState()
-      .scanOne(current)
+    setLooking(!IS_MOBILE);
+    const people = usePeople.getState();
+    (IS_MOBILE ? people.load() : people.scanOne(current))
       .catch((e) => useStore.getState().toast(`It couldn't look for faces: ${String(e)}`, "error"))
       .finally(() => {
         if (!live) return;
         setLooking(false);
         // A picture with none found: marking is ready (a video's missed faces aren't marked).
-        if (!video && !usePeople.getState().faces.some((f) => f.key === current.key)) useFaceMode.setState({ marking: true });
+        if (!IS_MOBILE && !video && !usePeople.getState().faces.some((f) => f.key === current.key)) useFaceMode.setState({ marking: true });
       });
     return () => {
       live = false;
@@ -268,9 +271,11 @@ export function FacesPanel({ videoRef }: { videoRef?: RefObject<HTMLVideoElement
       ? "Looking for faces in a few of its frames…"
       : "Looking for faces…"
     : !scanned && !here.length
-      ? "Not looked at yet."
+      ? IS_MOBILE
+        ? "Not looked at yet: faces are found on your computer."
+        : "Not looked at yet."
       : here.length
-        ? `${here.length} face${here.length === 1 ? "" : "s"}: click one to ${video ? "see it in its frame and " : ""}say who it is.`
+        ? `${here.length} face${here.length === 1 ? "" : "s"}: ${IS_MOBILE ? "tap" : "click"} one to ${video ? "see it in its frame and " : ""}say who it is.`
         : "No faces found.";
   // A face picked: in a video, at its moment, paused there.
   const pick = (face: FaceView) => {
@@ -339,7 +344,7 @@ export function FacesPanel({ videoRef }: { videoRef?: RefObject<HTMLVideoElement
         </div>
       )}
 
-      {!video && (
+      {!video && !IS_MOBILE && (
         <button className={`btn sm ${marking ? "active" : "ghost"}`} onClick={() => useFaceMode.setState({ marking: !marking, picked: null })} title="Drag over a face it missed: it looks there, close up">
           <Selection /> {marking ? "Drag over the face…" : "Mark a face it missed"}
         </button>

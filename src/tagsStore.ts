@@ -248,6 +248,13 @@ useStore.subscribe((s, prev) => {
 });
 let loadedFor: string | null = null;
 
+/** A tag as typed, type/name or just a name (in the folder given, else the first), as its id; null for nothing typed. */
+export function tagIdFrom(typed: string, types: string[], folder?: string): string | null {
+  const clean = typed.trim().replace(/\s*\/\s*/, "/");
+  if (!clean) return null;
+  return clean.includes("/") ? clean : `${folder || types[0] || "tags"}/${clean}`;
+}
+
 export const typeOf = (id: string) => id.slice(0, id.indexOf("/"));
 export const nameOf = (id: string) => id.slice(id.indexOf("/") + 1);
 

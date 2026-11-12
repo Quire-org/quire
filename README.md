@@ -128,7 +128,7 @@ Four short videos, each following one way of using Quire. Click one to watch it 
   </tr>
   <tr>
     <td align="center"><b>Reading manga</b>: albums page by page, and Japanese pages read in English with Manga Translate (19 s)</td>
-    <td align="center"><b>Private photos</b>: faces named once, the library in a vault, a picture shown on a phone (21 s)</td>
+    <td align="center"><b>Private photos</b>: faces named once, the library in a vault (17 s)</td>
   </tr>
 </table>
 

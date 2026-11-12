@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Minus, Plus } from "@phosphor-icons/react";
 import { useArtists } from "../artistsStore";
+import { IS_MOBILE } from "../lib/platform";
 import { ArtistIcon } from "./ArtistIcon";
 
 /**
@@ -31,7 +32,7 @@ export function ArtistPicker({ keys }: { keys: string[] }) {
     <div className="artist-picker">
       <input
         className="input"
-        autoFocus
+        autoFocus={!IS_MOBILE}
         placeholder="Find or add an artist"
         value={q}
         onChange={(e) => setQ(e.target.value)}

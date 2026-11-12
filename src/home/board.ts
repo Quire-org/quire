@@ -128,6 +128,12 @@ export const COLS = 12;
 /** A window too narrow for twelve: half as many, the blocks following in reading order. */
 export const NARROW_COLS = 6;
 
+/** The phone's board is six columns wide, as narrow screens are; a tablet's has all twelve. */
+export const phoneCols = NARROW_COLS;
+
+/** The kinds of block that can be on a phone's or a tablet's Home: what shows what it can do there. */
+export const MOBILE_KINDS: BlockType[] = ["sort", "findnew", "basket", "shared", "reading", "viewed", "newest", "last", "jumpin", "onthisday", "random", "favourites", "source", "unseen", "slideshow", "picture", "activity", "shortcuts", "theme"];
+
 export type BlockGroup = "work" | "pickup" | "rediscover" | "status" | "utility";
 export const GROUPS: { id: BlockGroup; name: string }[] = [
   { id: "work", name: "Work waiting" },
@@ -546,7 +552,7 @@ export interface Tile {
 export function justify(list: { key: string; a: number }[], W: number, H: number, maxRows = Infinity, gap = 4, most = 0.15): Tile[] | null {
   if (!list.length || W < 60 || H < 60) return null;
   let best: { rows: { key: string; a: number }[][]; heights: number[]; stretch: number; trim: number } | null = null;
-  const fewest = Math.max(1, Math.round(H / 240));
+  const fewest = Math.max(1, Math.ceil(H / 240));
   const natural = Math.max(fewest, Math.floor(H / 100));
   const rowsMost = Math.max(1, Math.min(maxRows, natural));
   for (let r = Math.min(fewest, rowsMost); r <= rowsMost; r++) {
@@ -556,9 +562,12 @@ export function justify(list: { key: string; a: number }[], W: number, H: number
     for (let n = 0; n < r && i < list.length; n++) {
       const row: { key: string; a: number }[] = [];
       let width = 0;
-      while (i < list.length && (row.length === 0 || width < W)) {
+      // As many as come closest to the width: always running over would leave every row too short.
+      while (i < list.length) {
+        const wider = width + list[i].a * target + (row.length ? gap : 0);
+        if (row.length && Math.abs(wider - W) > Math.abs(width - W)) break;
         row.push(list[i]);
-        width = row.reduce((s, p) => s + p.a * target, 0) + (row.length - 1) * gap;
+        width = wider;
         i++;
       }
       rows.push(row);
@@ -572,7 +581,8 @@ export function justify(list: { key: string; a: number }[], W: number, H: number
   }
   const capped = rowsMost < natural;
   if (!best || (best.trim > most && !capped)) return null;
-  const stretch = Math.min(1 + most, Math.max(1 - most, best.stretch));
+  // Kept to `maxRows`: no taller than the most allows, and never taller than the box.
+  const stretch = Math.min(1 + most, best.stretch);
   const heights = best.heights.map((h) => h * stretch);
   const tiles: Tile[] = [];
   let y = (H - heights.reduce((s, h) => s + h, 0) - (heights.length - 1) * gap) / 2;

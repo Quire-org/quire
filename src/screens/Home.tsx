@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowCounterClockwise, ArrowsOutLineVertical, CornersOut, Plus, Shuffle, Smiley, Trash, X } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowsOutCardinal, ArrowsOutLineVertical, CornersOut, Plus, Shuffle, Smiley, Trash, X } from "@phosphor-icons/react";
 import { HomeStickers, newSticker } from "../home/stickers";
 import { StickerShelf, STICKER_DRAG, type DraggedSticker } from "../components/StickerShelf";
 import { useScrapbook } from "../scrapbook/store";
@@ -14,8 +14,9 @@ import { dialogOpen, isTypingTarget } from "../lib/hotkeys";
 import { useTags } from "../tagsStore";
 import { usePeople } from "../peopleStore";
 import { useArtists } from "../artistsStore";
-import { COLS, GROUPS, KINDS, NARROW_COLS, PRESETS, RANDOM_BOARD, canMosaic, move, narrow, readingOrder, resize, type Block, type BlockFilter, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, MINE, GALLERY_KINDS } from "../home/board";
-import { useHome } from "../home/store";
+import { COLS, GROUPS, KINDS, MOBILE_KINDS, NARROW_COLS, PRESETS, RANDOM_BOARD, canMosaic, move, narrow, readingOrder, resize, type Block, type BlockFilter, type BlockType, type FolderFilter, type HomeDoc, type HomeSticker, MINE, GALLERY_KINDS } from "../home/board";
+import { homeCols, useHome } from "../home/store";
+import { HOME_DEVICE, IS_MOBILE } from "../lib/platform";
 import { actionOf, BlockBody, canShuffle, defaultSearches, defaultShortcuts, useBlockTitle, useBoards, usePool, useSalt, useSharedPanels, useShortcutOptions } from "../home/blocks";
 import { NewBoardAsked } from "../components/NewBoard";
 import { useFind } from "../findStore";
@@ -27,16 +28,19 @@ import { NO_FILTER, usePictureFilterSections, type PictureFilter } from "../comp
 const ROW = 64;
 const GAP = 10;
 const PAD = 12;
-/** Fit: the rows stretch to fill the window, but never shrink below this (the board scrolls instead). */
+/** Fit: the rows stretch to fill the window, but a board much too long for it keeps to this and scrolls. */
 const MIN_ROW = 48;
+/** A board only a little too long squeezes in, down to this, rather than leaving part of a block off the screen. */
+const SQUEEZED_ROW = 32;
 
 /**
  * A row's height for a board of `rows` rows in a window `height` tall: ROW, or with Fit on, whatever fills
- * the window, no smaller than MIN_ROW.
+ * the window; MIN_ROW when that would take rows smaller than SQUEEZED_ROW.
  */
 export const rowHeight = (fit: boolean, rows: number, height: number): number => {
   if (!fit || !rows || !height) return ROW;
-  return Math.max(MIN_ROW, Math.floor((height - PAD * 2 - GAP * (rows - 1)) / rows));
+  const fills = Math.floor((height - PAD * 2 - GAP * (rows - 1)) / rows);
+  return fills >= SQUEEZED_ROW ? fills : MIN_ROW;
 };
 /** A board narrower than this has half the columns (and isn't arranged). */
 const NARROW_BELOW = 600;
@@ -98,13 +102,15 @@ function Board({ doc, arranging }: { doc: HomeDoc; arranging: boolean }) {
     measure();
     return () => ro.disconnect();
   }, []);
-  const cols = width && width < NARROW_BELOW ? NARROW_COLS : COLS;
-  const canArrange = arranging && cols === COLS;
+  // A phone's or tablet's board is its own, laid out for its width as it is kept.
+  const cols = HOME_DEVICE ? homeCols : width && width < NARROW_BELOW ? NARROW_COLS : COLS;
+  const canArrange = arranging && (!!HOME_DEVICE || cols === COLS);
+  const asKept = !!HOME_DEVICE || cols === COLS;
   const blocks = preview ?? doc.blocks;
-  const laid = useMemo(() => (cols === COLS ? blocks : narrow(blocks)), [cols, blocks]);
+  const laid = useMemo(() => (asKept ? blocks : narrow(blocks)), [asKept, blocks]);
   // Fit: the rows share the window's height. Measured from the blocks as kept, not a drag's preview, so the
   // grid holds still under the cursor and settles when the block is let go.
-  const kept = useMemo(() => (cols === COLS ? doc.blocks : narrow(doc.blocks)), [cols, doc.blocks]);
+  const kept = useMemo(() => (asKept ? doc.blocks : narrow(doc.blocks)), [asKept, doc.blocks]);
   const rows = useMemo(() => kept.reduce((m, b) => Math.max(m, b.y + b.h), 0), [kept]);
   const row = rowHeight(!!doc.fit, rows, height);
   const order = useMemo(() => readingOrder(laid), [laid]);
@@ -139,19 +145,21 @@ function Board({ doc, arranging }: { doc: HomeDoc; arranging: boolean }) {
       if (last && last.x === next.x && last.y === next.y) return;
       if (!last && useHome.getState().picked) setSelected(null);
       last = next;
-      setPreview(mode === "move" ? move(doc.blocks, b.id, next.x, next.y) : resize(doc.blocks, b.id, next.x, next.y));
+      setPreview(mode === "move" ? move(doc.blocks, b.id, next.x, next.y, cols) : resize(doc.blocks, b.id, next.x, next.y, cols));
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("blur", onUp);
       setPreview(null);
       if (!last) return void (mode === "move" && setSelected(b.id));
-      if (mode === "move") useHome.getState().moveBlock(b.id, last.x, last.y);
-      else useHome.getState().resizeBlock(b.id, last.x, last.y);
+      if (mode === "move") useHome.getState().moveBlock(b.id, last.x, last.y, cols);
+      else useHome.getState().resizeBlock(b.id, last.x, last.y, cols);
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
     window.addEventListener("blur", onUp);
   };
 
@@ -198,7 +206,7 @@ function Board({ doc, arranging }: { doc: HomeDoc; arranging: boolean }) {
       ))}
       {drop && <div className="home-drop" style={{ gridColumn: `${drop.x + 1} / span ${drop.w}`, gridRow: `${drop.y + 1} / span ${drop.h}` }} />}
       <HomeStickers board={board} m={{ width, pad: PAD, row: row + GAP }} canArrange={canArrange} />
-      {arranging && cols !== COLS && <div className="home-narrow dim small">Widen the window to arrange: in one this narrow the blocks follow each other.</div>}
+      {arranging && !canArrange && <div className="home-narrow dim small">Widen the window to arrange: in one this narrow the blocks follow each other.</div>}
       {arranging && !doc.blocks.length && (
         <div className="home-drop home-start" style={{ gridColumn: `1 / span ${cols}`, gridRow: "1 / span 3" }}>
           <span className="dim">Add blocks with Add in the top bar: click one, or drag it here.</span>
@@ -227,7 +235,9 @@ function BlockFrame({ block, number, arranging, canArrange, selected, onGrab, on
       style={{ gridColumn: `${block.x + 1} / span ${block.w}`, gridRow: `${block.y + 1} / span ${block.h}` }}
       aria-label={title}
       title={block.bare && arranging ? title : undefined}
-      onPointerDown={canArrange ? onGrab : undefined}
+      // A finger needs the board to scroll: a block is moved by its handle there, and a tap sets it up.
+      onPointerDown={canArrange && !IS_MOBILE ? onGrab : undefined}
+      onClick={canArrange && IS_MOBILE ? () => useHome.getState().pick(block.id) : undefined}
     >
       {block.bare ? (
         // No name: its tools over its corner, on hover.
@@ -255,6 +265,11 @@ function BlockFrame({ block, number, arranging, canArrange, selected, onGrab, on
         <button className="home-del" onPointerDown={(e) => e.stopPropagation()} onClick={() => useHome.getState().removeBlock(block.id)} title="Take it off (⌘Z brings it back)">
           <X />
         </button>
+      )}
+      {canArrange && IS_MOBILE && (
+        <span className="home-move" onPointerDown={onGrab} onClick={(e) => e.stopPropagation()} aria-label="Drag to move it">
+          <ArrowsOutCardinal />
+        </span>
       )}
       {canArrange && <span className="home-size" onPointerDown={onSize} title="Drag to size it" />}
     </section>
@@ -400,7 +415,7 @@ function BlockMenu({ onDone }: { onDone: () => void }) {
   const onBoard = (t: BlockType) => blocks.find((b) => b.type === t);
   const [q, setQ] = useState("");
   const want = q.trim().toLowerCase();
-  const kinds = (Object.keys(KINDS) as BlockType[]).filter((t) => !want || `${KINDS[t].name} ${KINDS[t].about}`.toLowerCase().includes(want));
+  const kinds = (Object.keys(KINDS) as BlockType[]).filter((t) => (!IS_MOBILE || MOBILE_KINDS.includes(t)) && (!want || `${KINDS[t].name} ${KINDS[t].about}`.toLowerCase().includes(want)));
   return (
     <div className="home-menu">
       <input className="input" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Look for a block…" />

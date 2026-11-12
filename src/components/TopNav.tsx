@@ -3,12 +3,13 @@ import { Books, CaretDown, Tag as TagIcon, CaretLeft, CaretRight, CaretUp, Copy,
 import { useShallow } from "zustand/react/shallow";
 import { useStore, type Screen } from "../store";
 import { ActivityButton } from "./Activity";
-import { CastButton } from "./Cast";
 import { useFinders } from "../plugins/find";
 import { useFind } from "../findStore";
 import { PlatformIcon } from "./PlatformIcon";
 import { useUpdateCount } from "../lib/updates";
 import { QuireMark } from "./QuireMark";
+import { MobileTop } from "../mobile/TopBar";
+import { IS_MOBILE } from "../lib/platform";
 
 export const LABEL: Record<string, string> = { viewer: "Sort", browse: "Browse", albums: "Albums", dupes: "Duplicates", files: "Files", tags: "Tags", people: "People", artists: "Artists", find: "Find", activity: "Activity", scrapbook: "Scrapbook" };
 
@@ -35,8 +36,13 @@ export const SCREENS: Partial<Record<Screen, ScreenInfo>> = {
 /** Each group's screen last open in it: a group opens where you left it. */
 const lastIn = new Map<string, Screen>();
 
+/** The head of every list screen: the navigation bar on a computer, on a phone or tablet its own. */
+export function TopNav(props: { current: Screen; children?: React.ReactNode; bar?: React.ReactNode }) {
+  return IS_MOBILE ? <MobileTop {...props} /> : <DesktopNav {...props} />;
+}
+
 /** The same navigation bar on every list screen. H collapses it and the sidebar to a thin strip. */
-export function TopNav({ current, children, bar }: { current: Screen; children?: React.ReactNode; bar?: React.ReactNode }) {
+function DesktopNav({ current, children, bar }: { current: Screen; children?: React.ReactNode; bar?: React.ReactNode }) {
   const s = useStore(useShallow((x) => ({ lockVault: x.lockVault, navCollapsed: x.navCollapsed, openAlbums: x.openAlbums, openBrowse: x.openBrowse, openDupes: x.openDupes, openFiles: x.openFiles, openFind: x.openFind, openPeople: x.openPeople, openSortQueue: x.openSortQueue, openScrapbook: x.openScrapbook, openTags: x.openTags, root: x.root, set: x.set, toggleNav: x.toggleNav, vault: x.vault })));
   const group = GROUPS.find((g) => g.screens.includes(current)) ?? GROUPS[0];
   const updates = useUpdateCount();
@@ -102,7 +108,6 @@ export function TopNav({ current, children, bar }: { current: Screen; children?:
       )}
       <div className="hud-right">
         <ActivityButton />
-        {s.root && <CastButton />}
         {children}
         {s.vault?.unlocked && (
           <button className="btn sm ghost accent2" onClick={() => void s.lockVault()} title="Vault unlocked. Click to lock and close">

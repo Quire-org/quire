@@ -18,7 +18,7 @@ vi.mock("../lib/api", () => ({
 }));
 vi.mock("@tauri-apps/api/core", () => ({ convertFileSrc: (p: string) => p, invoke: vi.fn(async () => null) }));
 
-const { freshIn, idNumber, nameFor, newer, newestOf, saveable } = await import("../lib/savedSearches");
+const { freshIn, idNumber, nameFor, newer, newestOf, ofSite, saveable } = await import("../lib/savedSearches");
 const { useFind } = await import("../findStore");
 const { finder, useFinders } = await import("../plugins/find");
 const { useStore } = await import("../store");
@@ -90,5 +90,47 @@ describe("saved searches in Find", () => {
     const doc = saved.docs[saved.docs.length - 1] as { saved: unknown[]; seen: Record<string, string[]> };
     expect(doc.saved).toHaveLength(1);
     expect(doc.seen.plat).toEqual(["1", "2"]);
+  });
+
+  describe("on a platform of several sites", () => {
+    const on = (current: string) => useFinders.setState((f) => ({ finders: { ...f.finders, p: { ...f.finders.p, sites: { list: [], current, add: null } } } }) as never);
+
+    it("belong to the site they were saved on, and opening one from elsewhere goes there with the old site's works gone", async () => {
+      on("a.example");
+      const s = useFind.getState().saveSearch()!;
+      expect(s.site).toBe("a.example");
+      expect(ofSite(s, "a.example")).toBe(true);
+      expect(ofSite(s, "b.example")).toBe(false);
+
+      on("b.example");
+      useFind.setState({ items: [work("other-site")] } as never);
+      let during: string[] = [];
+      const site = vi.spyOn(finder, "site").mockImplementation(async () => void on("a.example"));
+      const list = vi.spyOn(finder, "list").mockImplementation(async () => {
+        during = useFind.getState().items.map((i) => i.id);
+        return page(["1"]);
+      });
+      await useFind.getState().openSaved(s.id);
+      await vi.waitFor(() => expect(useFind.getState().items.map((i) => i.id)).toEqual(["1"]));
+      expect(site).toHaveBeenCalledWith("p", "a.example");
+      expect(during).toEqual([]);
+      expect(useFind.getState().view.query).toBe("sea");
+      site.mockRestore();
+      list.mockRestore();
+    });
+
+    it("kept before their site was noted show on any, and take the site they are opened on", async () => {
+      on("b.example");
+      const s = { ...useFind.getState().saveSearch()!, site: null };
+      useFind.setState({ saved: [s] } as never);
+      expect(ofSite(s, "a.example")).toBe(true);
+      const site = vi.spyOn(finder, "site");
+      const list = vi.spyOn(finder, "list").mockResolvedValue(page(["1"]));
+      await useFind.getState().openSaved(s.id);
+      expect(site).not.toHaveBeenCalled();
+      expect(useFind.getState().saved[0].site).toBe("b.example");
+      site.mockRestore();
+      list.mockRestore();
+    });
   });
 });

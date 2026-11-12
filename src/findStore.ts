@@ -248,7 +248,8 @@ export const useFind = create<FindState>((set, get) => ({
   async refreshAccount(force) {
     const { pluginId } = get();
     const root = useStore.getState().root;
-    if (!pluginId || !root) return;
+    // Not connected yet: not asked at all, or Connect would find it asked already (and refused).
+    if (!pluginId || !root || !mayGoOnline(pluginId)) return;
     // Asked per site, where the platform has several.
     const forWhat = `${pluginId}@${root}#${useFinders.getState().finders[pluginId]?.sites?.current ?? ""}`;
     // Asked already (or being asked) for this platform and library.
@@ -358,13 +359,19 @@ export const useFind = create<FindState>((set, get) => ({
     const s = get().saved.find((x) => x.id === id);
     if (!s || s.pluginId !== pluginId) return;
     const f = useFinders.getState().finders[pluginId];
-    // One of a platform's several sites: shown first.
+    // One of a platform's several sites: shown first, Find starting again there.
     if (s.site && f?.sites && f.sites.current !== s.site) {
       try {
         await finder.site(pluginId, s.site);
       } catch (e) {
         return void useStore.getState().toast(String(e).replace(/^Error: /, ""), "error");
       }
+      shown(pluginId);
+    }
+    // Kept before its site was noted: of the one it is opened on, from now on.
+    if (!s.site && f?.sites?.current) {
+      set({ saved: get().saved.map((x) => (x.id === id ? { ...x, site: f.sites!.current } : x)) });
+      saveBaskets();
     }
     set({ visit: { id, since: s.mark } });
     get().open({ ...s.view });

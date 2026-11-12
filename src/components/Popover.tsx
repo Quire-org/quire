@@ -8,7 +8,7 @@ import { useOpenSound } from "../lib/sounds";
  * useFloating), over everything. Closes on a click outside it (a list opened from inside it counts as
  * inside) or Escape.
  */
-export function Popover({ open, onClose, trigger, children, width = 300 }: { open: boolean; onClose: () => void; trigger: ReactNode; children: ReactNode; width?: number }) {
+export function Popover({ open, onClose, trigger, children, width = 300, className = "" }: { open: boolean; onClose: () => void; trigger: ReactNode; children: ReactNode; width?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   useFloating(ref, pop, open, { gap: 8 });
@@ -39,7 +39,7 @@ export function Popover({ open, onClose, trigger, children, width = 300 }: { ope
       {trigger}
       {open &&
         createPortal(
-          <div ref={pop} className="pop panel" style={{ width }}>
+          <div ref={pop} className={`pop panel ${className}`} style={{ width }}>
             {children}
           </div>,
           document.body,

@@ -3,17 +3,21 @@
 //! password in the user's Keychain, and the prompt is Touch ID or the login
 //! password through LocalAuthentication. Windows: a file only this user can
 //! read in the app's data folder, behind Windows Hello (UserConsentVerifier).
-//! Linux has no standard prompt, so there it is "unlock without passphrase on
-//! this computer", gated by the login session alone.
+//! iOS: a Keychain item for this device alone that the system only gives out to
+//! Face ID or the passcode. Linux has no standard prompt, so there it is "unlock
+//! without passphrase on this computer", gated by the login session alone.
 //!
 //! The passphrase and recovery code stay valid; this is a convenience slot
 //! that lives only on this computer.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(not(target_os = "ios"))]
+use std::path::PathBuf;
 
 /// Where remembered keys live on Windows and Linux: the app's own data folder (`quick-unlock`), mode
 /// 0600. On macOS this is only where earlier versions kept them: a key found here is moved into the
 /// Keychain the next time it is used, and the file deleted.
+#[cfg(not(target_os = "ios"))]
 fn store_dir() -> Result<PathBuf, String> {
     let dir = crate::data_dir().ok_or("the app's data folder isn't known yet")?.join("quick-unlock");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -30,15 +34,20 @@ fn store_dir() -> Result<PathBuf, String> {
 fn root_name(root: &Path) -> String {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
+    // On iOS a drive's path changes between times it is plugged in; the folder's name doesn't.
+    #[cfg(target_os = "ios")]
+    let root = Path::new(root.file_name().unwrap_or(root.as_os_str()));
     root.to_string_lossy().hash(&mut h);
     format!("vault-{:016x}", h.finish())
 }
 
+#[cfg(not(target_os = "ios"))]
 fn key_file(root: &Path) -> Result<PathBuf, String> {
     Ok(store_dir()?.join(format!("{}.key", root_name(root))))
 }
 
 /// The key a file holds, hex-encoded as `remember_in_file` wrote it.
+#[cfg(not(target_os = "ios"))]
 fn read_key_file(p: &Path) -> Result<[u8; 32], String> {
     let hex_key = std::fs::read_to_string(p).map_err(|e| e.to_string())?;
     decode_key(hex_key.trim().as_bytes())
@@ -55,7 +64,7 @@ fn decode_key(hex_key: &[u8]) -> Result<[u8; 32], String> {
 }
 
 /// The key into a file only this user can read.
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 fn remember_in_file(root: &Path, key: &[u8; 32]) -> Result<(), String> {
     let p = key_file(root)?;
     std::fs::write(&p, hex::encode(key)).map_err(|e| format!("could not store the key: {e}"))?;
@@ -68,6 +77,7 @@ fn remember_in_file(root: &Path, key: &[u8; 32]) -> Result<(), String> {
 }
 
 /// The key file gone, if there was one.
+#[cfg(not(target_os = "ios"))]
 fn forget_file(root: &Path) -> Result<(), String> {
     let p = key_file(root)?;
     match std::fs::remove_file(&p) {
@@ -81,6 +91,8 @@ fn forget_file(root: &Path) -> Result<(), String> {
 pub fn method() -> &'static str {
     if cfg!(target_os = "macos") {
         "touchid"
+    } else if cfg!(target_os = "ios") {
+        "faceid"
     } else if cfg!(target_os = "windows") {
         "hello"
     } else {
@@ -88,23 +100,23 @@ pub fn method() -> &'static str {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 pub fn is_remembered(root: &Path) -> bool {
     key_file(root).map(|p| p.is_file()).unwrap_or(false)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 pub fn remember(root: &Path, key: &[u8; 32]) -> Result<(), String> {
     remember_in_file(root, key)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 pub fn forget(root: &Path) -> Result<(), String> {
     forget_file(root)
 }
 
 /// Prompt the user, then return the stored key.
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
 pub fn unlock(root: &Path, reason: &str) -> Result<[u8; 32], String> {
     let p = key_file(root)?;
     if !p.is_file() {
@@ -202,6 +214,63 @@ pub fn unlock(root: &Path, reason: &str) -> Result<[u8; 32], String> {
     decode_key(&stored)
 }
 
+#[cfg(target_os = "ios")]
+const KEYCHAIN_SERVICE: &str = "Quire quick unlock";
+
+/// The Keychain's "no such item" status.
+#[cfg(target_os = "ios")]
+const ITEM_NOT_FOUND: i32 = -25300;
+
+/// The Keychain's "it would have to ask" status: the item is there.
+#[cfg(target_os = "ios")]
+const WOULD_ASK: i32 = -25308;
+
+#[cfg(target_os = "ios")]
+pub fn is_remembered(root: &Path) -> bool {
+    use core_foundation::base::{CFType, TCFType};
+    use objc2_local_authentication::LAContext;
+    use security_framework::item::{ItemClass, ItemSearchOptions, Limit};
+    // Asked each time the vault is looked at: this context may not bring up Face ID, only unlocking does.
+    // SAFETY: an LAContext made here; an Objective-C object is a CFType, retained by `wrap_under_get_rule` for the search.
+    let quiet = unsafe {
+        let ctx = LAContext::new();
+        ctx.setInteractionNotAllowed(true);
+        CFType::wrap_under_get_rule((&*ctx as *const LAContext).cast())
+    };
+    match ItemSearchOptions::new().class(ItemClass::generic_password()).service(KEYCHAIN_SERVICE).account(&root_name(root)).load_attributes(true).limit(Limit::Max(1)).local_authentication_context(Some(quiet)).search() {
+        Ok(found) => !found.is_empty(),
+        Err(e) => e.code() == WOULD_ASK,
+    }
+}
+
+/// For this device alone (never in a backup), and only while it has a passcode.
+#[cfg(target_os = "ios")]
+pub fn remember(root: &Path, key: &[u8; 32]) -> Result<(), String> {
+    use security_framework::access_control::{ProtectionMode, SecAccessControl};
+    use security_framework::passwords::{AccessControlOptions, PasswordOptions, set_generic_password_options};
+    forget(root)?;
+    let mut options = PasswordOptions::new_generic_password(KEYCHAIN_SERVICE, &root_name(root));
+    options.set_access_control(SecAccessControl::create_with_protection(Some(ProtectionMode::AccessibleWhenPasscodeSetThisDeviceOnly), AccessControlOptions::USER_PRESENCE.bits()).map_err(|e| e.to_string())?);
+    set_generic_password_options(hex::encode(key).as_bytes(), options).map_err(|e| format!("could not store the key in the Keychain: {e}"))
+}
+
+#[cfg(target_os = "ios")]
+pub fn forget(root: &Path) -> Result<(), String> {
+    match security_framework::passwords::delete_generic_password(KEYCHAIN_SERVICE, &root_name(root)) {
+        Ok(()) => Ok(()),
+        Err(e) if e.code() == ITEM_NOT_FOUND => Ok(()),
+        Err(e) => Err(format!("could not remove the key from the Keychain: {e}")),
+    }
+}
+
+/// The system asks for Face ID or the passcode as the item is read.
+#[cfg(target_os = "ios")]
+pub fn unlock(root: &Path, _reason: &str) -> Result<[u8; 32], String> {
+    use security_framework::passwords::{PasswordOptions, generic_password};
+    let stored = generic_password(PasswordOptions::new_generic_password(KEYCHAIN_SERVICE, &root_name(root))).map_err(|e| format!("could not read the key from the Keychain: {e}"))?;
+    decode_key(&stored)
+}
+
 /// Confirm the user before storing a key (same prompt as unlocking).
 pub fn authenticate_for_setup() -> Result<(), String> {
     authenticate("remember this vault on this computer")
@@ -260,6 +329,7 @@ fn authenticate(reason: &str) -> Result<(), String> {
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn authenticate(_reason: &str) -> Result<(), String> {
-    // No portable local-authentication API on Linux desktops; the login session is the gate.
+    // No portable local-authentication API on Linux desktops; the login session is the gate. On iOS
+    // the Keychain asks, as the key is read.
     Ok(())
 }
