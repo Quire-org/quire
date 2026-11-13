@@ -105,6 +105,9 @@ interface FindState {
   /** How tall a row of works is, in pixels: the grid's size. */
   tile: number;
   setTile(px: number): void;
+  /** On a phone or tablet, a work read as an album: only its pages, its panel and the reader's bars away (a computer's H hides the app's bars too). */
+  pageOnly: boolean;
+  setPageOnly(on: boolean): void;
   /** The view on show kept to look at again (a search, or an artist's works with a tag); null when it can't be. */
   saveSearch(): SavedSearch | null;
   renameSearch(id: string, name: string): void;
@@ -230,6 +233,7 @@ export const useFind = create<FindState>((set, get) => ({
   visit: null,
   onlyNew: readPref("quire.find.onlyNew") === "1",
   tile: Math.min(TILE_MAX, Math.max(TILE_MIN, Number(readPref("quire.find.tile")) || TILE_DEFAULT)),
+  pageOnly: false,
   checking: false,
   sigs: {},
   checks: {},
@@ -326,6 +330,10 @@ export const useFind = create<FindState>((set, get) => ({
     const tile = Math.min(TILE_MAX, Math.max(TILE_MIN, Math.round(px)));
     set({ tile });
     writePref("quire.find.tile", String(tile));
+  },
+
+  setPageOnly(on) {
+    set({ pageOnly: on });
   },
 
   saveSearch() {

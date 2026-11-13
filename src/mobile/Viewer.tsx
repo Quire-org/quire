@@ -24,10 +24,10 @@ import { usePeople, useFaceMode } from "../peopleStore";
 import { originalOf, selectCurrent, selectRating, SLIDESHOW_SECONDS, useStore } from "../store";
 import { albumKeyOf, useTags } from "../tagsStore";
 import { useVersionInfo, useVersions } from "../versionsStore";
+import { SWIPE, TURN_ZONE } from "./gestures";
 import { useSlideshow } from "./useSlideshow";
 
-/** How far a finger goes across, at the least, for a swipe; and how long two taps are apart at most to be one double tap. */
-const SWIPE = 56;
+/** How long two taps are apart at most to be one double tap. */
 const DOUBLE_TAP_MS = 260;
 /** Pulled down this share of the screen, or flicked at this many pixels a millisecond, it goes back. */
 const PULL_AWAY = 0.16;
@@ -37,8 +37,6 @@ const SETTLE_MS = 220;
 /** A double tap on a video goes this many seconds; what it went stays on show this long (as .m-skip has it). */
 const SKIP_S = 10;
 const SKIP_SHOWN_MS = 800;
-/** In an album, this share of the page at either side turns it when tapped. */
-const TURN_ZONE = 1 / 3;
 
 /**
  * One picture or video at a time: Sort's queue, or what was opened from a list. A swipe goes to the

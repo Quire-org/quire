@@ -8202,6 +8202,11 @@ button.source-pic:focus-visible {
   padding: 8px 8px 8px 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
+/* How many are chosen and what they come to: side by side here (a phone stacks them, and says only "all" and "none"). */
+.find-pick-count,
+.find-pick-verb {
+  display: contents;
+}
 /* While looking closer, the picks sit under the pages, clear of the side. */
 .find-main.previewing .find-pickbar {
   left: calc((100% - 340px) / 2);

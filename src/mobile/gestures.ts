@@ -1,6 +1,9 @@
 /** How long a finger stays down before it counts as a long press, and how far it may wander. */
 const HOLD_MS = 450;
 const WANDER = 10;
+/** How far a finger goes across, at the least, for a swipe; and the share of an album's page at either side that turns it when tapped. */
+export const SWIPE = 56;
+export const TURN_ZONE = 1 / 3;
 
 /**
  * A long press is a right-click: whatever the app offers on a right-click (a tile's menu, a work's,

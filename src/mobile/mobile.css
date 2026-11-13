@@ -974,8 +974,51 @@ textarea {
   opacity: 1;
 }
 
+/* The picks to import: a bar of their own at the foot, under the works or the work looked at, never over them. */
 .find-main {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
+}
+
+.find-main > * {
+  grid-area: 1 / 1;
+}
+
+.find-main > .find-preview {
+  position: relative;
+  inset: auto;
+  min-height: 0;
+}
+
+.find-pickbar,
+.find-main.previewing .find-pickbar {
+  position: static;
+  grid-area: 2 / 1;
+  width: auto;
+  padding: 8px 12px;
+  border-width: 1px 0 0;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Only the page: the picks away too. */
+.find-main:has(> .find-preview.bare) > .find-pickbar {
+  display: none;
+}
+
+.find-grid {
+  padding-bottom: 16px;
+}
+
+/* An album read in Find: a swipe across the page turns it, a swipe up or down still scrolls. */
+.find-reader-stage {
+  touch-action: pan-y;
+}
+
+.find-page-only {
+  margin-left: auto;
 }
 
 .find-side-help {
@@ -1067,6 +1110,7 @@ textarea {
 
   /* A closer look: the work first, what is known of it under it, its way out always at the top. */
   .find-preview {
+    --way-out: 44px;
     display: flex;
     flex-direction: column;
     padding-bottom: 16px;
@@ -1081,6 +1125,17 @@ textarea {
     order: 1;
     padding: 0;
     overflow: visible;
+  }
+
+  /* A work read as an album: the page as tall as the screen allows under its way out, what is known of it under that. */
+  .find-preview > .find-reader {
+    flex: none;
+    order: 1;
+    height: calc(100% - var(--way-out));
+  }
+
+  .find-preview.bare > .find-reader {
+    height: 100%;
   }
 
   .find-preview-page img {
@@ -1101,6 +1156,7 @@ textarea {
     top: 0;
     z-index: 2;
     order: 0;
+    height: var(--way-out);
     margin: 0;
     padding: 4px 8px;
     background: var(--bg-2);
@@ -1144,14 +1200,32 @@ textarea {
     padding: 0 12px;
   }
 
-  .find-pickbar,
-  .find-main.previewing .find-pickbar {
-    right: 8px;
-    bottom: 8px;
-    left: 8px;
-    flex-wrap: wrap;
-    width: auto;
-    transform: none;
+  /* The picks in one row: how many over what they come to, the buttons beside (All, None, Import). */
+  .find-pickbar {
+    gap: 8px;
+  }
+
+  .find-pick-count {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin-right: auto;
+  }
+
+  .find-pick-count > * {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .find-pickbar > .grow,
+  .find-pick-verb {
+    display: none;
+  }
+
+  .find-pickbar .btn {
+    flex: none;
+    padding-inline: 10px;
   }
 }
 

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ConnectGate } from "../components/ConnectGate";
 import { useMayGoOnline } from "../lib/online";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ArrowLeft, ArrowSquareOut, Basket, Check, DownloadSimple, FilmStrip, Heart, LinkSimple, MagnifyingGlass, PaintBrush, Plus, PuzzlePiece, SignOut, Sparkle, Stack, Star, UserCircle, X } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowSquareOut, Basket, Check, CornersOut, DownloadSimple, FilmStrip, Heart, LinkSimple, MagnifyingGlass, PaintBrush, Plus, PuzzlePiece, SignOut, Sparkle, Stack, Star, UserCircle, X } from "@phosphor-icons/react";
 import { useJobs } from "../lib/jobs";
 import { useShallow } from "zustand/react/shallow";
 import { TopNav } from "../components/TopNav";
@@ -31,6 +31,7 @@ import { countsOf, linkedArtist, useArtists, type LocalArtist } from "../artists
 import { ArtistLinkPicker } from "../components/ArtistLinkPicker";
 import { ArtistIcon } from "../components/ArtistIcon";
 import { HOME_DEVICE, IS_MOBILE } from "../lib/platform";
+import { SWIPE, TURN_ZONE } from "../mobile/gestures";
 
 /** As mobile.css has it: below this a closer look is one column. */
 const STACKED_BELOW = "(max-width: 699px)";
@@ -232,7 +233,7 @@ function FindBody() {
         else if (key === "c" && it) void s.check(it);
         else if (key === "o" && it?.url) void openUrl(it.url);
         // As everywhere: the bars and panels away (here the work's own too, only its pages left), or back.
-        else if (key === "h") st.toggleChrome();
+        else if (key === "h") (IS_MOBILE ? s.setPageOnly(!s.pageOnly) : st.toggleChrome());
         else return;
         e.preventDefault();
         return;
@@ -274,6 +275,11 @@ function FindBody() {
   useEffect(() => {
     if (focus >= shown.length && shown.length) setFocus(shown.length - 1);
   }, [focus, shown.length]);
+  // Done looking closer: the next work opens with its panel and bars.
+  const looking = !!look;
+  useEffect(() => {
+    if (!looking) useFind.getState().setPageOnly(false);
+  }, [looking]);
 
   const sideHidden = useStore((s) => s.sideCollapsed);
   return (
@@ -1199,12 +1205,16 @@ function Preview({ item: listed, index, count, depth, onClose, onBack, onMove, o
     // At least one page: leaving every page out is taking the work out of the basket.
     if (next.length) f.setPages(item, next);
   };
-  // H: only its pages, everything around them away (as the top bar and side panel).
-  const bare = useStore((s) => s.navCollapsed && s.sideCollapsed);
+  // H: only its pages, everything around them away (as the top bar and side panel). On a phone or
+  // tablet only in the album reader, whose middle brings everything back.
+  const chromeAway = useStore((s) => s.navCollapsed && s.sideCollapsed);
+  const pageOnly = useFind((s) => s.pageOnly);
+  const reading = finder.albums && pages.length > 1;
+  const bare = IS_MOBILE ? pageOnly && reading : chromeAway;
   const stacked = useStacked();
   return (
     <div className={`find-preview ${bare ? "bare" : ""}`} role="dialog" aria-label={item.title} ref={stacked ? pagesRef : undefined}>
-      {finder.albums && pages.length > 1 ? (
+      {reading ? (
         // A work of an album platform is read as an album.
         <AlbumPages key={item.id} pages={pages} picked={pagePicked} onToggle={togglePick} error={work.error}>
           <Related item={item} root={pagesRef} marks={marks} onOpen={onRelated} onContext={onContext} />
@@ -1369,7 +1379,7 @@ function Preview({ item: listed, index, count, depth, onClose, onBack, onMove, o
         {linking && <LinkTag platform={finder.platform} name={linking} onClose={() => setLinking(null)} />}
         {work.view?.caption && <p className="small find-caption-text">{work.view.caption}</p>}
       </aside>
-      {stacked && !(finder.albums && pages.length > 1) && <Related item={item} root={pagesRef} marks={marks} onOpen={onRelated} onContext={onContext} />}
+      {stacked && !reading && <Related item={item} root={pagesRef} marks={marks} onOpen={onRelated} onContext={onContext} />}
     </div>
   );
 }
@@ -1461,6 +1471,12 @@ function AlbumPages({ pages, picked, onToggle, error, children }: { pages: FindW
   const strip = useRef<HTMLDivElement>(null);
   useEffect(() => strip.current?.querySelector(".find-strip-page.on")?.scrollIntoView({ block: "nearest", inline: "nearest" }), [at]);
   const away = turn && turn.forward !== rtl ? "to-left" : "to-right";
+  // A side turns to the page that lies that way. On a touch screen a swipe brings in the page from the
+  // side the finger goes away from, and the middle shows only the page, or everything again.
+  const turnFrom = (left: boolean) => go(left === rtl ? at + 1 : at - 1);
+  const finger = useRef<{ x: number; y: number } | null>(null);
+  const pageOnly = useFind((s) => s.pageOnly);
+  const setPageOnly = useFind((s) => s.setPageOnly);
   return (
     <div className={`find-reader ${rtl ? "rtl" : ""}`}>
       <div
@@ -1468,8 +1484,18 @@ function AlbumPages({ pages, picked, onToggle, error, children }: { pages: FindW
         onClick={(e) => {
           if (end) return;
           const r = e.currentTarget.getBoundingClientRect();
-          const left = e.clientX < r.left + r.width / 2;
-          go(left === rtl ? at + 1 : at - 1);
+          const x = (e.clientX - r.left) / r.width;
+          if (IS_MOBILE && x > TURN_ZONE && x < 1 - TURN_ZONE) return setPageOnly(!pageOnly);
+          turnFrom(x < 0.5);
+        }}
+        onTouchStart={(e) => (finger.current = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null)}
+        onTouchEnd={(e) => {
+          const f = finger.current;
+          const t = e.changedTouches[0];
+          finger.current = null;
+          if (!f || !t) return;
+          const dx = t.clientX - f.x;
+          if (Math.abs(dx) >= SWIPE && Math.abs(dx) > Math.abs(t.clientY - f.y) * 2) turnFrom(dx > 0);
         }}
       >
         {end ? (
@@ -1497,7 +1523,13 @@ function AlbumPages({ pages, picked, onToggle, error, children }: { pages: FindW
           {rtl ? "Right to left" : "Left to right"}
         </button>
         <span className="mono small">{end ? "End" : `${at + 1} / ${pages.length}`}</span>
-        <span className="faint small">{rtl ? "← next · → back" : "→ next · ← back"} · P picks this page · ⇧ another work · H only the page</span>
+        {IS_MOBILE ? (
+          <button className="btn sm ghost find-page-only" onClick={() => (setPageOnly(true), useStore.getState().toast("Tap the middle of the page for everything again"))}>
+            <CornersOut /> Only the page
+          </button>
+        ) : (
+          <span className="faint small">{rtl ? "← next · → back" : "→ next · ← back"} · P picks this page · ⇧ another work · H only the page</span>
+        )}
       </div>
       <div className="find-strip" ref={strip}>
         {pages.map((p, i) => (
@@ -1763,22 +1795,24 @@ function PickBar({ shown }: { shown: FindItem[] }) {
   const all = f.inBasket && shown.length > 0 && shown.every((it) => f.picks.some((p) => p.id === it.id));
   return (
     <div className="find-pickbar panel">
-      <b>
-        {f.picks.length} of {basket.length} chosen
-      </b>
-      <span className="dim small">
-        {files} file{files === 1 ? "" : "s"}
-        {albums ? `, ${albums} as album${albums === 1 ? "" : "s"}` : ""}
+      <span className="find-pick-count">
+        <b>
+          {f.picks.length} of {basket.length} chosen
+        </b>
+        <span className="dim small">
+          {files} file{files === 1 ? "" : "s"}
+          {albums ? `, ${albums} as album${albums === 1 ? "" : "s"}` : ""}
+        </span>
       </span>
       <span className="grow" />
       {f.inBasket && !all && (
         <button className="btn ghost" onClick={() => useFind.setState({ picks: [...shown] })} disabled={f.pulling} title="Choose all of the basket (⌘A)">
-          Choose all
+          <span className="find-pick-verb">Choose </span>all
         </button>
       )}
       {f.picks.length > 0 && (
         <button className="btn ghost" onClick={f.clearPicks} disabled={f.pulling}>
-          Choose none
+          <span className="find-pick-verb">Choose </span>none
         </button>
       )}
       <button className="btn primary" onClick={() => void f.pull()} disabled={f.pulling || !f.picks.length}>
